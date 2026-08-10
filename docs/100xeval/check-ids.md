@@ -4,7 +4,9 @@ title: Static check IDs
 description: Every check the static linter emits, grouped by the sub-score its prefix feeds.
 resource: ../../plugins/100xeval/skills/100xeval/scripts/engine/lint.py
 tags: [100xeval, static, reference]
-timestamp: 2026-08-10T00:00:00Z
+generated:
+  by: claude-code/claude-opus-5
+  at: 2026-08-10T00:00:00Z
 ---
 
 # Static check IDs

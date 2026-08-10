@@ -4,7 +4,9 @@ title: Harness
 description: The runtime that executes a turn and observes what happened — one of the two independent execution axes.
 resource: ../../plugins/100xeval/skills/100xeval/scripts/engine/harnesses/base.py
 tags: [100xeval, evals, execution]
-timestamp: 2026-08-10T00:00:00Z
+generated:
+  by: claude-code/claude-opus-5
+  at: 2026-08-10T00:00:00Z
 ---
 
 # Harness

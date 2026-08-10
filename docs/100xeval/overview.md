@@ -4,7 +4,9 @@ title: 100xeval
 description: Behavioral and static evaluation for Claude Code plugins, answering whether a plugin actually gave the right answer.
 resource: ../../plugins/100xeval
 tags: [100xeval, evals, testing]
-timestamp: 2026-08-10T00:00:00Z
+generated:
+  by: claude-code/claude-opus-5
+  at: 2026-08-10T00:00:00Z
 ---
 
 # 100xeval

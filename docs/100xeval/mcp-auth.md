@@ -4,7 +4,9 @@ title: MCP auth
 description: Two authentication paths that produce two different tool-name schemes, and the failure that looks like nothing.
 resource: ../../plugins/100xeval/skills/100xeval/scripts/engine/harnesses/claude_code.py
 tags: [100xeval, mcp, auth]
-timestamp: 2026-08-10T00:00:00Z
+generated:
+  by: claude-code/claude-opus-5
+  at: 2026-08-10T00:00:00Z
 ---
 
 # MCP auth

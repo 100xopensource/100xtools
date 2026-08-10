@@ -4,7 +4,9 @@ title: Run folder
 description: The self-contained evidence every invocation writes, and where to look when a case goes red.
 resource: ../../plugins/100xeval/skills/100xeval/scripts/engine/reporter.py
 tags: [100xeval, debugging, reports]
-timestamp: 2026-08-10T00:00:00Z
+generated:
+  by: claude-code/claude-opus-5
+  at: 2026-08-10T00:00:00Z
 ---
 
 # Run folder

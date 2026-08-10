@@ -63,11 +63,18 @@ lifetimes:
 | `skills/<name>/SKILL.md` + `references/` | How should Claude operate it? | Yes |
 | `docs/` (OKF bundle) | What is this concept and why does it exist? | **No** |
 
-`docs/` is [Open Knowledge Format](https://okf.md/spec/) v0.1: one concept per file, YAML
-frontmatter, `type` required, `index.md`/`log.md` reserved. It is concept-only by design —
-it must never become load-bearing for operating a plugin, per invariant 1. Links inside it
-are relative rather than bundle-absolute so they resolve on GitHub; `docs/index.md` records
-that deviation.
+`docs/` is [Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
+v0.2: one concept per file, YAML frontmatter, `type` required, `index.md`/`log.md` reserved,
+provenance in a `generated: { by, at }` mapping whose `by` follows the spec's actor
+convention. The bundle root declares `okf_version` in `index.md` frontmatter — the one place
+a reserved file is allowed any.
+
+It is concept-only by design and must never become load-bearing for operating a plugin, per
+invariant 1. Links inside it are relative rather than bundle-absolute so they resolve on
+GitHub; `docs/index.md` records that deviation.
+
+`scripts/check_docs.py` enforces all of the above, plus check-ID sync and link resolution.
+It fails on a leftover v0.1 `timestamp` field, so a spec migration cannot half-happen.
 
 ## Commands
 

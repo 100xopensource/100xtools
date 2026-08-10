@@ -64,8 +64,9 @@ Each plugin's README carries its own full setup — start there:
 Each plugin's README tells you how to run it. If you want to understand *why* the pieces are
 shaped the way they are — what a grader is, what a `design_score` of 0.68 means, why
 `entrypoint` defaults to `none` — that lives in [`docs/`](./docs/index.md), written in
-[Open Knowledge Format](https://okf.md/spec/): one small file per concept, cross-linked, and
-readable by an agent that wants one idea rather than a whole guide.
+[Open Knowledge Format](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md)
+v0.2: one small file per concept, cross-linked, and readable by an agent that wants one idea
+rather than a whole guide.
 
 ## Repository layout
 

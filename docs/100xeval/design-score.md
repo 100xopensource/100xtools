@@ -4,7 +4,9 @@ title: Design score
 description: The static layer's 0-1 verdict on plugin design, folded from weighted sub-scores and a flag penalty.
 resource: ../../plugins/100xeval/skills/100xeval/scripts/engine/static.py
 tags: [100xeval, static, scoring]
-timestamp: 2026-08-10T00:00:00Z
+generated:
+  by: claude-code/claude-opus-5
+  at: 2026-08-10T00:00:00Z
 ---
 
 # Design score

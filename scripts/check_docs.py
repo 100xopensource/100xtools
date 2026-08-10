@@ -30,6 +30,15 @@ ENGINE = os.path.join(REPO, "plugins", "100xeval", "skills", "100xeval", "script
 CHECK_IDS_DOC = os.path.join(DOCS, "100xeval", "check-ids.md")
 
 RESERVED = {"index.md", "log.md"}
+OKF_VERSION = "0.2"
+ROOT_INDEX = os.path.join(DOCS, "index.md")
+
+# v0.1 fields that v0.2 replaced. Left in place they parse fine and mean nothing, so the
+# only thing that catches them is naming them.
+REMOVED_FIELDS = {"timestamp": "generated: { by, at }"}
+
+# §7 actor convention for identity fields: <producer>/<version>, human:<id>, process:<id>.
+_ACTOR = re.compile(r"^(?:[\w.-]+/[\w.-]+|human:[\w.-]+|process:[\w.-]+)$")
 
 # `  FM1  frontmatter name does not match …` inside lint.py's Check IDs block. One space
 # is enough after the ID: the longer `SEC1` entries align with one, and cosmetic alignment
@@ -60,33 +69,73 @@ def bundle_docs() -> list[str]:
     return out
 
 
+def _frontmatter(text: str) -> tuple[dict, str | None]:
+    """Top-level `key: value` pairs, plus nested one-level mappings as `parent.child`."""
+    if not text.startswith("---"):
+        return {}, "no YAML frontmatter block"
+    lines = text.splitlines()
+    end = next((i for i, ln in enumerate(lines[1:], start=1) if ln.strip() == "---"), None)
+    if end is None:
+        return {}, "frontmatter block is not closed"
+    fm, parent = {}, None
+    for ln in lines[1:end]:
+        if not ln.strip():
+            continue
+        m = re.match(r"^([A-Za-z_][\w.-]*):\s*(.*)$", ln)
+        if m:
+            parent = m.group(1)
+            fm[parent] = m.group(2).strip()
+            continue
+        m = re.match(r"^\s+([A-Za-z_][\w.-]*):\s*(.*)$", ln)
+        if m and parent:
+            fm[f"{parent}.{m.group(1)}"] = m.group(2).strip()
+    return fm, None
+
+
 def check_okf_conformance() -> list[str]:
-    """Every non-reserved .md needs frontmatter with a non-empty `type`."""
+    """OKF v0.2 §11: parseable frontmatter with a non-empty `type` on every concept doc."""
     errors = []
+    root_fm, _ = _frontmatter(read(ROOT_INDEX)) if os.path.isfile(ROOT_INDEX) else ({}, None)
+    if root_fm.get("okf_version", "").strip('"\'') != OKF_VERSION:
+        errors.append(
+            f"docs/index.md: bundle root must declare okf_version: \"{OKF_VERSION}\" "
+            f"(found {root_fm.get('okf_version') or 'nothing'})")
+
     for path in bundle_docs():
         rel = os.path.relpath(path, REPO)
         text = read(path)
+        fm, err = _frontmatter(text)
+
         if os.path.basename(path) in RESERVED:
-            # Reserved files carry no frontmatter; flag it if one crept in, since a
-            # consumer following the spec will not look for it there.
-            if text.startswith("---"):
+            # §8: reserved files carry no frontmatter, with one exception — the bundle-root
+            # index.md may declare okf_version, and nothing else.
+            if not text.startswith("---"):
+                continue
+            if path != ROOT_INDEX:
                 errors.append(f"{rel}: reserved file must not have frontmatter")
+            elif set(fm) - {"okf_version"}:
+                errors.append(
+                    f"{rel}: bundle-root index.md may only carry okf_version, "
+                    f"found {sorted(set(fm) - {'okf_version'})}")
             continue
-        if not text.startswith("---"):
-            errors.append(f"{rel}: no YAML frontmatter block")
+
+        if err:
+            errors.append(f"{rel}: {err}")
             continue
-        lines = text.splitlines()
-        end = next((i for i, ln in enumerate(lines[1:], start=1) if ln.strip() == "---"), None)
-        if end is None:
-            errors.append(f"{rel}: frontmatter block is not closed")
-            continue
-        fm = {}
-        for ln in lines[1:end]:
-            m = re.match(r"^([A-Za-z_][\w.-]*):\s*(.*)$", ln)
-            if m:
-                fm[m.group(1)] = m.group(2).strip()
         if not fm.get("type"):
             errors.append(f"{rel}: missing or empty `type` (the only field OKF requires)")
+
+        for dead, replacement in REMOVED_FIELDS.items():
+            if dead in fm:
+                errors.append(f"{rel}: `{dead}` was removed in OKF v0.2 — use `{replacement}`")
+
+        # §7: identity fields name an agent, a human, or a process, in a known shape.
+        for field in ("generated.by", "verified.by"):
+            actor = fm.get(field)
+            if actor and not _ACTOR.match(actor):
+                errors.append(
+                    f"{rel}: {field} {actor!r} does not match the actor convention "
+                    f"(<producer>/<version>, human:<id>, or process:<id>)")
     return errors
 
 

@@ -4,7 +4,9 @@ title: Entrypoint
 description: The surface being emulated — that surface's real system prompt, swapped in for the run.
 resource: ../../plugins/100xeval/skills/100xeval/scripts/engine/entrypoints/README.md
 tags: [100xeval, evals, execution]
-timestamp: 2026-08-10T00:00:00Z
+generated:
+  by: claude-code/claude-opus-5
+  at: 2026-08-10T00:00:00Z
 ---
 
 # Entrypoint

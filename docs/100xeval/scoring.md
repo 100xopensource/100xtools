@@ -4,7 +4,9 @@ title: Scoring
 description: How repeated runs become a pass rate, a weighted case score, and a pass/fail verdict.
 resource: ../../plugins/100xeval/skills/100xeval/scripts/engine/orchestrator.py
 tags: [100xeval, evals, scoring]
-timestamp: 2026-08-10T00:00:00Z
+generated:
+  by: claude-code/claude-opus-5
+  at: 2026-08-10T00:00:00Z
 ---
 
 # Scoring

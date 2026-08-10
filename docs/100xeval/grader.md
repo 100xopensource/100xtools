@@ -4,7 +4,9 @@ title: Grader
 description: One checkable claim about the result of a run, scored pass or fail.
 resource: ../../plugins/100xeval/skills/100xeval/scripts/engine/graders.py
 tags: [100xeval, evals, grading]
-timestamp: 2026-08-10T00:00:00Z
+generated:
+  by: claude-code/claude-opus-5
+  at: 2026-08-10T00:00:00Z
 ---
 
 # Grader

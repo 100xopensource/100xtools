@@ -4,7 +4,9 @@ title: Eval case
 description: The unit of work — one scenario, one folder, one case.yaml declaring the plugin, the prompt, and the graders.
 resource: ../../plugins/100xeval/skills/100xeval/scripts/engine/loader.py
 tags: [100xeval, evals, cases]
-timestamp: 2026-08-10T00:00:00Z
+generated:
+  by: claude-code/claude-opus-5
+  at: 2026-08-10T00:00:00Z
 ---
 
 # Eval case
