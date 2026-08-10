@@ -80,16 +80,24 @@ def score_from_findings(finding_msgs: list[str], token_efficiency: float) -> dic
 
 
 def token_efficiency(plugin_dir: str) -> float:
-    """Cheap proxy: penalize duplicate non-blank lines across SKILL.md files.
+    """Cheap proxy: penalize duplicate non-blank lines across a plugin's SKILL.md files.
 
-    Copy-pasted blocks across skills are the most common way a plugin quietly doubles
-    what it loads into context. This does not measure tokens; it measures the habit
-    that wastes them.
+    Copy-pasted blocks BETWEEN sibling skills are the most common way a plugin quietly
+    doubles what it loads into context, so `seen` spans the whole plugin rather than
+    resetting per file — scoped per file it only ever caught a skill repeating itself,
+    which is the rarer and cheaper mistake. Repetition inside one skill still counts.
+
+    This does not measure tokens; it measures the habit that wastes them.
+
+    The score is independent of walk order: for a line in N files, exactly N-1 of its
+    occurrences count as duplicates whichever file is visited first.
     """
     total = 0
     dupes = 0
-    for dirpath, _dirs, files in os.walk(plugin_dir):
-        for fn in files:
+    seen: set[str] = set()
+    for dirpath, dirnames, files in os.walk(plugin_dir):
+        dirnames.sort()  # stable traversal; the ratio doesn't depend on it, per-file reporting would
+        for fn in sorted(files):
             if fn != "SKILL.md":
                 continue
             try:
@@ -97,7 +105,6 @@ def token_efficiency(plugin_dir: str) -> float:
                     lines = [ln.strip() for ln in fh if ln.strip()]
             except OSError:
                 continue
-            seen: set[str] = set()
             for ln in lines:
                 if len(ln) < 20:  # ignore short/structural lines
                     continue

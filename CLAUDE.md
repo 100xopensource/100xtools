@@ -102,6 +102,12 @@ verb near the `../`, so config examples like `plugins: ["../../plugins/x"]` don'
 `static.analyze()` only reads `.msg` off each finding, so any module exposing
 `lint_plugin(dir, root)` can replace `lint.py`.
 
+`token_efficiency` is the one sub-score with no check ID behind it — it is computed
+directly in `static.py` by counting duplicate ≥20-char lines across **all** of a plugin's
+SKILL.md files. Its `seen` set spans the whole plugin on purpose: scoped per file it only
+caught a skill repeating itself and scored copy-paste between siblings at a clean 1.00,
+which is the case the metric exists for.
+
 ### MCP: strict mode and tool-name canonicalization
 
 Two auth paths, and they produce **different tool names**:

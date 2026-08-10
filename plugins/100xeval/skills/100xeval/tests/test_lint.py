@@ -211,6 +211,61 @@ class TestDiscovery(PluginFixture):
         self.assertEqual(lint.find_repo_root(self.plugin), self.root)
 
 
+class TestTokenEfficiency(PluginFixture):
+    """The metric exists to catch blocks copy-pasted BETWEEN sibling skills.
+
+    It originally reset its `seen` set per file, so it only ever caught a skill repeating
+    itself and scored a plugin with three identical instruction blocks at a clean 1.00 —
+    exactly the case it was documented as catching. Both directions are pinned here.
+    """
+
+    BLOCK = [
+        "Always cite the source table and the period the figures cover.",
+        "Refuse the request when it falls outside the configured data scope.",
+        "Present results as a markdown table, newest period first, with a total row.",
+    ]
+
+    def test_block_copied_between_sibling_skills_is_penalized(self):
+        body = "\n".join(self.BLOCK)
+        self.add_skill("alpha", "Reports on alpha metrics for one store.", body)
+        self.add_skill("beta", "Reports on beta metrics for one store.", body)
+        self.assertLess(static.token_efficiency(self.plugin), 1.0)
+
+    def test_skills_that_share_nothing_score_clean(self):
+        self.add_skill("alpha", "Reports on alpha metrics for one store.", "\n".join(self.BLOCK))
+        self.add_skill("beta", "Reports on beta metrics for one store.", "\n".join([
+            "Rank the top ten products by contribution margin for the window.",
+            "Exclude wholesale orders unless the question names them explicitly.",
+            "Round currency to whole units and state the currency in the header.",
+        ]))
+        self.assertEqual(static.token_efficiency(self.plugin), 1.0)
+
+    def test_repetition_inside_one_skill_still_counts(self):
+        self.add_skill("alpha", "Reports on alpha metrics for one store.",
+                       "\n".join(self.BLOCK + self.BLOCK))
+        self.assertLess(static.token_efficiency(self.plugin), 1.0)
+
+    def test_short_lines_are_ignored(self):
+        # Headings and terse bullets repeat across skills legitimately; penalizing them
+        # would make every well-structured plugin look wasteful.
+        shared = "## Usage\n\n- run it\n- read it\n"
+        self.add_skill("alpha", "Reports on alpha metrics for one store.", shared)
+        self.add_skill("beta", "Reports on beta metrics for one store.", shared)
+        self.assertEqual(static.token_efficiency(self.plugin), 1.0)
+
+    def test_more_duplication_scores_worse(self):
+        body = "\n".join(self.BLOCK)
+        self.add_skill("alpha", "Reports on alpha metrics for one store.", body)
+        self.add_skill("beta", "Reports on beta metrics for one store.", body)
+        two = static.token_efficiency(self.plugin)
+        self.add_skill("gamma", "Reports on gamma metrics for one store.", body)
+        self.assertLess(static.token_efficiency(self.plugin), two)
+
+    def test_single_skill_plugin_is_unaffected(self):
+        # The repo's own plugins ship one skill each; the fix must not move their score.
+        self.assertEqual(static.token_efficiency(self.plugin), 1.0)
+
+
 class TestStaticRunWiring(PluginFixture):
     """`run()` is what CI calls; the scorer being right doesn't help if this path breaks."""
 

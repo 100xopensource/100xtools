@@ -159,7 +159,7 @@ plugin and emits tagged findings; `engine/static.py` maps them to sub-scores:
 | `structural_completeness` | `P4` `S7` | no plugin README, a "self-check" that isn't a checklist |
 | `ecosystem_coherence` | `P3` | routing to a companion skill that doesn't exist |
 | `security` (weight ×2) | `X1` `X3` `X4` | committed secrets, unknown network destinations, `../` traversal |
-| `token_efficiency` (weight ×0.5) | — | duplicated blocks copy-pasted across skills |
+| `token_efficiency` (weight ×0.5) | — | instruction blocks copy-pasted between sibling skills, or repeated inside one |
 
 These encode *published* Claude Code skill guidance plus generic hygiene, deliberately
 conservative: a finding should mean "this is probably wrong", not "this differs from how we
