@@ -1,0 +1,30 @@
+# Secrets — never commit. Tokens are read from the environment at run time.
+.env
+.env.*
+!.env.example
+
+# Eval run output: transcripts, debug logs, and reports from every invocation.
+# These are large, machine-specific, and can contain data returned by your own MCP.
+evals/runs/
+**/evals/runs/
+
+# Surface system prompts are supplied by whoever operates that surface and are often
+# not redistributable. Keep local copies out of git; the engine only needs them at run time.
+plugins/100xeval/skills/100xeval/scripts/engine/entrypoints/*.md
+!plugins/100xeval/skills/100xeval/scripts/engine/entrypoints/README.md
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Claude Code local settings (machine-specific permissions, not project config)
+.claude/settings.local.json

@@ -1,0 +1,29 @@
+{
+  "name": "100xtools",
+  "owner": {
+    "name": "100x",
+    "url": "https://github.com/100xopensource"
+  },
+  "metadata": {
+    "description": "Open-source tooling for building and maintaining Claude Code plugins and skills.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "100xeval",
+      "source": "./plugins/100xeval",
+      "description": "Behavioral and static evaluation for Claude Code plugins: run a plugin against saved testcases, grade whether it queried the right data and presented it correctly, plus a run-free design-quality score.",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "keywords": ["evals", "testing", "plugins", "skills", "ci"]
+    },
+    {
+      "name": "drift-check",
+      "source": "./plugins/drift-check",
+      "description": "Cross-plugin drift review: when a PR edits a skill, find the sibling skills in your other plugins and report which siblings the change likely applies to. Non-blocking, report-only.",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "keywords": ["drift", "review", "skills", "plugins", "ci", "github-actions"]
+    }
+  ]
+}

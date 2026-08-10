@@ -1,0 +1,234 @@
+name: drift-check
+
+# Cross-plugin drift "vibe check".
+#
+# When a PR edits skill content, a headless Claude run reads the changed skills and their
+# siblings in other plugins, and posts a NON-BLOCKING report: which sibling plugins the
+# change likely applies to, and which are legitimate variations. Reviewers decide.
+#
+# Report-only by construction: Claude gets read-only tools plus the ability to write the
+# report file. Nothing merges, blocks, or commits based on this job.
+#
+# SETUP: copy this file to .github/workflows/drift-check.yml in your repo, adjust the
+# `paths:` filter to match your layout, and add a CLAUDE_CODE_OAUTH_TOKEN or
+# ANTHROPIC_API_KEY secret. Full instructions: plugins/drift-check/README.md.
+#
+# TRUST BOUNDARY: changes to this file should be reviewed by someone other than the author.
+
+on:
+  pull_request:
+    # labeled/unlabeled included so toggling skip-drift-check takes effect immediately
+    # (the default activity types would only apply the label on the next push)
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+    paths:
+      # ← adjust to your repo's layout
+      - "plugins/**/skills/**"
+
+permissions:
+  contents: read
+  pull-requests: write # sticky PR comment only
+
+# The wrap-up steps (fallback note, artifact upload, PR comment) run on success or failure
+# but NOT on cancellation (!cancelled() instead of always()): a superseded run killed
+# mid-review by cancel-in-progress must not post a false "failed" note — the newer run
+# owns the sticky comment.
+concurrency:
+  group: drift-check-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  drift-check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    # Unrelated label add/remove events never re-run the review. skip-drift-check label
+    # events DO run the job: with OPTED_OUT set, everything below is skipped except the
+    # opt-out note + sticky comment, which replace any earlier advisory in place — a stale
+    # advisory would otherwise keep describing an older revision with no hint that the
+    # check was opted out.
+    if: >-
+      ${{ (github.event.action != 'labeled' && github.event.action != 'unlabeled')
+      || github.event.label.name == 'skip-drift-check' }}
+    env:
+      OPTED_OUT: ${{ contains(github.event.pull_request.labels.*.name, 'skip-drift-check') }}
+      # secrets.* is not an allowed context inside if: expressions (the parser rejects the
+      # whole file) — derive a boolean here, where env values may read secrets.
+      HAS_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN != '' }}
+    steps:
+      - if: ${{ env.OPTED_OUT != 'true' }}
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0 # need the base branch for the diff
+
+      # Which skill files changed, and how many? Caps the blast radius: bulk changes
+      # (> 15 skills) get a "run the full pass manually" note instead of burning a Claude
+      # session judging every pair.
+      - name: Collect changed skill files
+        id: changed
+        if: ${{ env.OPTED_OUT != 'true' }}
+        # Non-blocking like everything else: a failed fetch/merge-base must not fail the
+        # job — empty outputs make the later conditions skip the Claude step, and the
+        # fallback note explains why.
+        continue-on-error: true
+        env:
+          # Never interpolate a github context value into run: — branch names are
+          # attacker-controllable input (script injection); pass through env instead.
+          BASE_REF: ${{ github.base_ref }}
+        run: |
+          # Full fetch (no --depth): a shallow base ref can yield a wrong merge base or
+          # "no merge base", silently missing real skill edits.
+          git fetch --no-tags origin "$BASE_REF"
+          BASE=$(git merge-base "origin/$BASE_REF" HEAD)
+          # D included: deleted skills are drift-relevant too (siblings may warrant the
+          # same removal, or now dangle references to the deleted skill).
+          git diff --name-only --diff-filter=ACMRD "$BASE" HEAD -- \
+            'plugins/**/skills/**' > changed-skill-files.txt
+          COUNT=$(grep -c . changed-skill-files.txt || true)
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          echo "base=$BASE"   >> "$GITHUB_OUTPUT"
+          echo "Changed skill files ($COUNT):"; cat changed-skill-files.txt
+
+      # Non-blocking by design: the workflow must not fail a PR whether the secret is
+      # missing, the model errors, or the report is empty — hence the fallback notes and
+      # continue-on-error below.
+      # The skip notes all append (>>): the first writer creates the file, and multiple
+      # applicable reasons combine instead of overwriting each other.
+      - name: Note when opted out via the skip-drift-check label
+        if: ${{ env.OPTED_OUT == 'true' }}
+        run: |
+          echo "_drift-check skipped: the \`skip-drift-check\` label is on this PR, so these changes got no drift review (remove the label to re-enable)._" >> drift-report.md
+
+      - name: Note when the changed-file list could not be computed
+        if: ${{ steps.changed.outcome == 'failure' }}
+        run: |
+          echo "_drift-check skipped: could not compute the changed-skill list (git fetch / merge-base failed — see the Actions log)._" >> drift-report.md
+
+      - name: Note when the OAuth token is not configured
+        if: ${{ env.OPTED_OUT != 'true' && env.HAS_TOKEN != 'true' }}
+        run: |
+          echo "_drift-check skipped: \`CLAUDE_CODE_OAUTH_TOKEN\` secret is not configured (generate with \`claude setup-token\`)._" >> drift-report.md
+
+      - name: Note when the PR is too bulky to judge pair-by-pair
+        if: ${{ steps.changed.outputs.count > 15 }}
+        env:
+          COUNT: ${{ steps.changed.outputs.count }}
+        run: |
+          echo "_drift-check skipped: $COUNT skill files changed (cap is 15)._" >> drift-report.md
+          echo "_For bulk changes, run the baseline pass locally: ask Claude in this repo to review cross-plugin drift for the touched plugins._" >> drift-report.md
+
+      - name: Cross-plugin drift review (headless Claude, non-blocking)
+        id: drift               # the upload step below reads outputs.execution_file
+        if: ${{ env.OPTED_OUT != 'true' && env.HAS_TOKEN == 'true' && steps.changed.outputs.count > 0 && steps.changed.outputs.count <= 15 }}
+        # STEP-level timeout, deliberately: a hung review dies here as an ordinary step
+        # failure (continue-on-error), so the wrap-up steps still post the Critical note.
+        # A JOB-level timeout presents as a cancellation, which the !cancelled() gates
+        # skip — keep this below timeout-minutes on the job.
+        timeout-minutes: 15
+        continue-on-error: true
+        uses: anthropics/claude-code-action@12531344451323133b0493233c759991ac61da12 # v1.0.174
+        with:
+          # Auth: a token from `claude setup-token`, stored as the CLAUDE_CODE_OAUTH_TOKEN
+          # repo secret. Runs bill against the token owner's plan limits — for a team repo,
+          # prefer an organization API key (anthropic_api_key) over a personal token.
+          #
+          # Explicit workflow token: without it the action tries an OIDC → GitHub-App token
+          # exchange, which needs id-token: write (not granted here) and fails with
+          # "Unable to get ACTIONS_ID_TOKEN_REQUEST_URL". Claude needs no GitHub API access
+          # here anyway — the sticky comment is posted by the github-script step below.
+          github_token: ${{ github.token }}
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Read-only plus the report file. No Edit, no network, no git write — the
+          # prompt-injection mitigation is structural rather than instructional, because
+          # the skill reads contributor-authored content. The tool allowlist stays HERE
+          # (permissions belong to the caller), not in the skill.
+          #
+          # Model comes from an Actions VARIABLE (repo Settings → Secrets and variables →
+          # Actions → Variables → DRIFT_CHECK_MODEL) so retuning the pin needs no workflow
+          # PR; falls back to Sonnet when unset.
+          claude_args: |
+            --model ${{ vars.DRIFT_CHECK_MODEL || 'claude-sonnet-4-6' }}
+            --max-turns 50
+            --allowedTools Read,Grep,Glob,Write,Bash(git diff:*),Bash(git log:*),Bash(git show:*),Bash(cat:*),Bash(ls:*)
+            --disallowedTools Edit,NotebookEdit,WebFetch,WebSearch
+          # The drift-review contract lives in the drift-check skill — one prompt shared by
+          # CI and local runs (/drift-check), and a trust-boundary file like this one. The
+          # argument is the merge-base SHA; the skill reads changed-skill-files.txt from
+          # the workspace and writes drift-report.md for the comment step below.
+          prompt: "/drift-check ${{ steps.changed.outputs.base }}"
+
+      - name: Fallback note when the review produced no report
+        if: ${{ !cancelled() }}
+        env:
+          COUNT: ${{ steps.changed.outputs.count }}
+        run: |
+          # Disambiguate the no-report cases: zero changed skills is a benign no-op
+          # (warning); an UNSET count means the job aborted before collect ran — e.g.
+          # checkout failed — so Claude never started (infra failure, critical); a real
+          # count with no report means Claude ran silently (model failure, critical).
+          # Both failure notes start "drift-check failed" for the classifier below.
+          if [ ! -s drift-report.md ]; then
+            if [ "$COUNT" = "0" ]; then
+              echo "_drift-check skipped: no skill files changed against the merge base — nothing to review._" > drift-report.md
+            elif [ -z "$COUNT" ]; then
+              echo "_drift-check failed: the job aborted before the changed-skill list was computed (checkout or an earlier step failed) — the review never started. See the Actions log._" > drift-report.md
+            else
+              echo "_drift-check failed: the review ran but produced no report (model error or review timeout) — see the Actions log._" > drift-report.md
+            fi
+          fi
+
+      # Persist the run's evidence: Claude's full execution transcript (every message,
+      # tool call, and result — the action's execution_file output), the report, and the
+      # changed-file list. Downloadable from the run page; note that artifacts are visible
+      # to anyone with read access to the repo.
+      - name: Upload drift-check artifacts
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: drift-check-pr${{ github.event.pull_request.number }}-run${{ github.run_attempt }}
+          path: |
+            drift-report.md
+            changed-skill-files.txt
+            ${{ steps.drift.outputs.execution_file }}
+          if-no-files-found: ignore   # skipped / opted-out runs may produce nothing
+          retention-days: 7
+
+      - name: Comment drift report on PR (sticky, non-blocking)
+        if: ${{ !cancelled() }}
+        continue-on-error: true
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
+        with:
+          script: |
+            const fs = require('fs');
+            let body = '(no output)';
+            try { body = fs.readFileSync('drift-report.md', 'utf8') || body; } catch {}
+            if (body.length > 60000) body = body.slice(0, 60000);  // PR comment cap is 65536
+            const marker = '<!-- drift-check-report -->';
+            // Status category. The skill writes a drift-status marker as the report's
+            // first line (critical = conflicts verdict, warning = likely-applies/unclear,
+            // good = plugin-specific only). Workflow-generated skip/fallback notes have no
+            // marker — classify them here: a broken check is critical, everything else
+            // (token missing, opt-out, bulk cap) is a warning. Unknown → warning.
+            let status = 'warning';
+            const statusMatch = body.match(/<!--\s*drift-status:\s*(critical|warning|good)\s*-->/i);
+            const skipped = !statusMatch && body.trim().startsWith('_drift-check');
+            if (statusMatch) {
+              status = statusMatch[1].toLowerCase();
+              body = body.replace(statusMatch[0], '').trim();
+            } else if (skipped && /could not compute|drift-check failed/.test(body)) {
+              status = 'critical';
+            }
+            const meta = {
+              critical: { icon: '🔴', label: 'Critical', blurb: 'a change conflicts with a sibling plugin, or the check itself is broken — look before merging.' },
+              warning:  { icon: '🟡', label: 'Warning',  blurb: 'nothing is broken, but findings below need a human decision (or the review could not fully run).' },
+              good:     { icon: '🟢', label: 'Good',     blurb: 'no cross-plugin concerns — siblings are unaffected or legitimately different.' },
+            }[status];
+            const intro = skipped
+              ? `_Non-blocking. ${meta.blurb} Reason below._`
+              : `_Non-blocking. ${meta.blurb} Reviewers decide apply/ignore per plugin._`;
+            const message = `${marker}\n## ${meta.icon} Cross-plugin drift check — ${meta.label}\n${intro}\n\n${body}`;
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(github.rest.issues.listComments, { owner, repo, issue_number });
+            const prev = comments.find(c => c.body?.includes(marker));
+            if (prev) await github.rest.issues.updateComment({ owner, repo, comment_id: prev.id, body: message });
+            else      await github.rest.issues.createComment({ owner, repo, issue_number, body: message });

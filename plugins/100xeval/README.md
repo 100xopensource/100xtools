@@ -1,0 +1,196 @@
+# 100xeval — run evals on a plugin, and grow the eval dataset
+
+100xeval answers one question: **did this plugin actually give the right answer?** It runs
+a plugin for real, then grades what came back.
+
+Two layers:
+
+- **Behavioral** — really runs the plugin with its own MCP attached, then checks that it
+  queried the right data (`tool_used`), presented it correctly (`llm` format judge), and,
+  where it matters, that the *numbers* are right (`llm` agentic judge against a ground-truth
+  query you supply).
+- **Static** — a free, run-free design-quality score per plugin from the bundled linter.
+  No model, no network, no API key.
+
+It is a self-contained plugin: the skill (the front door) and the Python engine ship
+together. **Python 3.11+, stdlib only** — no `pip install`, no virtualenv, no lockfile.
+
+---
+
+## Get started
+
+**1. Load it and just ask.** The skill drives the engine, so you don't need the flags:
+
+```bash
+claude --plugin-dir plugins/100xeval
+```
+
+> *"run the evals for asksales"* · *"static-check plugins/my-plugin"* ·
+> *"add a testcase for askinventory"*
+
+**2. Or drive the engine directly**, from your repo root:
+
+```bash
+RUN=plugins/100xeval/skills/100xeval/scripts/run.py
+
+python3 "$RUN" eval --static-only --target plugins/<name>   # free, no run, start here
+python3 "$RUN" eval --case '<case-name>' --runs 1           # one case, debugging pass
+python3 "$RUN" eval --tag <suite>                           # a whole suite
+```
+
+Exit codes: `0` all pass · `1` a case below `--threshold` · `2` engine error. That makes
+`eval` usable directly as a CI gate.
+
+**3. Behavioral runs need model auth**, and MCP auth if your plugin declares an MCP server.
+Set `ANTHROPIC_API_KEY` (or be logged into Claude Code), then either authenticate the
+connector interactively (`claude` → `/mcp`) or inject a bearer token for headless runs:
+
+```bash
+export EVAL_MCP_BEARER='<service-token>'      # applied to every declared server
+python3 "$RUN" eval --tag <suite>
+```
+
+Token injection is also the **higher-fidelity** path: the runner isolates the run to the
+plugin's *own* declared MCP with `--mcp-config … --strict-mcp-config`, ignoring whatever
+account connector happens to be logged in on your machine. Runs then behave the same
+locally and in CI. The token is read from the environment only — never committed, never
+written into any `.mcp.json`.
+
+**Preflight before you spend.** A blocked endpoint otherwise burns a whole suite scoring
+zero. The runner checks `claude mcp list` and aborts with guidance rather than producing a
+misleading dataless run — but if your MCP sits behind an IP allowlist, confirm your egress
+is allowed before starting a large suite.
+
+**4. Read the run folder.** Every invocation writes a self-contained
+`evals/runs/<run_id>/<case>/`: the full `cases.json`, per-run `result.json` + transcript +
+`claude --debug-file` log, `scorecard.json`, and `report.{md,json,html}` with cost and
+token usage split run vs judge. When something fails, the answer is in there.
+
+---
+
+## The eval dataset
+
+Cases live at `evals/<case-name>/case.yaml` — one scenario per folder, plain YAML, no
+index or registry. A case names the plugin, the prompt, and the graders:
+
+```yaml
+name: asksales-slowest-hours
+description: >-
+  What this case proves. Source: who asked for it (issue id).
+plugins: ["../../plugins/acme-analytics"]   # relative to THIS file
+tags: [acme, asksales]                      # select with --tag
+runs: 3
+execution:
+  prompt: "What were the slowest hours at the Northgate store last week?"
+  model: claude-sonnet-5
+  harness: claude_code        # the RUNTIME that executes the turn
+  entrypoint: none            # the SURFACE emulated; `none` = the harness's own prompt
+  allowed_tools: [Read, Glob, Grep, Skill, mcp__Acme__run_query]
+  mcp_config: ../mcp-config.json
+graders:
+  - {type: tool_used, name: filtered-to-store, tool: mcp__Acme__run_query, input_match: "Northgate", min: 1}
+  - {type: llm, name: presentation, focus: last_message, criteria: "cites source; clear table; disclaimer"}
+```
+
+Scaffold one with `python3 "$RUN" init <name> --plugin plugins/<p> --tag <skill> --prompt
+"<question>"`, then edit.
+
+`harness` and `entrypoint` are independent axes and easy to confuse. `harness` is the
+**runtime** (`claude_code`). `entrypoint` is the **surface** whose system prompt gets
+swapped in. No entrypoint files ship with this repo — a surface's system prompt belongs to
+whoever operates that surface — so the default `none` runs on Claude Code's own prompt. See
+`skills/100xeval/scripts/engine/entrypoints/README.md` to add your own.
+
+---
+
+## Best practice for the dataset
+
+Distilled from actually running it — the full versions, with the evidence, are in
+[`references/managing-testcases.md`](skills/100xeval/references/managing-testcases.md).
+
+**Assert the query shape, not the figure.** `tool_used` with `input_match` survives next
+week's data; a hard-coded number is a scheduled false failure.
+
+**When you must check numbers, hardcode the query in the criteria.** Left to itself the
+judge writes a different query per vote and the "ground truth" moves, so a failure tells
+you nothing. Verify the query by lifting it from a successful run — and don't trust the
+plugin's own docs for table names.
+
+**Keep `runs: 3`.** Skills are non-deterministic: one case answered `0.148×` (correct) and
+`0.24×` (62% off) to the same prompt. A single run reports a coin flip as a fact.
+
+**One claim per grader.** When a case fails you want the scorecard to name *which*
+property broke.
+
+**Grade what the prompt asks.** A criterion the user never requested fails correct
+answers. If you add a stricter rule of your own, say so in a comment.
+
+**Cover more than the happy path.** A suite of well-formed in-scope questions tests
+little. Include a case the plugin should **refuse** (assert `tool_used` `min: 0, max: 0`),
+one a sibling skill owns, and one exercising a documented business rule.
+
+**Expect the first run to debug the case, not the skill.** Measured across the first six
+cases we wrote, case defects outnumbered skill defects about **3:1** — wrong table,
+ungranted tool, over-strict criteria, an off-by-one date bound. Budget a `--runs 1` pass
+for it.
+
+**Park, don't delete.** `skip: "<reason>"` keeps the scenario and prints the reason every
+run. Deleting a case deletes the regression it guards — and never delete one to make a
+suite green.
+
+**Mind the cost.** Judges are up to nine extra model calls per case; a case at `runs: 3`
+lands around $3–5. Reports break out `Run $ / Judge $ / Total $`.
+
+**No secrets in a case, ever.** `mcp_config` holds a *path*; the config it points to uses
+`Bearer ${EVAL_MCP_BEARER}`, expanded from the environment at run time.
+
+---
+
+## The static layer
+
+`--static-only` scores plugin *design* with no model call at all. `engine/lint.py` walks the
+plugin and emits tagged findings; `engine/static.py` maps them to sub-scores:
+
+| Sub-score | Fed by | Catches |
+| --- | --- | --- |
+| `frontmatter_quality` | `P2` `S13` | name/dir mismatch, missing or first-person description, unknown keys |
+| `progressive_disclosure` | `S2` `S5` | SKILL.md over the 500-line cap, dangling `references/` |
+| `reference_hygiene` | `S4` `S11` | references nobody is told to read, references pointing at references |
+| `structural_completeness` | `P4` `S7` | no plugin README, a "self-check" that isn't a checklist |
+| `ecosystem_coherence` | `P3` | routing to a companion skill that doesn't exist |
+| `security` (weight ×2) | `X1` `X3` `X4` | committed secrets, unknown network destinations, `../` traversal |
+| `token_efficiency` (weight ×0.5) | — | duplicated blocks copy-pasted across skills |
+
+These encode *published* Claude Code skill guidance plus generic hygiene, deliberately
+conservative: a finding should mean "this is probably wrong", not "this differs from how we
+write skills". House-style rules belong in your fork of `lint.py`, not here. Extend the
+allowed network destinations with `EVAL_LINT_ALLOWED_DOMAINS=internal.corp,cdn.example`.
+
+---
+
+## Layout
+
+```
+.claude-plugin/plugin.json              manifest
+skills/100xeval/
+├── SKILL.md                            the model-invoked skill (the front door)
+├── references/
+│   ├── case-schema.md                  every case.yaml field + every grader parameter
+│   └── managing-testcases.md           lifecycle, best practice, gotchas, reading a red scorecard
+└── scripts/
+    ├── run.py                          CLI entrypoint
+    └── engine/                         loader · orchestrator · graders · judge · reporter · lint · static
+        ├── entrypoints/                surface system prompts (none ship — see its README)
+        ├── harnesses/                  runtimes: claude_code · codex (seam)
+        └── tests/                      stdlib unittest, no live calls
+```
+
+## Tests
+
+```bash
+cd plugins/100xeval/skills/100xeval/scripts
+python3 -m unittest discover -s engine/tests -p 'test_*.py'
+```
+
+The `cd` matters — tests import `engine.*`, so `scripts/` must be the cwd. No live model or
+MCP calls; the suite runs offline.
