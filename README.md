@@ -59,13 +59,23 @@ Each plugin's README carries its own full setup — start there:
 - **An Anthropic API key or Claude Code login** for anything that actually calls a model.
   The static layer needs neither.
 
+## Concepts
+
+Each plugin's README tells you how to run it. If you want to understand *why* the pieces are
+shaped the way they are — what a grader is, what a `design_score` of 0.68 means, why
+`entrypoint` defaults to `none` — that lives in [`docs/`](./docs/index.md), written in
+[Open Knowledge Format](https://okf.md/spec/): one small file per concept, cross-linked, and
+readable by an agent that wants one idea rather than a whole guide.
+
 ## Repository layout
 
 ```
 .claude-plugin/marketplace.json   the marketplace manifest (one entry per plugin)
+docs/                             OKF knowledge bundle — concepts, not how-to
 plugins/
 ├── 100xeval/                     eval engine + skill
 └── drift-check/                  drift review skill + GitHub Actions workflow
+scripts/check_docs.py             bundle conformance + check-ID sync (runs in CI)
 ```
 
 One repo, one folder per tool. Each plugin is self-contained: you can copy a single

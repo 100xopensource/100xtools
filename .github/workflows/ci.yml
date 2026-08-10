@@ -54,6 +54,19 @@ jobs:
           python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --report static.md
           { echo '## 100xeval — static design quality'; echo; cat static.md; } >> "$GITHUB_STEP_SUMMARY"
 
+  # Separate job so documentation drift reads distinctly from a test failure — they call
+  # for different fixes, and a merged job makes the summary ambiguous.
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Validate the docs/ knowledge bundle
+        run: python3 scripts/check_docs.py
+
   manifests:
     runs-on: ubuntu-latest
     steps:
