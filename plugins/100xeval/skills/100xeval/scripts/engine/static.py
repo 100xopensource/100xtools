@@ -135,21 +135,59 @@ def token_efficiency(plugin_dir: str) -> float:
     return max(0.0, 1.0 - dupes / total)
 
 
+class TargetError(ValueError):
+    """`--target` is not a plugin, or discovery found none. A usage error, not a low score."""
+
+
+def _require_plugin(path: str) -> None:
+    """Refuse to 'score' something that is not a plugin.
+
+    Without this, a typo'd --target scored 0.92: `lint_plugin` on a non-existent directory
+    finds no README and no skills/, emits exactly one ST1, and returns a respectable number.
+    A gate that reports a passing score for a path that isn't there is worse than no gate,
+    because nothing about the output says it evaluated nothing.
+    """
+    if not os.path.isdir(path):
+        raise TargetError(f"--target {path!r} is not a directory")
+    if not os.path.isfile(os.path.join(path, ".claude-plugin", "plugin.json")):
+        raise TargetError(
+            f"--target {path!r} is not a plugin — no .claude-plugin/plugin.json inside it")
+
+
 def analyze(plugin_dir: str) -> dict:
     """Lint one plugin and compute its design score."""
     plugin_dir = os.path.abspath(plugin_dir)
     root = lint.find_repo_root(plugin_dir)
     findings = lint.lint_plugin(plugin_dir, root)
     result = score_from_findings([f.msg for f in findings], token_efficiency(plugin_dir))
-    result["path"] = os.path.relpath(plugin_dir, root)
+    # `relpath` is "." whenever the plugin IS the detected root — the normal case for a
+    # developer with a single plugin and no surrounding repo. "## ." names nothing.
+    rel = os.path.relpath(plugin_dir, root)
+    result["path"] = os.path.basename(plugin_dir) if rel == "." else rel
     result["findings"] = [f"{f.where}: {f.msg}" for f in findings]
     return result
 
 
 def run(root: str, targets: list[str] | None = None) -> dict:
-    """Analyze the given plugin paths, or discover every plugin under the repo."""
-    if not targets:
-        targets = lint.discover_plugins(lint.find_repo_root(os.path.abspath(root)))
+    """Analyze the given plugin paths, or discover every plugin under the repo.
+
+    Raises TargetError rather than returning an empty, cheerful report: "scored nothing"
+    and "scored everything and it passed" must not look the same to a caller.
+    """
+    if targets:
+        for t in targets:
+            _require_plugin(t)
+    else:
+        # `root` is the CASE root (`evals/`), which is the wrong place to look for plugins
+        # and often does not exist yet. Fall back to the working directory so that running
+        # this inside a project containing plugins just works.
+        start = root if os.path.isdir(root) else os.getcwd()
+        search_root = lint.find_repo_root(os.path.abspath(start))
+        targets = lint.discover_plugins(search_root)
+        if not targets:
+            raise TargetError(
+                f"no plugins found under {search_root} — a plugin is a directory containing "
+                f".claude-plugin/plugin.json. Point at one with --target <dir>.")
     plugins = []
     ok = True
     for t in targets:

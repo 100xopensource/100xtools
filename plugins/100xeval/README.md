@@ -19,27 +19,44 @@ together. **Python 3.11+, stdlib only** — no `pip install`, no virtualenv, no 
 
 ## Get started
 
-**1. Load it and just ask.** The skill drives the engine, so you don't need the flags:
+**1. Install it.** From Claude Code:
 
-```bash
-claude --plugin-dir plugins/100xeval
+```
+/plugin marketplace add 100xopensource/100xtools
+/plugin install 100xeval
 ```
 
-> *"run the evals for asksales"* · *"static-check plugins/my-plugin"* ·
-> *"add a testcase for askinventory"*
+Or point at a clone: `claude --plugin-dir plugins/100xeval`.
 
-**2. Or drive the engine directly**, from your repo root:
+**2. Just ask.** The skill drives the engine, so you don't need any flags — this is the
+whole interface for most people:
+
+> *"static-check my plugin"* · *"run the evals for asksales"* ·
+> *"add a testcase for askinventory"* · *"why did it score 0.92?"*
+
+**3. Or drive the engine directly.** Start with the static check: it is free, needs no API
+key, and touches no network.
 
 ```bash
 RUN=plugins/100xeval/skills/100xeval/scripts/run.py
 
-python3 "$RUN" eval --static-only --target plugins/<name>   # free, no run, start here
-python3 "$RUN" eval --case '<case-name>' --runs 1           # one case, debugging pass
-python3 "$RUN" eval --tag <suite>                           # a whole suite
+python3 "$RUN" eval --static-only --target <your-plugin-dir>   # free — start here
+python3 "$RUN" eval --static-only                              # every plugin it can find
+python3 "$RUN" eval --case '<case-name>' --dry-run             # what would run, and rough cost
+python3 "$RUN" eval --case '<case-name>' --runs 1              # one case, for real
+python3 "$RUN" eval --tag <suite>                              # a whole suite
 ```
 
-Exit codes: `0` all pass · `1` a case below `--threshold` · `2` engine error. That makes
-`eval` usable directly as a CI gate.
+The static check prints the findings behind each score, so a `0.92` tells you *which* rule
+fired and in which file. A `--target` that is not a plugin is an error (exit `2`), not a
+score — it will not quietly hand you a passing number for a path that isn't there.
+
+**Behavioral runs cost real money.** Roughly $1–2 per run, and `runs: 3` with `llm` graders
+lands around $3–5 for a single case. Use `--dry-run` first; it lists what would execute and
+the rough spend without spending it.
+
+Exit codes: `0` all pass · `1` a case below `--threshold` · `2` usage or engine error. That
+makes `eval` usable directly as a CI gate.
 
 **3. Behavioral runs need model auth**, and MCP auth if your plugin declares an MCP server.
 Set `ANTHROPIC_API_KEY` (or be logged into Claude Code), then either authenticate the

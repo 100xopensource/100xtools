@@ -221,6 +221,84 @@ class TestDiscovery(PluginFixture):
         self.assertEqual(lint.find_repo_root(self.plugin), self.root)
 
 
+class TestTargetValidation(PluginFixture):
+    """A static run must never report a score for something it did not evaluate.
+
+    A typo'd --target used to score 0.92: linting a non-existent directory finds no README
+    and no skills/, emits exactly one ST1, and produces a respectable number with exit 0.
+    """
+
+    def test_missing_target_raises(self):
+        with self.assertRaises(static.TargetError) as ctx:
+            static.run(self.root, targets=[os.path.join(self.root, "nope")])
+        self.assertIn("not a directory", str(ctx.exception))
+
+    def test_non_plugin_directory_raises(self):
+        plain = os.path.join(self.root, "just-a-folder")
+        os.makedirs(plain)
+        with self.assertRaises(static.TargetError) as ctx:
+            static.run(self.root, targets=[plain])
+        self.assertIn("plugin.json", str(ctx.exception))
+
+    def test_discovery_finding_nothing_raises(self):
+        # Needs its OWN tree: the fixture root holds plugins/demo, and discovery correctly
+        # walks up to find it, so an "empty" subdirectory of it is not actually empty.
+        with tempfile.TemporaryDirectory() as bare:
+            with self.assertRaises(static.TargetError) as ctx:
+                static.run(bare)
+        self.assertIn("no plugins found", str(ctx.exception))
+
+    def test_valid_target_still_scores(self):
+        rep = static.run(self.root, targets=[self.plugin])
+        self.assertTrue(rep["ok"])
+        self.assertEqual(rep["plugins"][0]["design_score"], 1.0)
+
+
+class TestPluginNaming(unittest.TestCase):
+    """`## .` names nothing — and it is what a standalone plugin used to report.
+
+    Built without PluginFixture on purpose: that fixture nests the plugin under `plugins/`,
+    which gives `find_repo_root` a marker and hides the bug behind a real relative path.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        # A bare plugin directory — no plugins/, no .git, no marketplace.json above it.
+        self.plugin = os.path.join(self.tmp.name, "my-plugin")
+        write(os.path.join(self.plugin, ".claude-plugin", "plugin.json"), '{"name": "my-plugin"}')
+
+    def test_standalone_plugin_reports_its_own_name(self):
+        self.assertEqual(static.analyze(self.plugin)["path"], "my-plugin")
+
+    def test_nested_plugin_keeps_its_relative_path(self):
+        # The fix must not flatten a plugin that genuinely sits inside a repo.
+        nested = os.path.join(self.tmp.name, "plugins", "inner")
+        write(os.path.join(nested, ".claude-plugin", "plugin.json"), '{"name": "inner"}')
+        self.assertEqual(static.analyze(nested)["path"], os.path.join("plugins", "inner"))
+
+    def test_findings_are_attributed_to_a_named_path(self):
+        findings = lint.lint_plugin(self.plugin)     # no root → plugin IS the root
+        self.assertTrue(findings)
+        self.assertEqual(findings[0].where, "my-plugin")
+
+
+class TestFindingsAreVisible(PluginFixture):
+    """A sub-score names a category; only the findings name something you can fix."""
+
+    def test_render_includes_findings(self):
+        from engine import cli
+        os.remove(os.path.join(self.plugin, "README.md"))
+        rendered = cli.static_render(static.run(self.root, targets=[self.plugin]))
+        self.assertIn("ST1", rendered)
+        self.assertIn("findings", rendered)
+
+    def test_clean_plugin_says_so(self):
+        from engine import cli
+        rendered = cli.static_render(static.run(self.root, targets=[self.plugin]))
+        self.assertIn("No findings", rendered)
+
+
 class TestCheckIdContract(unittest.TestCase):
     """The ID prefix is the mapping to a sub-score, so the two files must agree.
 

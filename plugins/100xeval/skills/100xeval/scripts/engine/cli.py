@@ -19,6 +19,19 @@ from . import loader, reporter
 from .orchestrator import run_case
 
 DEFAULT_ROOT = "evals"
+# `run.py` beside the engine package — used to print copy-pasteable next steps.
+RUN_PY = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "run.py")
+
+
+def _run_py() -> str:
+    """The shortest path to run.py that actually works from here.
+
+    A relative path is only friendlier when it is shorter. Installed outside the user's
+    tree it becomes `../../../Users/...`, which is worse than the absolute path and reads
+    like a bug.
+    """
+    rel = os.path.relpath(RUN_PY)
+    return rel if not rel.startswith("..") else RUN_PY
 
 
 def _new_run_id() -> str:
@@ -46,8 +59,11 @@ execution:
   allowed_tools: [Read, Glob, Grep, Skill]
   append_system_prompt: null
 graders:
-  - {{type: tool_used, name: queried-right-data, tool: mcp__claude_ai_Acme__run_query, min: 1}}
-  - {{type: llm, name: presentation, focus: last_message, criteria: "cites source; clear table; disclaimer"}}
+  # Assert the SHAPE of the query, not a figure — a hard-coded number is a scheduled
+  # false failure. Replace <your-mcp-tool> with a tool your plugin actually calls, e.g.
+  # mcp__<Server>__<tool>; delete this grader if your plugin declares no MCP.
+  - {{type: tool_used, name: queried-right-data, tool: <your-mcp-tool>, min: 1}}
+  - {{type: llm, name: presentation, focus: last_message, criteria: "<what a good answer looks like>"}}
 """
 
 
@@ -89,6 +105,8 @@ def main(argv=None) -> int:
     p_eval.add_argument("--json", dest="json_path", default=None, help="write JSON here")
     p_eval.add_argument("--html", dest="html_path", default=None, help="write HTML here")
     p_eval.add_argument("--verbose", action="store_true")
+    p_eval.add_argument("--dry-run", dest="dry_run", action="store_true",
+                        help="list what would run and the rough spend, without running it")
 
     args = ap.parse_args(argv)
     if args.command == "init":
@@ -115,7 +133,14 @@ def _cmd_init(args) -> int:
         text = text.replace('"<the user question, verbatim>"', f'"{args.prompt}"')
     with open(path, "w", encoding="utf-8") as fh:
         fh.write(text)
-    print(f"wrote {path}")
+    # A scaffold that does not say what to do next is a dead end: the stub still has
+    # placeholders in it, and running it as-is spends money to fail.
+    print(f"wrote {path}\n")
+    print("Next:")
+    print(f"  1. edit {path} — replace <your-mcp-tool> and the grader criteria")
+    print(f"  2. dry run:  python3 {_run_py()} eval --case {args.name} --dry-run")
+    print(f"  3. for real: python3 {_run_py()} eval --case {args.name} --runs 1")
+    print("\n     A behavioral run costs real money (~$1-2 per run, more with llm graders).")
     return 0
 
 
@@ -127,7 +152,11 @@ def _cmd_eval(args) -> int:
     # Static layer (optional; import guarded so behavioral works even if unavailable).
     static_report = None
     if not args.skip_static:
-        static_report = _run_static(args)
+        try:
+            static_report = _run_static(args)
+        except _StaticUsageError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
         if args.static_only:
             _emit_static(static_report, args)
             return 0 if (static_report or {}).get("ok", True) else 1
@@ -151,6 +180,23 @@ def _cmd_eval(args) -> int:
             print(f"⏭  skipping {c.name}: {c.skip}")
     if not cases:
         print("no matching cases — nothing to run (not an error).")
+        return 0
+
+    if args.dry_run:
+        # Behavioral runs spend real money, and the first one a user tries is usually a
+        # freshly scaffolded case that still has placeholders in it. Let them look first.
+        total_runs = sum(args.runs or c.runs for c in cases)
+        judges = sum(1 for c in cases for g in c.graders if g.type == "llm")
+        print(f"\ndry run — {len(cases)} case(s), {total_runs} plugin run(s), "
+              f"{judges} llm grader(s)\n")
+        for c in cases:
+            n = args.runs or c.runs
+            print(f"  {c.name}  ×{n}  [{c.label()}]  {len(c.graders)} grader(s)")
+            for g in c.graders:
+                print(f"      - {g.type}: {g.name}")
+        print(f"\n  Rough spend: ${total_runs * 1.0:.0f}-${total_runs * 2.0 + judges * 1.0:.0f}. "
+              f"Judges are extra model calls on top of each run.")
+        print("  Nothing was executed. Drop --dry-run to run it.")
         return 0
 
     # One self-contained run directory: workspace + artifacts + reports.
@@ -241,6 +287,10 @@ def _load_judge_system_prompt(value):
     return value
 
 
+class _StaticUsageError(Exception):
+    """Wraps static.TargetError so _cmd_eval can exit 2 rather than reporting a score."""
+
+
 def _run_static(args):
     try:
         from . import static as static_mod
@@ -249,7 +299,10 @@ def _run_static(args):
             print(f"(static layer unavailable: {exc})", file=sys.stderr)
         return None
     targets = [args.target] if args.target else None
-    return static_mod.run(args.root, targets=targets)
+    try:
+        return static_mod.run(args.root, targets=targets)
+    except static_mod.TargetError as exc:
+        raise _StaticUsageError(str(exc)) from exc
 
 
 def _emit_static(report, args):
@@ -293,11 +346,26 @@ def static_html(report) -> str:
 
 
 def static_render(report) -> str:
+    """Scores AND the findings behind them.
+
+    Printing the score alone left the only actionable half of the result reachable through
+    an undocumented `python3 -c` incantation — a sub-score of 0.75 named a category and
+    nothing you could fix.
+    """
     lines = ["# 100xeval — static design quality", ""]
     for plugin in report.get("plugins", []):
         lines.append(f"## {plugin['path']} — design_score {plugin['design_score']:.2f}")
+        if plugin.get("error"):
+            lines += [f"- error: {plugin['error']}", ""]
+            continue
         for name, score in plugin["sub_scores"].items():
             lines.append(f"- {name}: {score:.2f}")
+        findings = plugin.get("findings") or []
+        if findings:
+            lines += ["", f"### findings ({len(findings)})"]
+            lines += [f"- {f}" for f in findings]
+        elif plugin["design_score"] >= 1.0:
+            lines.append("\nNo findings. Nothing to fix.")
         lines.append("")
     return "\n".join(lines)
 

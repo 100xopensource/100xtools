@@ -330,7 +330,11 @@ def lint_plugin(plugin_dir: str, root: str | None = None) -> list[Finding]:
     root = root or plugin_dir
     out: list[Finding] = []
     allowed = _allowed_domains()
+    # "." whenever the plugin IS the root, which is the normal case for a standalone
+    # plugin. A finding reported against "." names nothing the reader can open.
     prel = os.path.relpath(plugin_dir, root)
+    if prel == ".":
+        prel = os.path.basename(os.path.abspath(plugin_dir))
 
     if not os.path.isfile(os.path.join(plugin_dir, "README.md")):
         out.append(Finding(prel, "[ST1] plugin has no README.md at its root"))
