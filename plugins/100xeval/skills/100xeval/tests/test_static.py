@@ -12,17 +12,17 @@ class TestStaticScorer(unittest.TestCase):
     def test_findings_lower_score(self):
         clean = static.score_from_findings([], 1.0)["design_score"]
         dirty = static.score_from_findings(
-            ["[S2] SKILL.md over 500 lines", "[S5] missing reference file"], 1.0
+            ["[PD1] SKILL.md over 500 lines", "[PD2] missing reference file"], 1.0
         )["design_score"]
         self.assertLess(dirty, clean)
 
     def test_id_maps_to_subcheck(self):
-        r = static.score_from_findings(["[S4] ships references/ nobody is told to read"], 1.0)
+        r = static.score_from_findings(["[RH1] ships references/ nobody is told to read"], 1.0)
         self.assertLess(r["sub_scores"]["reference_hygiene"], 1.0)
         self.assertEqual(r["sub_scores"]["security"], 1.0)  # untouched
 
     def test_security_weighted_and_penalized(self):
-        r = static.score_from_findings(["[X1] hardcoded secret"], 1.0)
+        r = static.score_from_findings(["[SEC1] hardcoded secret"], 1.0)
         self.assertLess(r["sub_scores"]["security"], 1.0)
         self.assertEqual(r["flags"], 1)
 
@@ -39,7 +39,7 @@ class TestStaticScorer(unittest.TestCase):
 
     def test_penalty_floor(self):
         # Many findings can't push design_score arbitrarily low (floor 0.5 penalty).
-        many = ["[S2] x"] * 50
+        many = ["[PD1] x"] * 50
         r = static.score_from_findings(many, 1.0)
         self.assertGreaterEqual(r["design_score"], 0.0)  # sub-scores floor at 0 though
 

@@ -153,13 +153,17 @@ plugin and emits tagged findings; `engine/static.py` maps them to sub-scores:
 
 | Sub-score | Fed by | Catches |
 | --- | --- | --- |
-| `frontmatter_quality` | `P2` `S13` | name/dir mismatch, missing or first-person description, unknown keys |
-| `progressive_disclosure` | `S2` `S5` | SKILL.md over the 500-line cap, dangling `references/` |
-| `reference_hygiene` | `S4` `S11` | references nobody is told to read, references pointing at references |
-| `structural_completeness` | `P4` `S7` | no plugin README, a "self-check" that isn't a checklist |
-| `ecosystem_coherence` | `P3` | routing to a companion skill that doesn't exist |
-| `security` (weight ×2) | `X1` `X3` `X4` | committed secrets, unknown network destinations, `../` traversal |
+| `frontmatter_quality` | `FM1`–`FM7` | name/dir mismatch, unusable or missing description, unknown keys, malformed frontmatter |
+| `progressive_disclosure` | `PD1` `PD2` | SKILL.md over the 500-line cap, dangling or empty `references/` |
+| `reference_hygiene` | `RH1`–`RH3` | references nobody is told to read, references pointing at references, Windows separators |
+| `structural_completeness` | `ST1` `ST2` | no plugin README, a "self-check" that isn't a checklist |
+| `ecosystem_coherence` | `EC1` | routing to a companion skill that doesn't exist |
+| `security` (weight ×2) | `SEC1`–`SEC3` | committed secrets, unknown network destinations, `../` traversal |
 | `token_efficiency` (weight ×0.5) | — | instruction blocks copy-pasted between sibling skills, or repeated inside one |
+
+A check ID's **prefix is its sub-score** (`FM3` → `frontmatter_quality`), so the two are
+wired together by construction rather than by a lookup table someone has to remember to
+update. `engine/lint.py`'s docstring lists every ID and what it means.
 
 These encode *published* Claude Code skill guidance plus generic hygiene, deliberately
 conservative: a finding should mean "this is probably wrong", not "this differs from how we

@@ -1,6 +1,6 @@
 """Static design-quality layer.
 
-Deterministic, free, no model run. `lint.py` walks a plugin and emits `[P2]`/`[S2]`/…
+Deterministic, free, no model run. `lint.py` walks a plugin and emits `[FM3]`/`[PD1]`/…
 tagged findings; this module maps those IDs onto 0–1 sub-scores and folds them into a
 single `design_score`, plus a token-efficiency metric computed here.
 
@@ -21,16 +21,17 @@ import re
 
 from . import lint
 
-# Each conformance-check ID → the sub-check it feeds. IDs the linter never emits are
-# simply absent; a sub-check with nothing mapped to it would sit at 1.0 forever and
-# quietly dilute the score, so every entry below is reachable.
-_ID_TO_SUBCHECK = {
-    "P2": "frontmatter_quality", "S13": "frontmatter_quality",
-    "S2": "progressive_disclosure", "S5": "progressive_disclosure",
-    "S4": "reference_hygiene", "S11": "reference_hygiene",
-    "P4": "structural_completeness", "S7": "structural_completeness",
-    "P3": "ecosystem_coherence",
-    "X1": "security", "X3": "security", "X4": "security",
+# A check ID's PREFIX names the sub-check it feeds (`FM3` → frontmatter_quality), so the
+# mapping is derived rather than hand-maintained. That is deliberate: the old per-ID table
+# had to be edited in lockstep with lint.py, and forgetting made the new check silently
+# score nothing — a check that looks live, fires, and changes no number.
+_PREFIX_TO_SUBCHECK = {
+    "FM": "frontmatter_quality",
+    "PD": "progressive_disclosure",
+    "RH": "reference_hygiene",
+    "ST": "structural_completeness",
+    "EC": "ecosystem_coherence",
+    "SEC": "security",
 }
 
 # Sub-check weights for the weighted mean. Security counts double — a leaked
@@ -46,23 +47,40 @@ _WEIGHTS = {
     "security": 2.0,
 }
 
-_ID_RE = re.compile(r"\[([PSX]\d+)\]")
+# Anchored to the start: a finding's ID is always its first token. Scanning the whole
+# message would also match bracketed text interpolated from the plugin under test (a
+# frontmatter key, a domain), and since an unknown prefix now raises, that would turn
+# someone else's content into a crash.
+_ID_RE = re.compile(r"^\[([A-Z]{2,3})\d+\]")
+
+
+class UnknownCheckPrefix(KeyError):
+    """A finding carried a check-ID prefix with no sub-score behind it."""
 
 
 def score_from_findings(finding_msgs: list[str], token_efficiency: float) -> dict:
     """Pure: map linter finding messages → sub-scores → design_score.
 
     finding_msgs: the `.msg` text of each finding for one plugin (each may carry a
-    `[P2]`-style tag). token_efficiency: a 0–1 metric computed by the caller.
+    `[FM3]`-style tag). token_efficiency: a 0–1 metric computed by the caller.
+
+    An unrecognized prefix RAISES rather than being skipped. Silently ignoring it is how
+    a new check ends up firing while changing no number — the failure mode the derived
+    mapping exists to prevent, so it must not be reintroduced here.
     """
     counts: dict[str, int] = {k: 0 for k in _WEIGHTS}
     flags = 0
     for msg in finding_msgs:
-        for cid in _ID_RE.findall(msg):
-            sub = _ID_TO_SUBCHECK.get(cid)
-            if sub:
-                counts[sub] += 1
-                flags += 1
+        m = _ID_RE.match(msg)
+        if m is None:
+            continue          # untagged note — informational, scores nothing
+        prefix = m.group(1)
+        if prefix not in _PREFIX_TO_SUBCHECK:
+            raise UnknownCheckPrefix(
+                f"check-ID prefix {prefix!r} has no sub-score in _PREFIX_TO_SUBCHECK "
+                f"(known: {', '.join(sorted(_PREFIX_TO_SUBCHECK))}) — from finding: {msg!r}")
+        counts[_PREFIX_TO_SUBCHECK[prefix]] += 1
+        flags += 1
 
     sub_scores: dict[str, float] = {}
     for sub in _WEIGHTS:

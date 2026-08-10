@@ -86,18 +86,27 @@ wrong reason is worse than a failure.
 
 ### The static layer: lint → check ID → sub-score
 
-`lint.py` walks a plugin and emits `Finding`s whose `.msg` carries a bracketed check ID
-(`[P2]`, `[S5]`, `[X1]`). `static.py` maps IDs → sub-scores via `_ID_TO_SUBCHECK`, weights
-them (`security` ×2, `token_efficiency` ×0.5), and applies a flag-count penalty.
+`lint.py` walks a plugin and emits `Finding`s whose `.msg` **starts with** a bracketed check
+ID (`[FM3]`, `[PD1]`, `[SEC1]`). The **prefix names the sub-score**, so `static.py` derives
+the mapping from `_PREFIX_TO_SUBCHECK` (`FM` · `PD` · `RH` · `ST` · `EC` · `SEC`) rather than
+keeping a per-ID table. It then weights them (`security` ×2, `token_efficiency` ×0.5) and
+applies a flag-count penalty.
 
-**Adding a check means touching both files.** An ID with no mapping is silently ignored, and
-a sub-score with no ID mapped to it sits at 1.00 forever and dilutes every score. That is
-why `output_contract` was dropped when the internal checklist was cut down.
+**Adding a check: pick the prefix for its sub-score, take the next free number.** No second
+file to edit. An unregistered prefix now *raises* (`UnknownCheckPrefix`) instead of scoring
+nothing, and `TestCheckIdContract` fails in both directions — a prefix nothing emits leaves
+its sub-score pinned at 1.00 and dilutes every score, which is why `output_contract` was
+dropped when the internal checklist was cut down.
 
-Scoping rule worth knowing: **X1 (secrets) scans every text file; X3/X4 scan skill prose
-only** (`_PROSE_SUFFIXES`). X3/X4 read a file as *instructions to the model*, so applying
-them to bundled source flagged every plugin that ships a script. X4 further requires a read
-verb near the `../`, so config examples like `plugins: ["../../plugins/x"]` don't fire.
+`_ID_RE` is anchored to the start of the message on purpose: findings interpolate content
+from the plugin under test, and a bracketed token in there must not be read as a check ID
+now that unknown prefixes raise.
+
+Scoping rule worth knowing: **SEC1 (secrets) scans every text file; SEC2/SEC3 scan skill
+prose only** (`_PROSE_SUFFIXES`). SEC2/SEC3 read a file as *instructions to the model*, so
+applying them to bundled source flagged every plugin that ships a script. SEC3 further
+requires a read verb near the `../`, so config examples like `plugins: ["../../plugins/x"]`
+don't fire.
 
 `static.analyze()` only reads `.msg` off each finding, so any module exposing
 `lint_plugin(dir, root)` can replace `lint.py`.

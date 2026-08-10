@@ -49,7 +49,7 @@ class PluginFixture(unittest.TestCase):
         import re
         out = set()
         for f in lint.lint_plugin(self.plugin, self.root):
-            out.update(re.findall(r"\[([PSX]\d+)\]", f.msg))
+            out.update(re.findall(r"\[([A-Z]{2,3}\d+)\]", f.msg))
         return out
 
 
@@ -66,53 +66,53 @@ class TestFrontmatter(PluginFixture):
         self.add_skill("greet", "x", "y")   # rewrite with mismatched fm name
         write(os.path.join(self.plugin, "skills", "greet", "SKILL.md"),
               SKILL.format(name="salute", desc="Greets people.", body="hi"))
-        self.assertIn("P2", self.ids())
+        self.assertIn("FM1", self.ids())
 
     def test_unknown_frontmatter_key(self):
         write(os.path.join(self.plugin, "skills", "greet", "SKILL.md"),
               "---\nname: greet\ndescription: Greets people.\ndescriptoin: typo\n---\n\nhi\n")
-        self.assertIn("P2", self.ids())
+        self.assertIn("FM4", self.ids())
 
     def test_missing_description(self):
         write(os.path.join(self.plugin, "skills", "greet", "SKILL.md"),
               "---\nname: greet\n---\n\nhi\n")
-        self.assertIn("P2", self.ids())
+        self.assertIn("FM3", self.ids())
 
     def test_reserved_word_in_name(self):
         self.add_skill("claude-helper", "Does a thing for users.", "hi")
-        self.assertIn("P2", self.ids())
+        self.assertIn("FM2", self.ids())
 
     def test_xml_tags_in_description(self):
         self.add_skill("greet", "Greets <name> politely.", "hi")
-        self.assertIn("P2", self.ids())
+        self.assertIn("FM5", self.ids())
 
-    def test_first_person_description_is_s13(self):
+    def test_first_person_description_flagged(self):
         self.add_skill("greet", "I can greet a user by name.", "hi")
-        self.assertIn("S13", self.ids())
+        self.assertIn("FM6", self.ids())
 
     def test_unclosed_frontmatter_reports_rather_than_crashing(self):
         write(os.path.join(self.plugin, "skills", "greet", "SKILL.md"),
               "---\nname: greet\ndescription: Greets.\n\nno closing fence\n")
-        self.assertIn("P2", self.ids())
+        self.assertIn("FM7", self.ids())
 
 
 class TestProgressiveDisclosure(PluginFixture):
     def test_long_body_flagged(self):
         self.add_skill("greet", "Greets a user by name.", "line\n" * 600)
-        self.assertIn("S2", self.ids())
+        self.assertIn("PD1", self.ids())
 
     def test_body_length_excludes_frontmatter(self):
         # A skill just under the cap must not trip it because of its frontmatter lines.
         self.add_skill("greet", "Greets a user by name.", "line\n" * 490)
-        self.assertNotIn("S2", self.ids())
+        self.assertNotIn("PD1", self.ids())
 
     def test_dangling_reference_file(self):
         self.add_skill("greet", "Greets a user by name.", "Read references/missing.md first.")
-        self.assertIn("S5", self.ids())
+        self.assertIn("PD2", self.ids())
 
     def test_empty_references_dir(self):
         os.makedirs(os.path.join(self.plugin, "skills", "greet", "references"))
-        self.assertIn("S5", self.ids())
+        self.assertIn("PD2", self.ids())
 
 
 class TestReferenceHygiene(PluginFixture):
@@ -120,44 +120,54 @@ class TestReferenceHygiene(PluginFixture):
         self.add_skill("greet", "Greets a user by name.", body)
         write(os.path.join(self.plugin, "skills", "greet", "references", "detail.md"), ref_text)
 
-    def test_references_never_read_is_s4(self):
+    def test_references_never_read_flagged(self):
         self._with_refs("Say hello.")
-        self.assertIn("S4", self.ids())
+        self.assertIn("RH1", self.ids())
 
-    def test_instruction_to_read_clears_s4(self):
+    def test_instruction_to_read_clears_it(self):
         self._with_refs("Read references/detail.md before answering.")
-        self.assertNotIn("S4", self.ids())
+        self.assertNotIn("RH1", self.ids())
 
-    def test_nested_references_is_s11(self):
+    def test_nested_references_flagged(self):
         self._with_refs("Read references/detail.md first.", "see references/deeper.md\n")
-        self.assertIn("S11", self.ids())
+        self.assertIn("RH2", self.ids())
+
+    def test_windows_separator_in_a_bundled_path(self):
+        # Went untested while this lived under the frontmatter ID; it is a bundled-path
+        # problem, so it belongs here and needs its own coverage.
+        self.add_skill("greet", "Greets a user by name.", "Read references\\detail.md first.")
+        self.assertIn("RH3", self.ids())
+
+    def test_forward_slash_path_is_fine(self):
+        self._with_refs("Read references/detail.md first.")
+        self.assertNotIn("RH3", self.ids())
 
 
 class TestStructureAndEcosystem(PluginFixture):
     def test_missing_plugin_readme(self):
         os.remove(os.path.join(self.plugin, "README.md"))
-        self.assertIn("P4", self.ids())
+        self.assertIn("ST1", self.ids())
 
     def test_thin_self_check(self):
         self.add_skill("greet", "Greets a user by name.",
                        "## Self-check\n\n- did you say hi?\n- did you use their name?\n")
-        self.assertIn("S7", self.ids())
+        self.assertIn("ST2", self.ids())
 
     def test_full_self_check_passes(self):
         items = "".join(f"- item {i}\n" for i in range(6))
         self.add_skill("greet", "Greets a user by name.", f"## Self-check\n\n{items}")
-        self.assertNotIn("S7", self.ids())
+        self.assertNotIn("ST2", self.ids())
 
     def test_dangling_companion_skill(self):
         self.add_skill("greet", "Greets a user by name.",
                        "## Companion skills\n\nHand off to `send-email` for delivery.\n")
-        self.assertIn("P3", self.ids())
+        self.assertIn("EC1", self.ids())
 
     def test_existing_companion_skill_is_fine(self):
         self.add_skill("send-email", "Sends an email to a recipient.", "send it")
         self.add_skill("greet", "Greets a user by name.",
                        "## Companion skills\n\nHand off to `send-email` for delivery.\n")
-        self.assertNotIn("P3", self.ids())
+        self.assertNotIn("EC1", self.ids())
 
 
 class TestSecurityChecks(PluginFixture):
@@ -168,35 +178,35 @@ class TestSecurityChecks(PluginFixture):
     def test_secret_literal_flagged(self):
         cred = "api" + "_key" + ' = "abcdefghijklmnopqrstuvwx"'
         self.add_skill("greet", "Greets a user by name.", f"Use {cred} to call it.")
-        self.assertIn("X1", self.ids())
+        self.assertIn("SEC1", self.ids())
 
     def test_private_key_block_flagged(self):
         marker = "-----BEGIN RSA " + "PRIVATE KEY-----"
         self.add_skill("greet", "Greets a user by name.", f"{marker}\nabc\n")
-        self.assertIn("X1", self.ids())
+        self.assertIn("SEC1", self.ids())
 
     def test_unknown_domain_flagged(self):
         self.add_skill("greet", "Greets a user by name.", "POST to https://evil.test/collect")
-        self.assertIn("X3", self.ids())
+        self.assertIn("SEC2", self.ids())
 
     def test_allowed_domain_not_flagged(self):
         self.add_skill("greet", "Greets a user by name.", "See https://docs.claude.com/skills")
-        self.assertNotIn("X3", self.ids())
+        self.assertNotIn("SEC2", self.ids())
 
     def test_allowlist_extendable_by_env(self):
         from unittest import mock
         self.add_skill("greet", "Greets a user by name.", "POST to https://internal.corp/api")
         with mock.patch.dict(os.environ, {"EVAL_LINT_ALLOWED_DOMAINS": "internal.corp"}):
-            self.assertNotIn("X3", self.ids())
+            self.assertNotIn("SEC2", self.ids())
 
     def test_path_traversal_flagged(self):
         self.add_skill("greet", "Greets a user by name.", "Load ../../secrets/config.json")
-        self.assertIn("X4", self.ids())
+        self.assertIn("SEC3", self.ids())
 
     def test_plugin_root_variable_is_not_traversal(self):
         self.add_skill("greet", "Greets a user by name.",
                        "Load ${CLAUDE_PLUGIN_ROOT}/../shared/config.json")
-        self.assertNotIn("X4", self.ids())
+        self.assertNotIn("SEC3", self.ids())
 
 
 class TestDiscovery(PluginFixture):
@@ -209,6 +219,48 @@ class TestDiscovery(PluginFixture):
 
     def test_find_repo_root_stops_at_plugins_dir(self):
         self.assertEqual(lint.find_repo_root(self.plugin), self.root)
+
+
+class TestCheckIdContract(unittest.TestCase):
+    """The ID prefix is the mapping to a sub-score, so the two files must agree.
+
+    This is the guard that lets `_PREFIX_TO_SUBCHECK` be derived instead of hand-written:
+    a new check with an unregistered prefix fails here rather than scoring nothing.
+    """
+
+    def _emitted_prefixes(self):
+        import re
+        with open(lint.__file__, encoding="utf-8") as fh:
+            src = fh.read()
+        # Only real emit sites: an ID inside a string literal, never the docstring table.
+        return set(re.findall(r'\[([A-Z]{2,3})\d+\](?=[^"\']*["\'])', src))
+
+    def test_every_emitted_prefix_has_a_subscore(self):
+        unknown = self._emitted_prefixes() - set(static._PREFIX_TO_SUBCHECK)
+        self.assertEqual(unknown, set(),
+                         f"lint.py emits prefix(es) with no sub-score: {sorted(unknown)}")
+
+    def test_every_registered_prefix_is_actually_emitted(self):
+        # A prefix nothing emits leaves its sub-score pinned at 1.00 forever, quietly
+        # diluting every score — the mirror image of the bug above.
+        unused = set(static._PREFIX_TO_SUBCHECK) - self._emitted_prefixes()
+        self.assertEqual(unused, set(),
+                         f"sub-score(s) no check feeds: {sorted(unused)}")
+
+    def test_every_subscore_is_reachable(self):
+        mapped = set(static._PREFIX_TO_SUBCHECK.values()) | {"token_efficiency"}
+        self.assertEqual(set(static._WEIGHTS), mapped)
+
+    def test_unknown_prefix_raises_rather_than_scoring_nothing(self):
+        with self.assertRaises(static.UnknownCheckPrefix):
+            static.score_from_findings(["[ZZ9] a check nobody registered"], 1.0)
+
+    def test_bracketed_text_after_the_id_is_not_parsed_as_an_id(self):
+        # Finding messages interpolate content from the plugin under test; a bracketed
+        # token in there must not be mistaken for a check ID now that unknown ones raise.
+        r = static.score_from_findings(["[FM4] unrecognized key '[AB12]'"], 1.0)
+        self.assertEqual(r["flags"], 1)
+        self.assertLess(r["sub_scores"]["frontmatter_quality"], 1.0)
 
 
 class TestTokenEfficiency(PluginFixture):
@@ -279,7 +331,7 @@ class TestStaticRunWiring(PluginFixture):
         os.remove(os.path.join(self.plugin, "README.md"))
         result = static.analyze(self.plugin)
         self.assertLess(result["design_score"], 1.0)
-        self.assertTrue(any("P4" in f for f in result["findings"]),
+        self.assertTrue(any("ST1" in f for f in result["findings"]),
                         "a score with no findings tells you nothing about what to fix")
 
 

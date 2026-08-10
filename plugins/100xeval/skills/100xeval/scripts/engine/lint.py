@@ -5,9 +5,14 @@ frontmatter shape, progressive disclosure, reference hygiene, and a few security
 smells. No model, no network, no third-party packages — pure stdlib, so it runs
 free on every commit.
 
-Each finding carries a bracketed check ID (`[P2]`, `[S5]`, `[X1]`, …). `static.py`
-maps those IDs onto sub-scores; nothing else depends on the wording, so messages are
-free to improve.
+Each finding carries a bracketed check ID (`[FM1]`, `[PD2]`, `[SEC1]`, …). The **prefix
+names the sub-score the finding feeds**, so `static.py` derives the mapping instead of
+keeping a hand-written table that can silently fall out of sync. Nothing depends on the
+message wording, so the text is free to improve.
+
+Adding a check: pick the prefix for the sub-score it belongs to, take the next free
+number, and add a test asserting both directions. A prefix `static.py` doesn't know is
+loud rather than silent — it raises instead of quietly scoring nothing.
 
 The checks encode *published* Claude Code skill guidance (code.claude.com/docs/en/skills)
 plus the generic hygiene any plugin wants. They are intentionally conservative: a
@@ -16,18 +21,35 @@ skills". Add house-style rules in your own fork rather than here.
 
 Check IDs
 ---------
-P2  frontmatter shape — name/description validity, unknown keys
-P3  ecosystem coherence — references a companion skill that does not exist
-P4  plugin has no README.md
-S2  progressive disclosure — SKILL.md body over the 500-line cap
-S4  ships references/ but never tells the model to read them
-S5  dangling or empty references/
-S7  a "self-check" section that is not a real checklist
-S11 reference files that point at further reference files
-S13 description not in third person; Windows-style paths
-X1  possible secret committed in plugin content
-X3  network destination outside the allowed set
-X4  path traversal ('../') escaping the component directory
+FM — frontmatter_quality
+  FM1  frontmatter `name` does not match the skill's directory name
+  FM2  skill name unusable: over the length limit, reserved word, or too vague to trigger
+  FM3  no description — the model cannot decide when to load the skill
+  FM4  unrecognized frontmatter key (likely a typo)
+  FM5  description contains XML-like tags — rejected by Skills API upload
+  FM6  description not written in third person
+  FM7  frontmatter block missing or not closed — nothing else about the skill can be read
+
+PD — progressive_disclosure
+  PD1  SKILL.md body over the line cap; detail belongs in references/
+  PD2  references/ is empty, or the body names a reference file that is missing
+
+RH — reference_hygiene
+  RH1  ships references/ but never instructs the model to read them
+  RH2  a reference file points at further reference files
+  RH3  Windows-style separator in a bundled path (`references\\…`, `scripts\\…`)
+
+ST — structural_completeness
+  ST1  plugin has no README.md at its root
+  ST2  a "self-check" section that is not a real checklist
+
+EC — ecosystem_coherence
+  EC1  routes to a companion skill that does not exist in this plugin
+
+SEC — security
+  SEC1 possible secret committed in plugin content
+  SEC2 network destination outside the allowed set
+  SEC3 a read instruction escaping the skill directory via `../`
 """
 
 from __future__ import annotations
@@ -62,7 +84,7 @@ SECRET_PATTERNS = [
         r"['\"][A-Za-z0-9+/_-]{16,}['\"]")),
 ]
 
-# X3 flags URLs outside this set. Docs/vendor hosts a plugin legitimately links to.
+# SEC2 flags URLs outside this set. Docs/vendor hosts a plugin legitimately links to.
 # Point `EVAL_LINT_ALLOWED_DOMAINS` (comma-separated) at your own list to extend it —
 # an unknown host is a notice, not a failure, so a false positive costs little.
 URL_ALLOWED_DOMAINS = {
@@ -72,14 +94,14 @@ URL_ALLOWED_DOMAINS = {
 
 _TEXT_SUFFIXES = {".md", ".txt", ".json", ".yaml", ".yml", ".py", ".sh", ".js"}
 
-# X3/X4 read a file as *instructions to the model*, so they only apply to skill prose.
+# SEC2/SEC3 read a file as *instructions to the model*, so they only apply to skill prose.
 # Bundled source legitimately handles relative paths and names hosts in test fixtures;
 # flagging that produced findings on every plugin that ships a script, which is exactly
-# the kind of noise that trains people to ignore the security sub-score. X1 (secrets)
+# the kind of noise that trains people to ignore the security sub-score. SEC1 (secrets)
 # still runs over every text file — a committed credential is a problem anywhere.
 _PROSE_SUFFIXES = {".md", ".txt"}
 
-# X4 fires on a read INSTRUCTION that escapes the skill directory ("Load ../../config"),
+# SEC3 fires on a read INSTRUCTION that escapes the skill directory ("Load ../../config"),
 # not on every `../` in the file. Relative paths are ordinary in config examples — a case
 # file's `plugins: ["../../plugins/x"]` is data the skill never opens — and flagging those
 # buried the one pattern worth seeing.
@@ -180,11 +202,11 @@ def _allowed_domains() -> set[str]:
 # --- the checks ---------------------------------------------------------------
 
 def _scan_text_file(path: str, rel: str, out: list[Finding], allowed: set[str]) -> None:
-    """X1 over any text file; X3/X4 over skill prose only (see _PROSE_SUFFIXES)."""
+    """SEC1 over any text file; SEC2/SEC3 over skill prose only (see _PROSE_SUFFIXES)."""
     content = _read_text(path)
     for label, pat in SECRET_PATTERNS:
         if pat.search(content):
-            out.append(Finding(rel, f"[X1] possible {label} committed in plugin content", "warn"))
+            out.append(Finding(rel, f"[SEC1] possible {label} committed in plugin content", "warn"))
             break
     if os.path.splitext(path)[1] not in _PROSE_SUFFIXES:
         return
@@ -193,12 +215,12 @@ def _scan_text_file(path: str, rel: str, out: list[Finding], allowed: set[str]) 
            if not any(d == a or d.endswith("." + a) for a in allowed)}
     if odd:
         out.append(Finding(
-            rel, f"[X3] network destination(s) outside the allowed set: "
+            rel, f"[SEC2] network destination(s) outside the allowed set: "
                  f"{', '.join(sorted(odd)[:4])}"))
     for line in content.splitlines():
         if _TRAVERSAL_RE.search(line) and "CLAUDE_PLUGIN_ROOT" not in line \
                 and "CLAUDE_SKILL_DIR" not in line:
-            out.append(Finding(rel, "[X4] instructs reading a path ('../') outside the skill directory"))
+            out.append(Finding(rel, "[SEC3] instructs reading a path ('../') outside the skill directory"))
             break
 
 
@@ -206,28 +228,28 @@ def _check_frontmatter(rel: str, dirname: str, fm: dict, out: list[Finding]) -> 
     name = fm.get("name", "")
     desc = fm.get("description", "")
     if name and name != dirname:
-        out.append(Finding(rel, f"[P2] frontmatter name {name!r} != directory name {dirname!r}"))
+        out.append(Finding(rel, f"[FM1] frontmatter name {name!r} != directory name {dirname!r}"))
     if len(name) > SKILL_NAME_MAX:
-        out.append(Finding(rel, f"[P2] skill name is {len(name)} chars (limit {SKILL_NAME_MAX})"))
+        out.append(Finding(rel, f"[FM2] skill name is {len(name)} chars (limit {SKILL_NAME_MAX})"))
     if any(w in name.lower() for w in RESERVED_NAME_WORDS):
-        out.append(Finding(rel, f"[P2] skill name {name!r} contains a reserved word"))
+        out.append(Finding(rel, f"[FM2] skill name {name!r} contains a reserved word"))
     if name.lower() in VAGUE_SKILL_NAMES:
-        out.append(Finding(rel, f"[P2] skill name {name!r} is too vague to trigger reliably"))
+        out.append(Finding(rel, f"[FM2] skill name {name!r} is too vague to trigger reliably"))
     if not desc:
-        out.append(Finding(rel, "[P2] skill has no description — the model cannot decide when to load it"))
+        out.append(Finding(rel, "[FM3] skill has no description — the model cannot decide when to load it"))
     for key in fm:
         if key not in SKILL_FM_KNOWN:
             close = difflib.get_close_matches(key, SKILL_FM_KNOWN, n=1)
             hint = f" (did you mean {close[0]!r}?)" if close else ""
-            out.append(Finding(rel, f"[P2] unrecognized frontmatter key {key!r}{hint}"))
+            out.append(Finding(rel, f"[FM4] unrecognized frontmatter key {key!r}{hint}"))
     # XML-ish tags load fine in Claude Code but the Skills API upload validation
     # rejects them — a portability nit, not a correctness bug.
     if re.search(r"<[A-Za-z][^>\n]*>", desc):
         out.append(Finding(
-            rel, "[P2] description contains XML-like tags; fine in Claude Code, rejected "
+            rel, "[FM5] description contains XML-like tags; fine in Claude Code, rejected "
                  "by Skills API upload — use [brackets] or backticks for portability"))
     if re.search(r"\b(I can|I'll|I will|You can use)\b", desc):
-        out.append(Finding(rel, "[S13] description not in third person (harms skill discovery)"))
+        out.append(Finding(rel, "[FM6] description not in third person (harms skill discovery)"))
 
 
 def _check_skill(sub: str, dirname: str, skill_names: set[str], root: str,
@@ -245,59 +267,62 @@ def _check_skill(sub: str, dirname: str, skill_names: set[str], root: str,
 
     fm, err = parse_frontmatter(skill_md)
     if err:
-        out.append(Finding(rel, f"[P2] {err}"))
+        out.append(Finding(rel, f"[FM7] {err}"))
         return
     _check_frontmatter(rel, dirname, fm, out)
 
+    # RH3 — the regex only matches `references\` / `scripts\`, i.e. a skill pointing at
+    # its OWN bundled files with a Windows separator. That is reference hygiene, not a
+    # frontmatter problem, which is where it used to be filed.
     if re.search(r"(?:references|scripts)\\", body):
-        out.append(Finding(rel, "[S13] Windows-style path (backslash) in skill content"))
+        out.append(Finding(rel, "[RH3] Windows-style separator in a bundled path (use `/`)"))
 
-    # S2 — compactness, measured on the BODY so frontmatter length doesn't count.
+    # PD1 — compactness, measured on the BODY so frontmatter length doesn't count.
     n_lines = body.count("\n") + 1
     if n_lines > SKILL_BODY_MAX_LINES:
         out.append(Finding(
-            rel, f"[S2] SKILL.md body is {n_lines} lines — over the {SKILL_BODY_MAX_LINES}-line "
+            rel, f"[PD1] SKILL.md body is {n_lines} lines — over the {SKILL_BODY_MAX_LINES}-line "
                  f"cap; move detail into references/"))
 
-    # S5 — dangling / empty references.
+    # PD2 — dangling / empty references.
     referenced = set(re.findall(r"references/([A-Za-z0-9_.-]+\.[a-z]{2,4})", body))
     for rf in sorted(referenced):
         if not os.path.isfile(os.path.join(refdir, rf)):
-            out.append(Finding(rel, f"[S5] references/{rf} is mentioned but the file is missing"))
+            out.append(Finding(rel, f"[PD2] references/{rf} is mentioned but the file is missing"))
     if os.path.isdir(refdir) and not os.listdir(refdir):
-        out.append(Finding(rel, "[S5] references/ directory exists but is empty"))
+        out.append(Finding(rel, "[PD2] references/ directory exists but is empty"))
 
-    # S4 — shipping references nobody is told to open is dead weight in the bundle.
+    # RH1 — shipping references nobody is told to open is dead weight in the bundle.
     gate2 = re.search(
         r"(?i)\b(read|load|open|consult|review)\b[^\n]{0,120}\breference"
         r"|\breferences?\b[^\n]{0,120}\b(read|load)\b", body)
     if os.path.isdir(refdir) and os.listdir(refdir) and not gate2:
-        out.append(Finding(rel, "[S4] ships references/ but never instructs the model to read them"))
+        out.append(Finding(rel, "[RH1] ships references/ but never instructs the model to read them"))
 
-    # S11 — references must stay one level deep, or loading one pulls a chain.
+    # RH2 — references must stay one level deep, or loading one pulls a chain.
     if os.path.isdir(refdir):
         for rf in sorted(os.listdir(refdir)):
             rp = os.path.join(refdir, rf)
             if os.path.isfile(rp) and "references/" in _read_text(rp):
                 out.append(Finding(
                     os.path.relpath(rp, root),
-                    "[S11] reference file points at further reference files "
+                    "[RH2] reference file points at further reference files "
                     "(keep references one level deep)"))
 
-    # S7 — a self-check section that isn't a real checklist teaches nothing.
+    # ST2 — a self-check section that isn't a real checklist teaches nothing.
     selfcheck = _section(body, ("self-check", "self check"))
     if selfcheck:
         items = re.findall(r"^\s*(?:[-*]|\d+\.)\s+\S", selfcheck, re.M)
         if len(items) < 5:
-            out.append(Finding(rel, f"[S7] self-check has only {len(items)} item(s) (expect >= 5)"))
+            out.append(Finding(rel, f"[ST2] self-check has only {len(items)} item(s) (expect >= 5)"))
 
-    # P3 — a companion skill that doesn't exist is a routing dead end.
+    # EC1 — a companion skill that doesn't exist is a routing dead end.
     comp = _section(body, ("companion skill",))
     cand = {m.lower() for m in re.findall(r"[`*]{1,2}([a-z0-9][a-z0-9-]+)[`*]{1,2}", comp)
             if "-" in m}
     for c in sorted(cand - skill_names):
         out.append(Finding(
-            rel, f"[P3] references companion skill {c!r} which does not exist in this plugin"))
+            rel, f"[EC1] references companion skill {c!r} which does not exist in this plugin"))
 
 
 def lint_plugin(plugin_dir: str, root: str | None = None) -> list[Finding]:
@@ -308,7 +333,7 @@ def lint_plugin(plugin_dir: str, root: str | None = None) -> list[Finding]:
     prel = os.path.relpath(plugin_dir, root)
 
     if not os.path.isfile(os.path.join(plugin_dir, "README.md")):
-        out.append(Finding(prel, "[P4] plugin has no README.md at its root"))
+        out.append(Finding(prel, "[ST1] plugin has no README.md at its root"))
 
     sdir = os.path.join(plugin_dir, "skills")
     if not os.path.isdir(sdir):

@@ -26,7 +26,7 @@ safety:
 
 ## What is out of scope
 
-- **The linter missing a secret.** `engine/lint.py`'s X1 check is a smoke detector, not a
+- **The linter missing a secret.** `engine/lint.py`'s SEC1 check is a smoke detector, not a
   secret scanner. It catches common shapes and will miss a clever one. Run a real secret
   scanner in your pipeline too; a missed pattern is a bug report, not a vulnerability.
 - **A model producing a wrong verdict.** drift-check is advisory and non-blocking by

@@ -12,7 +12,7 @@ to break. If you genuinely need a library, open an issue explaining why the stdl
 it before writing the PR.
 
 **No secrets, ever.** Not in a case file, not in a fixture, not in a test. Tokens come from
-the environment (`EVAL_MCP_BEARER`) and configs reference them as `${VAR}`. The linter's X1
+the environment (`EVAL_MCP_BEARER`) and configs reference them as `${VAR}`. The linter's SEC1
 check will catch the obvious cases; it will not catch a clever one.
 
 **No internal, customer, or tenant data.** Fixtures use `example.com` / `Acme`. If you are
@@ -58,9 +58,13 @@ Every check needs a test that builds a real plugin on disk and asserts both dire
 dirty case fires, and the clean fixture stays clean. A check that only ever fires is as
 useless as one that never does.
 
-If you add a check ID, map it to a sub-score in `engine/static.py` — an unmapped ID is
-silently ignored, and a sub-score with nothing mapped to it sits at 1.00 forever and
-dilutes the result.
+Check IDs carry their sub-score in the prefix — `FM` frontmatter, `PD` progressive
+disclosure, `RH` reference hygiene, `ST` structural, `EC` ecosystem, `SEC` security. To add
+a check, pick the right prefix and take the next free number; `engine/static.py` derives
+the mapping, so there is no second file to update. An unregistered prefix raises rather
+than scoring nothing, and `TestCheckIdContract` fails both ways — on a prefix with no
+sub-score, and on a sub-score no check feeds (which would sit at 1.00 forever and dilute
+every result). `engine/lint.py`'s docstring is the ID reference; keep it in step.
 
 ## Changing a trust-boundary file
 
