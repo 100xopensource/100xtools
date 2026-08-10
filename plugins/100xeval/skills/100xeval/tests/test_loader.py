@@ -200,3 +200,38 @@ class TestSkip(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestUnloadableCaseIsNotSilent(unittest.TestCase):
+    """A case that will not load used to warn on stderr and still exit 0.
+
+    That is how an example rots unnoticed: rename the plugin it points at, and the suite
+    keeps passing while testing nothing. The valid cases still run — one bad case must not
+    block a suite of fifty — but the exit code stops lying.
+    """
+
+    def _run(self, plugin_path):
+        import contextlib
+        import io
+        import os
+        import tempfile
+        from engine import cli
+        with tempfile.TemporaryDirectory() as tmp:
+            case_dir = os.path.join(tmp, "cases", "c1")
+            os.makedirs(case_dir)
+            with open(os.path.join(case_dir, "case.yaml"), "w", encoding="utf-8") as fh:
+                fh.write(
+                    "name: c1\n"
+                    f'plugins: ["{plugin_path}"]\n'
+                    "execution:\n  prompt: hi\n"
+                    "graders:\n  - {type: regex, name: g, pattern: hi}\n")
+            os.makedirs(os.path.join(tmp, "present"), exist_ok=True)
+            with contextlib.chdir(tmp), contextlib.redirect_stdout(io.StringIO()), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                return cli.main(["eval", "--root", "cases", "--skip-static", "--dry-run"])
+
+    def test_unresolvable_plugin_path_exits_two(self):
+        self.assertEqual(self._run("../../nowhere"), 2)
+
+    def test_resolvable_plugin_path_exits_zero(self):
+        self.assertEqual(self._run("../../present"), 0)

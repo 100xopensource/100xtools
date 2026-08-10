@@ -12,10 +12,20 @@ from a clean clone, with no install step.
 ```
 .claude-plugin/marketplace.json   one entry per plugin; CI checks it against plugins/
 docs/                             OKF knowledge bundle — concepts, NOT shipped with plugins
+examples/                         worked eval cases + vendored third-party plugins
 plugins/<name>/                   self-contained plugin: manifest, README, skills/
 scripts/check_docs.py             bundle conformance + check-ID sync
-.github/workflows/ci.yml          test · static · docs · manifests
+.github/workflows/ci.yml          test · static · examples · docs · manifests
 ```
+
+Two things about `examples/` that look odd until you know why:
+
+- **`examples/cases` is a second case root.** The default is `evals/`, so the example cases
+  are only found with `--root examples/cases`. CI dry-runs them, which proves they parse and
+  resolve their plugins without a model call.
+- **`vendor/` is skipped by plugin discovery** (`lint.py`). Third-party code copied in for
+  fixtures is not ours to score, and discovering it would turn our own sweep into a report
+  card on someone else's plugin. Lint it deliberately with `--target` if you want to.
 
 ## Repo-wide invariants
 

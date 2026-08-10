@@ -55,6 +55,13 @@ score — it will not quietly hand you a passing number for a path that isn't th
 lands around $3–5 for a single case. Use `--dry-run` first; it lists what would execute and
 the rough spend without spending it.
 
+**4. See a worked case.** [`examples/`](../../examples/README.md) ships two, running against
+real third-party plugins vendored into the repo — read them before writing your own:
+
+```bash
+python3 "$RUN" eval --root examples/cases --skip-static --dry-run   # free
+```
+
 Exit codes: `0` all pass · `1` a case below `--threshold` · `2` usage or engine error. That
 makes `eval` usable directly as a CI gate.
 

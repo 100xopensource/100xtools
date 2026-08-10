@@ -384,7 +384,11 @@ def discover_plugins(root: str) -> list[str]:
     """Every plugin under `root` — a directory holding `.claude-plugin/plugin.json`."""
     found = []
     for dirpath, dirnames, _files in os.walk(root):
-        dirnames[:] = [d for d in dirnames if d not in ("__pycache__", "node_modules", ".git")]
+        # `vendor` is skipped like the rest: third-party code copied in for fixtures or
+        # examples is not yours to score, and discovering it turns your own sweep into a
+        # report card on someone else's plugin. Lint it deliberately with --target.
+        dirnames[:] = [d for d in dirnames
+                       if d not in ("__pycache__", "node_modules", ".git", "vendor")]
         if os.path.isfile(os.path.join(dirpath, ".claude-plugin", "plugin.json")):
             found.append(dirpath)
             dirnames[:] = []  # a plugin does not nest inside another plugin

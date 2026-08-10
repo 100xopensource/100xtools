@@ -171,6 +171,11 @@ def _cmd_eval(args) -> int:
     cases, errors = loader.load_all(args.root, tags=args.tag or None, case_glob=args.case)
     for path, msg in errors:
         print(f"⚠️  skipped {path}: {msg}", file=sys.stderr)
+    # A case that will not parse is broken, and the run used to warn and still exit 0 — so a
+    # case that rotted (renamed plugin, bad YAML) silently stopped testing anything and CI
+    # stayed green. The valid cases still run: one bad case must not block a suite of fifty.
+    # But the exit code tells the truth, at every return path below.
+    load_failed = bool(errors)
     # Deliberately-skipped cases are announced every run: a silent skip becomes a
     # permanent one nobody remembers to revisit.
     all_cases, _ = loader.load_all(args.root, tags=args.tag or None, case_glob=args.case,
@@ -180,7 +185,7 @@ def _cmd_eval(args) -> int:
             print(f"⏭  skipping {c.name}: {c.skip}")
     if not cases:
         print("no matching cases — nothing to run (not an error).")
-        return 0
+        return 2 if load_failed else 0
 
     if args.dry_run:
         # Behavioral runs spend real money, and the first one a user tries is usually a
@@ -197,7 +202,7 @@ def _cmd_eval(args) -> int:
         print(f"\n  Rough spend: ${total_runs * 1.0:.0f}-${total_runs * 2.0 + judges * 1.0:.0f}. "
               f"Judges are extra model calls on top of each run.")
         print("  Nothing was executed. Drop --dry-run to run it.")
-        return 0
+        return 2 if load_failed else 0
 
     # One self-contained run directory: workspace + artifacts + reports.
     run_id = _new_run_id()
@@ -269,7 +274,7 @@ def _cmd_eval(args) -> int:
         _write(args.html_path, reporter.to_html(report))
     print(f"\n📁 run artifacts: {run_dir}")
 
-    if engine_error:
+    if engine_error or load_failed:
         return 2
     return 0 if report["casesPassed"] == report["casesTotal"] else 1
 

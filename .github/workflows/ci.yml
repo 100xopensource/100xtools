@@ -54,6 +54,22 @@ jobs:
           python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --report static.md
           { echo '## 100xeval — static design quality'; echo; cat static.md; } >> "$GITHUB_STEP_SUMMARY"
 
+  # The shipped example cases must keep parsing and resolving their vendored plugins.
+  # `--dry-run` proves that with no model call and nothing spent; a case that fails to load
+  # exits 2, so a rotted example fails the build instead of warning into the void.
+  examples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Example cases load and resolve (no model call)
+        run: |
+          python3 plugins/100xeval/skills/100xeval/scripts/run.py \
+            eval --root examples/cases --skip-static --dry-run
+
   # Separate job so documentation drift reads distinctly from a test failure — they call
   # for different fixes, and a merged job makes the summary ambiguous.
   docs:

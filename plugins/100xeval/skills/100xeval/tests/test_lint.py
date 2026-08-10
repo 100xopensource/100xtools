@@ -334,6 +334,33 @@ class TestFindingsAreVisible(PluginFixture):
         self.assertIn("No findings", rendered)
 
 
+class TestVendorIsNotDiscovered(PluginFixture):
+    """Third-party code copied in for fixtures is not yours to score.
+
+    Without the skip, `examples/vendor/*` joins this repo's own sweep and CI starts
+    reporting on someone else's plugin — which also breaks the "every plugin scores 1.00"
+    invariant for a reason that has nothing to do with our code.
+    """
+
+    def _vendored(self):
+        path = os.path.join(self.root, "examples", "vendor", "theirs")
+        write(os.path.join(path, ".claude-plugin", "plugin.json"), '{"name": "theirs"}')
+        return path
+
+    def test_vendor_is_skipped_by_discovery(self):
+        self._vendored()
+        found = lint.discover_plugins(self.root)
+        self.assertIn(self.plugin, found)
+        self.assertTrue(all("vendor" not in p for p in found), found)
+
+    def test_vendor_is_still_lintable_with_an_explicit_target(self):
+        # Skipped by discovery, never hidden — you can always ask for it by name, and it
+        # reports its full path so nobody mistakes it for one of your own plugins.
+        rep = static.run(self.root, targets=[self._vendored()])
+        self.assertTrue(rep["ok"])
+        self.assertEqual(rep["plugins"][0]["path"], os.path.join("examples", "vendor", "theirs"))
+
+
 class TestCheckIdContract(unittest.TestCase):
     """The ID prefix is the mapping to a sub-score, so the two files must agree.
 
