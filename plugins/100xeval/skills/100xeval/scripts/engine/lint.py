@@ -23,7 +23,7 @@ Check IDs
 ---------
 FM — frontmatter_quality
   FM1  frontmatter `name` does not match the skill's directory name
-  FM2  skill name unusable: over the length limit, reserved word, or too vague to trigger
+  FM2  skill name unusable: over the length limit, exactly a reserved name, or too vague to trigger
   FM3  no description — the model cannot decide when to load the skill
   FM4  unrecognized frontmatter key (likely a typo)
   FM5  description contains XML-like tags — rejected by Skills API upload
@@ -69,7 +69,12 @@ SKILL_FM_KNOWN = {
 }
 
 VAGUE_SKILL_NAMES = {"helper", "helpers", "util", "utils", "tools", "misc"}
-RESERVED_NAME_WORDS = ("anthropic", "claude")
+
+# Matched against the WHOLE name, not as a substring. Substring matching flagged
+# `claude-security`, `claude-api`, and `claude-md-management` — all names Anthropic ships
+# in its own official marketplace. A skill legitimately *about* Claude has to be able to say
+# so; only a skill named nothing but the reserved word is the problem.
+RESERVED_NAMES = frozenset({"anthropic", "claude"})
 SKILL_NAME_MAX = 64
 SKILL_BODY_MAX_LINES = 500
 
@@ -100,6 +105,14 @@ _TEXT_SUFFIXES = {".md", ".txt", ".json", ".yaml", ".yml", ".py", ".sh", ".js"}
 # the kind of noise that trains people to ignore the security sub-score. SEC1 (secrets)
 # still runs over every text file — a committed credential is a problem anywhere.
 _PROSE_SUFFIXES = {".md", ".txt"}
+
+# Licence and notice files are legal boilerplate, never instructions to the model, so the
+# prose checks skip them. Without this, every Apache-licensed plugin that ships its licence
+# inside the skill directory lost 0.25 on security because the Apache text contains
+# `http://www.apache.org/licenses/` — observed on `frontend-design` and `skill-creator`, two
+# of the most-installed plugins there are. SEC1 still scans them: a committed credential is
+# a problem in any file.
+_LICENCE_STEMS = {"license", "licence", "copying", "notice", "copyright"}
 
 # SEC3 fires on a read INSTRUCTION that escapes the skill directory ("Load ../../config"),
 # not on every `../` in the file. Relative paths are ordinary in config examples — a case
@@ -208,7 +221,8 @@ def _scan_text_file(path: str, rel: str, out: list[Finding], allowed: set[str]) 
         if pat.search(content):
             out.append(Finding(rel, f"[SEC1] possible {label} committed in plugin content", "warn"))
             break
-    if os.path.splitext(path)[1] not in _PROSE_SUFFIXES:
+    stem, ext = os.path.splitext(os.path.basename(path))
+    if ext not in _PROSE_SUFFIXES or stem.lower() in _LICENCE_STEMS:
         return
     domains = {d.lower() for d in re.findall(r"https?://([\w.-]+)", content)}
     odd = {d for d in domains
@@ -231,8 +245,8 @@ def _check_frontmatter(rel: str, dirname: str, fm: dict, out: list[Finding]) -> 
         out.append(Finding(rel, f"[FM1] frontmatter name {name!r} != directory name {dirname!r}"))
     if len(name) > SKILL_NAME_MAX:
         out.append(Finding(rel, f"[FM2] skill name is {len(name)} chars (limit {SKILL_NAME_MAX})"))
-    if any(w in name.lower() for w in RESERVED_NAME_WORDS):
-        out.append(Finding(rel, f"[FM2] skill name {name!r} contains a reserved word"))
+    if name.lower() in RESERVED_NAMES:
+        out.append(Finding(rel, f"[FM2] skill name {name!r} is a reserved name"))
     if name.lower() in VAGUE_SKILL_NAMES:
         out.append(Finding(rel, f"[FM2] skill name {name!r} is too vague to trigger reliably"))
     if not desc:

@@ -22,7 +22,7 @@ other fails the build. If you add a check, add it here.
 | ID | Fires when |
 | --- | --- |
 | `FM1` | frontmatter `name` does not match the skill's directory name |
-| `FM2` | skill name unusable: over the length limit, reserved word, or too vague to trigger |
+| `FM2` | skill name unusable: over the length limit, exactly a reserved name, or too vague to trigger |
 | `FM3` | no description — the model cannot decide when to load the skill |
 | `FM4` | unrecognized frontmatter key (likely a typo) |
 | `FM5` | description contains XML-like tags — rejected by Skills API upload |
