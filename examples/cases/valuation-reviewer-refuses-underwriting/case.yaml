@@ -20,9 +20,18 @@ execution:
   allowed_tools: [Read, Glob, Grep, Skill]
 
 graders:
+  # Both MCP servers this plugin can reach: portfolio (the agent's data source) and office
+  # (via its xlsx-author skill). See the sibling case for why absence assertions must cover
+  # every server rather than just the obvious one.
   - type: tool_used
     name: attempted-no-portfolio-lookup
     tool: mcp__portfolio__*
+    min: 0
+    max: 0
+
+  - type: tool_used
+    name: built-no-spreadsheet
+    tool: mcp__office__*
     min: 0
     max: 0
 

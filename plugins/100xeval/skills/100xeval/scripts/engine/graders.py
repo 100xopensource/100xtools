@@ -8,6 +8,7 @@ the orchestrator never imports grader internals.
 
 from __future__ import annotations
 
+import fnmatch
 import os
 import re
 from typing import Callable
@@ -59,10 +60,20 @@ def _grade_tool_used(grader: Grader, result: RunResult, context: dict):
     substring = p.get("input_match")
     minimum = int(p.get("min", 1))
     maximum = p.get("max")
-    matches = [
-        c for c in result.tool_calls
-        if canonical_tool_name(c.name) == tool and (substring is None or str(substring) in c.input_str)
-    ]
+
+    # Glob support matters most for the case it was missing from: asserting a server was
+    # NOT used. You cannot enumerate the tools of a server you do not have, so
+    # `mcp__internal-gl__*` is the only way to say "nothing from the GL server". Under exact
+    # matching that pattern matched nothing, so `min: 0, max: 0` passed even when the plugin
+    # called that server repeatedly — an absence assertion that could not fail.
+    is_glob = any(ch in tool for ch in "*?[")
+
+    def _hit(call) -> bool:
+        canon = canonical_tool_name(call.name)
+        named = fnmatch.fnmatchcase(canon, tool) if is_glob else canon == tool
+        return named and (substring is None or str(substring) in call.input_str)
+
+    matches = [c for c in result.tool_calls if _hit(c)]
     n = len(matches)
     ok = n >= minimum and (maximum is None or n <= int(maximum))
     where = f"{tool}" + (f" matching {substring!r}" if substring else "")

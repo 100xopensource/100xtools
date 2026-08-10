@@ -24,9 +24,21 @@ execution:
 
 graders:
   # One claim each — a red scorecard has to name WHICH property broke.
+  #
+  # The plugin reaches two MCP servers: internal-gl (the agent's data source) and office
+  # (via its xlsx-author skill). Asserting only the first would let a refusal that still
+  # went and built a spreadsheet pass, so both are covered. Enumerate the servers a plugin
+  # can reach before writing an absence assertion — `grep -rhoE "mcp__[A-Za-z0-9_-]+"`
+  # over the plugin is enough.
   - type: tool_used
     name: attempted-no-gl-lookup
     tool: mcp__internal-gl__*
+    min: 0
+    max: 0
+
+  - type: tool_used
+    name: built-no-spreadsheet
+    tool: mcp__office__*
     min: 0
     max: 0
 

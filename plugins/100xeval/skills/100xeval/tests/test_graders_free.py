@@ -71,3 +71,49 @@ class TestDispatch(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestToolUsedGlob(unittest.TestCase):
+    """`tool` accepts a glob, which absence assertions depend on.
+
+    Exact matching made `min: 0, max: 0` on `mcp__server__*` unfalsifiable: the pattern
+    matched no call, so the grader reported "called 0x" and passed while the plugin hammered
+    that server. You cannot enumerate the tools of a server you do not have, so the glob is
+    the only way to express "nothing from here".
+    """
+
+    def _grade(self, calls, tool, **params):
+        r = RunResult(tool_calls=[ToolCall(c, "") for c in calls])
+        return grade(Grader("tool_used", "t", params={"tool": tool, **params}), r, {})
+
+    def test_absence_assertion_fails_when_the_server_was_used(self):
+        out = self._grade(["mcp__internal-gl__query"] * 3, "mcp__internal-gl__*", min=0, max=0)
+        self.assertFalse(out.passed)
+        self.assertIn("3x", out.detail)
+
+    def test_absence_assertion_passes_when_nothing_was_called(self):
+        self.assertTrue(self._grade([], "mcp__internal-gl__*", min=0, max=0).passed)
+
+    def test_absence_assertion_ignores_a_different_server(self):
+        out = self._grade(["mcp__office__excel_write"], "mcp__internal-gl__*", min=0, max=0)
+        self.assertTrue(out.passed)
+
+    def test_glob_counts_positively_too(self):
+        out = self._grade(["mcp__gl__a", "mcp__gl__b"], "mcp__gl__*", min=1)
+        self.assertTrue(out.passed)
+        self.assertIn("2x", out.detail)
+
+    def test_exact_names_still_match_exactly(self):
+        self.assertTrue(self._grade(["mcp__Acme__run_query"], "mcp__Acme__run_query", min=1).passed)
+        self.assertFalse(self._grade(["mcp__Acme__other"], "mcp__Acme__run_query", min=1).passed)
+
+    def test_glob_still_normalises_the_account_connector_alias(self):
+        # mcp__claude_ai_X__t and mcp__X__t are the same tool under two auth paths.
+        self.assertTrue(self._grade(["mcp__claude_ai_portfolio__nav"], "mcp__portfolio__*", min=1).passed)
+
+    def test_glob_composes_with_input_match(self):
+        r = RunResult(tool_calls=[ToolCall("mcp__gl__query", "entity 400")])
+        g = Grader("tool_used", "t", params={"tool": "mcp__gl__*", "input_match": "entity 400", "min": 1})
+        self.assertTrue(grade(g, r, {}).passed)
+        g2 = Grader("tool_used", "t", params={"tool": "mcp__gl__*", "input_match": "entity 999", "min": 1})
+        self.assertFalse(grade(g2, r, {}).passed)

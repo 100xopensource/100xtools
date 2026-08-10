@@ -90,13 +90,30 @@ Asserts the **shape** of what was queried, never a figure, so it doesn't go stal
 
 | Param | Default | Meaning |
 | --- | --- | --- |
-| `tool` | **required** | Tool name. Canonicalized, so account vs plugin-scoped spellings match. |
+| `tool` | **required** | Tool name, or a glob (`mcp__server__*`). Canonicalized, so account vs plugin-scoped spellings match. |
 | `input_match` | — | Substring that must appear in the call's input (e.g. a store name). |
 | `min` | `1` | Minimum matching calls. |
 | `max` | — | Maximum matching calls. |
 
 `min: 0, max: 0` asserts the tool was **never** called — the strongest signal for an
 out-of-scope case (it declined without going to the data).
+
+> **Absence assertions fail open. Check the pattern matches something.**
+>
+> `min: 0, max: 0` passes when nothing matched — and a *wrong* pattern also matches nothing.
+> A typo, or a tool name that never existed, gives you a grader that cannot fail and a case
+> that looks green forever. This is the one grader configuration where being careless is
+> silent rather than loud.
+>
+> Two habits that prevent it:
+>
+> 1. **Enumerate the servers the plugin can actually reach** before writing the assertion.
+>    `grep -rhoE "mcp__[A-Za-z0-9_-]+" <plugin>` lists them. A plugin often reaches more
+>    than its agent frontmatter suggests — a bundled `xlsx-author` skill may pull in an
+>    office server the agent never mentions, and an absence assertion that misses it will
+>    pass while the plugin does the work anyway.
+> 2. **Sanity-check the pattern against a run where the tool WAS used.** If the same pattern
+>    with `min: 1` cannot pass on a happy-path run, it will never fail on a refusal one.
 
 ### `regex` — phrase present or absent
 
