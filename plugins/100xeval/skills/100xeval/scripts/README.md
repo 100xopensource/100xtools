@@ -48,12 +48,15 @@ runner canonicalizes them so a case's graders match either way.
 
 ## Tests
 
+The suite lives one level up, in `../tests/` — this directory is the runtime payload that
+ships with the plugin, so tests stay out of it.
+
 ```bash
-cd plugins/100xeval/skills/100xeval/scripts && python3 -m unittest discover -s engine/tests -p 'test_*.py'
+cd plugins/100xeval/skills/100xeval && PYTHONPATH=scripts python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
-(The `cd` matters — tests import `engine.*`, so the `scripts/` dir must be the cwd / on
-`sys.path`.)
+(`PYTHONPATH=scripts` matters — tests import `engine.*` absolutely and don't know where
+they live, so `scripts/` has to be on `sys.path`.)
 
 ## Layout
 

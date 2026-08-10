@@ -177,20 +177,22 @@ skills/100xeval/
 ├── references/
 │   ├── case-schema.md                  every case.yaml field + every grader parameter
 │   └── managing-testcases.md           lifecycle, best practice, gotchas, reading a red scorecard
-└── scripts/
-    ├── run.py                          CLI entrypoint
-    └── engine/                         loader · orchestrator · graders · judge · reporter · lint · static
-        ├── entrypoints/                surface system prompts (none ship — see its README)
-        ├── harnesses/                  runtimes: claude_code · codex (seam)
-        └── tests/                      stdlib unittest, no live calls
+├── scripts/                            ← the runtime payload: what ships and what Claude invokes
+│   ├── run.py                          CLI entrypoint
+│   └── engine/                         loader · orchestrator · graders · judge · reporter · lint · static
+│       ├── entrypoints/                surface system prompts (none ship — see its README)
+│       └── harnesses/                  runtimes: claude_code · codex (seam)
+└── tests/                              stdlib unittest, no live calls — beside scripts/, not in it
 ```
 
 ## Tests
 
 ```bash
-cd plugins/100xeval/skills/100xeval/scripts
-python3 -m unittest discover -s engine/tests -p 'test_*.py'
+cd plugins/100xeval/skills/100xeval
+PYTHONPATH=scripts python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
-The `cd` matters — tests import `engine.*`, so `scripts/` must be the cwd. No live model or
-MCP calls; the suite runs offline.
+`tests/` deliberately sits *beside* `scripts/` rather than inside it: `scripts/` is the
+runtime payload — it ships with the plugin as-is and is the directory Claude invokes — so
+the suite has no business being in there. Tests import `engine.*` absolutely, which is what
+`PYTHONPATH=scripts` resolves. No live model or MCP calls; the suite runs offline.

@@ -30,11 +30,13 @@ Everything runs from a clone with no setup step.
 
 ```bash
 # engine tests — offline, no model or MCP calls
-cd plugins/100xeval/skills/100xeval/scripts
-python3 -m unittest discover -s engine/tests -p 'test_*.py'
+cd plugins/100xeval/skills/100xeval
+PYTHONPATH=scripts python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
-The `cd` matters: tests import `engine.*`, so `scripts/` must be the working directory.
+`tests/` sits beside `scripts/`, not inside it — `scripts/` is what ships in the plugin
+and what Claude invokes at runtime, so the suite stays out of that payload. Tests import
+`engine.*` absolutely, so `PYTHONPATH=scripts` is what makes them resolve.
 
 ```bash
 # static self-check — both plugins should score 1.00

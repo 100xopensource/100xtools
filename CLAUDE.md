@@ -14,19 +14,21 @@ The eval engine is stdlib-only — there is no install, build, or lockfile step.
 
 ```bash
 # Full test suite (offline; no model, MCP, or network calls)
-cd plugins/100xeval/skills/100xeval/scripts
-python3 -m unittest discover -s engine/tests -p 'test_*.py'
+cd plugins/100xeval/skills/100xeval
+PYTHONPATH=scripts python3 -m unittest discover -s tests -p 'test_*.py'
 
 # One module / class / test
-python3 -m unittest engine.tests.test_lint
-python3 -m unittest engine.tests.test_lint.TestSecurityChecks
-python3 -m unittest engine.tests.test_lint.TestSecurityChecks.test_path_traversal_flagged
+PYTHONPATH=scripts python3 -m unittest tests.test_lint
+PYTHONPATH=scripts python3 -m unittest tests.test_lint.TestSecurityChecks
+PYTHONPATH=scripts python3 -m unittest tests.test_lint.TestSecurityChecks.test_path_traversal_flagged
 ```
 
-**The `cd` is required.** Tests import `engine.*`, so `scripts/` must be the working
-directory. Running from the repo root fails with `ModuleNotFoundError: No module named
+**`tests/` sits beside `scripts/`, not inside it.** `scripts/` is what ships in the plugin
+and what Claude invokes at runtime, so the suite is deliberately kept out of that payload.
+Both the `cd` and `PYTHONPATH=scripts` are required: tests import `engine.*` absolutely and
+have no idea where they live, so without them you get `ModuleNotFoundError: No module named
 'engine'`. Note the shell's cwd persists between tool calls — a later command run from the
-repo root will fail if you are still inside `scripts/`, and vice versa.
+repo root will fail if you are still inside the skill directory, and vice versa.
 
 ```bash
 # Static design quality — free, no model, no API key. Run from the REPO ROOT.

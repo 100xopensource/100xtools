@@ -28,9 +28,15 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      # tests/ sits beside scripts/, not inside it: scripts/ is what ships in the plugin
+      # and what Claude invokes at runtime, so the suite stays out of that payload.
+      # PYTHONPATH puts the engine on the path without the tests having to know where
+      # they live.
       - name: Engine unit tests
-        working-directory: plugins/100xeval/skills/100xeval/scripts
-        run: python3 -m unittest discover -s engine/tests -p 'test_*.py' -v
+        working-directory: plugins/100xeval/skills/100xeval
+        env:
+          PYTHONPATH: scripts
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
 
   static:
     runs-on: ubuntu-latest
