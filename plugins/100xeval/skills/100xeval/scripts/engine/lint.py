@@ -1,0 +1,438 @@
+"""Plugin conformance linter — the deterministic half of the static layer.
+
+Walks a Claude Code plugin directory and emits tagged findings about its *design*:
+frontmatter shape, progressive disclosure, reference hygiene, and a few security
+smells. No model, no network, no third-party packages — pure stdlib, so it runs
+free on every commit.
+
+Each finding carries a bracketed check ID (`[FM1]`, `[PD2]`, `[SEC1]`, …). The **prefix
+names the sub-score the finding feeds**, so `static.py` derives the mapping instead of
+keeping a hand-written table that can silently fall out of sync. Nothing depends on the
+message wording, so the text is free to improve.
+
+Adding a check: pick the prefix for the sub-score it belongs to, take the next free
+number, and add a test asserting both directions. A prefix `static.py` doesn't know is
+loud rather than silent — it raises instead of quietly scoring nothing.
+
+The checks encode *published* Claude Code skill guidance (code.claude.com/docs/en/skills)
+plus the generic hygiene any plugin wants. They are intentionally conservative: a
+finding should mean "this is probably wrong", not "this differs from how we write
+skills". Add house-style rules in your own fork rather than here.
+
+Check IDs
+---------
+FM — frontmatter_quality
+  FM1  frontmatter `name` shares no words with the skill's directory name
+  FM2  skill name unusable: over the length limit, exactly a reserved name, or too vague to trigger
+  FM3  no description — the model cannot decide when to load the skill
+  FM4  unrecognized frontmatter key (likely a typo)
+  FM5  description contains XML-like tags — rejected by Skills API upload
+  FM6  description not written in third person
+  FM7  frontmatter block missing or not closed — nothing else about the skill can be read
+
+PD — progressive_disclosure
+  PD1  SKILL.md body over the line cap; detail belongs in references/
+  PD2  references/ is empty, or the body names a reference file that is missing
+
+RH — reference_hygiene
+  RH1  ships references/ but never instructs the model to read them
+  RH2  a reference file points at further reference files
+  RH3  Windows-style separator in a bundled path (`references\\…`, `scripts\\…`)
+
+ST — structural_completeness
+  ST1  plugin has no README.md at its root
+  ST2  a "self-check" section that is not a real checklist
+
+EC — ecosystem_coherence
+  EC1  routes to a companion skill that does not exist in this plugin
+
+SEC — security
+  SEC1 possible secret committed in plugin content
+  SEC2 instructs sending data to a host outside the allowed set
+  SEC3 a read instruction escaping the skill directory via `../`
+"""
+
+from __future__ import annotations
+
+import difflib
+import os
+import re
+from dataclasses import dataclass
+
+# Official SKILL.md frontmatter fields, plus the metadata-ish keys Anthropic's own
+# skills repo uses. Anything else is a likely typo.
+SKILL_FM_KNOWN = {
+    "name", "description", "when_to_use", "argument-hint", "arguments",
+    "disable-model-invocation", "user-invocable", "allowed-tools",
+    "disallowed-tools", "model", "effort", "context", "agent", "hooks",
+    "paths", "shell", "license", "version", "metadata", "triggers",
+}
+
+VAGUE_SKILL_NAMES = {"helper", "helpers", "util", "utils", "tools", "misc"}
+
+# Matched against the WHOLE name, not as a substring. Substring matching flagged
+# `claude-security`, `claude-api`, and `claude-md-management` — all names Anthropic ships
+# in its own official marketplace. A skill legitimately *about* Claude has to be able to say
+# so; only a skill named nothing but the reserved word is the problem.
+RESERVED_NAMES = frozenset({"anthropic", "claude"})
+SKILL_NAME_MAX = 64
+SKILL_BODY_MAX_LINES = 500
+
+SECRET_PATTERNS = [
+    ("AWS access key", re.compile(r"\bAKIA[0-9A-Z]{16}\b")),
+    ("GitHub token", re.compile(r"\bghp_[A-Za-z0-9]{36}\b")),
+    ("Slack token", re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}\b")),
+    ("secret-key literal", re.compile(r"\bsk-[A-Za-z0-9_-]{20,}\b")),
+    ("private key block", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
+    ("hardcoded credential", re.compile(
+        r"(?i)\b(api[_-]?key|auth[_-]?token|secret|password)\b\s*[:=]\s*"
+        r"['\"](?P<value>[A-Za-z0-9+/_-]{16,})['\"]")),
+]
+
+# A value that names its own key is a placeholder, not a credential: `password:
+# 'meeting-password'` in a code sample matched the pattern above and read as a leak in
+# Anthropic's Zoom plugin. Real secrets do not describe themselves.
+_PLACEHOLDER_VALUE = re.compile(
+    r"(?i)^(your|my|example|sample|test|dummy|fake|placeholder|change|replace|xxx|<)"
+    r"|(key|token|secret|password|credential)$")
+
+# SEC2 second-stage filter, applied only to hosts a skill is told to SEND to.
+# Extend with `EVAL_LINT_ALLOWED_DOMAINS` (comma-separated).
+URL_ALLOWED_DOMAINS = {
+    "code.claude.com", "docs.claude.com", "platform.claude.com", "claude.com",
+    "claude.ai", "anthropic.com", "github.com", "example.com", "localhost",
+}
+
+# SEC2 fires on an instruction to SEND somewhere, not on any URL in the file. Matching
+# every URL against an allowlist cannot work: a plugin that integrates with a vendor links
+# to that vendor's docs, so the Zoom plugin drew 226 findings for `developers.zoom.us` and
+# scored 0.16. You cannot enumerate the legitimate internet — but exfiltration has a verb.
+_EXFIL_RE = re.compile(
+    r"(?i)\b(post|put|upload|send|submit|export|transmit|exfiltrate)\b[^\n]{0,40}"
+    r"https?://([\w.-]+)")
+
+_TEXT_SUFFIXES = {".md", ".txt", ".json", ".yaml", ".yml", ".py", ".sh", ".js"}
+
+# SEC2/SEC3 read a file as *instructions to the model*, so they apply to skill prose only —
+# bundled source handles relative paths and names hosts legitimately. SEC1 scans everything.
+_PROSE_SUFFIXES = {".md", ".txt"}
+
+# Licence text is boilerplate, not instructions. Without this every Apache-licensed plugin
+# lost 0.25 on security for the `apache.org/licenses` URL in its own LICENSE file.
+_LICENCE_STEMS = {"license", "licence", "copying", "notice", "copyright"}
+
+# Same reasoning: an entrypoint is a captured prompt the engine passes to a subprocess, and
+# it names whatever hosts that surface uses — not destinations this plugin visits.
+_PAYLOAD_DIRS = {"entrypoints"}
+
+# SEC3 fires on a read INSTRUCTION that escapes the skill directory ("Load ../../config"),
+# not on every `../` in the file. Relative paths are ordinary in config examples — a case
+# file's `plugins: ["../../plugins/x"]` is data the skill never opens — and flagging those
+# buried the one pattern worth seeing.
+_TRAVERSAL_RE = re.compile(
+    r"(?i)\b(read|load|open|import|include|source|cat|fetch|access)\b[^\n]{0,40}\.\./")
+
+
+@dataclass
+class Finding:
+    """One conformance observation. `msg` carries the `[ID]` tag static.py reads."""
+
+    where: str
+    msg: str
+    level: str = "notice"   # notice | warn
+
+
+# --- small parsing helpers ----------------------------------------------------
+
+def _tokens(name: str) -> set[str]:
+    """Words in a skill or directory name, for the FM1 relatedness test."""
+    return {t for t in re.split(r"[-_\s]+", name.lower()) if t}
+
+
+def _read_text(path: str) -> str:
+    try:
+        with open(path, encoding="utf-8", errors="ignore") as fh:
+            return fh.read()
+    except OSError:
+        return ""
+
+
+def parse_frontmatter(path: str) -> tuple[dict, str | None]:
+    """Return (frontmatter dict, error). Flat `key: value` YAML only — that is all
+    SKILL.md frontmatter is allowed to be, so a real YAML parser buys nothing."""
+    text = _read_text(path)
+    if not text.startswith("---"):
+        return {}, "no frontmatter block"
+    lines = text.splitlines()
+    end = next((i for i, ln in enumerate(lines[1:], start=1) if ln.strip() == "---"), None)
+    if end is None:
+        return {}, "frontmatter block is not closed"
+    fm: dict[str, str] = {}
+    key = None
+    for ln in lines[1:end]:
+        if not ln.strip():
+            continue
+        m = re.match(r"^([A-Za-z_][\w.-]*):\s*(.*)$", ln)
+        if m:
+            key = m.group(1)
+            fm[key] = m.group(2).strip().strip("'\"")
+        elif key:  # folded/continued value
+            fm[key] = (fm[key] + " " + ln.strip()).strip()
+    return fm, None
+
+
+def skill_body(path: str) -> str:
+    """Content after the closing `---` of the frontmatter."""
+    text = _read_text(path)
+    if not text.startswith("---"):
+        return text
+    lines = text.splitlines()
+    end = next((i for i, ln in enumerate(lines[1:], start=1) if ln.strip() == "---"), None)
+    return "\n".join(lines[end + 1:]) if end is not None else text
+
+
+def _section(body: str, titles: tuple[str, ...]) -> str:
+    """Body of the first heading whose text contains one of `titles` (lowercased)."""
+    out: list[str] = []
+    capturing = False
+    for ln in body.splitlines():
+        if ln.startswith("#"):
+            head = ln.lstrip("#").strip().lower()
+            if capturing:
+                break
+            capturing = any(t in head for t in titles)
+            continue
+        if capturing:
+            out.append(ln)
+    return "\n".join(out)
+
+
+def _skill_names(plugin_dir: str) -> set[str]:
+    """Every skill in this plugin, by directory name and by frontmatter name."""
+    names: set[str] = set()
+    sdir = os.path.join(plugin_dir, "skills")
+    if not os.path.isdir(sdir):
+        return names
+    for n in os.listdir(sdir):
+        if not os.path.isdir(os.path.join(sdir, n)):
+            continue
+        names.add(n.lower())
+        fm, _ = parse_frontmatter(os.path.join(sdir, n, "SKILL.md"))
+        if fm.get("name"):
+            names.add(fm["name"].lower())
+    return names
+
+
+def _own_domains(plugin_dir: str) -> set[str]:
+    """Registrable domains the plugin itself declares — its own vendor is not "external".
+
+    A Zoom plugin sending to `api.zoom.us` is doing its job. Judged against a global
+    allowlist it looked like exfiltration 35 times over, because the allowlist cannot know
+    which vendor a given plugin integrates with. The plugin already says so: its
+    `.mcp.json` server URLs and its manifest `homepage` name the hosts it is built around.
+    """
+    out: set[str] = set()
+    for rel in (".mcp.json", os.path.join(".claude-plugin", "plugin.json")):
+        for url in re.findall(r"https?://([\w.-]+)", _read_text(os.path.join(plugin_dir, rel))):
+            parts = url.lower().split(".")
+            if len(parts) >= 2:
+                out.add(".".join(parts[-2:]))   # registrable domain, so api.x.com covers x.com
+    return out
+
+
+def _allowed_domains(plugin_dir: str | None = None) -> set[str]:
+    extra = os.environ.get("EVAL_LINT_ALLOWED_DOMAINS", "")
+    allowed = URL_ALLOWED_DOMAINS | {d.strip().lower() for d in extra.split(",") if d.strip()}
+    return allowed | (_own_domains(plugin_dir) if plugin_dir else set())
+
+
+# --- the checks ---------------------------------------------------------------
+
+def _scan_text_file(path: str, rel: str, out: list[Finding], allowed: set[str]) -> None:
+    """SEC1 over any text file; SEC2/SEC3 over skill prose only (see _PROSE_SUFFIXES)."""
+    content = _read_text(path)
+    for label, pat in SECRET_PATTERNS:
+        m = pat.search(content)
+        if m and not (m.groupdict().get("value")
+                      and _PLACEHOLDER_VALUE.search(m.group("value"))):
+            out.append(Finding(rel, f"[SEC1] possible {label} committed in plugin content", "warn"))
+            break
+    stem, ext = os.path.splitext(os.path.basename(path))
+    parent = os.path.basename(os.path.dirname(path)).lower()
+    if ext not in _PROSE_SUFFIXES or stem.lower() in _LICENCE_STEMS or parent in _PAYLOAD_DIRS:
+        return
+    targets = {d.lower() for _verb, d in _EXFIL_RE.findall(content)}
+    # `your-auth-service.com`, `your_token_service_base_url` — documentation placeholders,
+    # not destinations. A host with no dot is not a host at all.
+    targets = {d for d in targets
+               if "." in d and not re.match(r"^(your|my|example|sample)[-_.]", d)}
+    odd = {d for d in targets
+           if not any(d == a or d.endswith("." + a) for a in allowed)}
+    if odd:
+        out.append(Finding(
+            rel, f"[SEC2] instructs sending data to: {', '.join(sorted(odd)[:4])}"))
+    for line in content.splitlines():
+        if _TRAVERSAL_RE.search(line) and "CLAUDE_PLUGIN_ROOT" not in line \
+                and "CLAUDE_SKILL_DIR" not in line:
+            out.append(Finding(rel, "[SEC3] instructs reading a path ('../') outside the skill directory"))
+            break
+
+
+def _check_frontmatter(rel: str, dirname: str, fm: dict, out: list[Finding]) -> None:
+    name = fm.get("name", "")
+    desc = fm.get("description", "")
+    # Namespacing a skill against its plugin is a convention, not a defect — Anthropic's own
+    # Zoom plugin ships `zoom-cobrowse-sdk` in `cobrowse-sdk/`. Only flag when the directory
+    # name's words are absent from the skill name, which is a genuine mismatch.
+    if name and not _tokens(dirname) <= _tokens(name):
+        out.append(Finding(rel, f"[FM1] frontmatter name {name!r} unrelated to directory {dirname!r}"))
+    if len(name) > SKILL_NAME_MAX:
+        out.append(Finding(rel, f"[FM2] skill name is {len(name)} chars (limit {SKILL_NAME_MAX})"))
+    if name.lower() in RESERVED_NAMES:
+        out.append(Finding(rel, f"[FM2] skill name {name!r} is a reserved name"))
+    if name.lower() in VAGUE_SKILL_NAMES:
+        out.append(Finding(rel, f"[FM2] skill name {name!r} is too vague to trigger reliably"))
+    if not desc:
+        out.append(Finding(rel, "[FM3] skill has no description — the model cannot decide when to load it"))
+    for key in fm:
+        if key not in SKILL_FM_KNOWN:
+            close = difflib.get_close_matches(key, SKILL_FM_KNOWN, n=1)
+            hint = f" (did you mean {close[0]!r}?)" if close else ""
+            out.append(Finding(rel, f"[FM4] unrecognized frontmatter key {key!r}{hint}"))
+    # XML-ish tags load fine in Claude Code but the Skills API upload validation
+    # rejects them — a portability nit, not a correctness bug.
+    if re.search(r"<[A-Za-z][^>\n]*>", desc):
+        out.append(Finding(
+            rel, "[FM5] description contains XML-like tags; fine in Claude Code, rejected "
+                 "by Skills API upload — use [brackets] or backticks for portability"))
+    if re.search(r"\b(I can|I'll|I will|You can use)\b", desc):
+        out.append(Finding(rel, "[FM6] description not in third person (harms skill discovery)"))
+
+
+def _check_skill(sub: str, dirname: str, skill_names: set[str], root: str,
+                 out: list[Finding], allowed: set[str]) -> None:
+    skill_md = os.path.join(sub, "SKILL.md")
+    rel = os.path.relpath(skill_md, root)
+    body = skill_body(skill_md)
+    refdir = os.path.join(sub, "references")
+
+    for dirpath, _dirs, files in os.walk(sub):
+        for fn in files:
+            fp = os.path.join(dirpath, fn)
+            if os.path.splitext(fn)[1] in _TEXT_SUFFIXES and not os.path.islink(fp):
+                _scan_text_file(fp, os.path.relpath(fp, root), out, allowed)
+
+    fm, err = parse_frontmatter(skill_md)
+    if err:
+        out.append(Finding(rel, f"[FM7] {err}"))
+        return
+    _check_frontmatter(rel, dirname, fm, out)
+
+    # RH3 — the regex only matches `references\` / `scripts\`, i.e. a skill pointing at
+    # its OWN bundled files with a Windows separator. That is reference hygiene, not a
+    # frontmatter problem, which is where it used to be filed.
+    if re.search(r"(?:references|scripts)\\", body):
+        out.append(Finding(rel, "[RH3] Windows-style separator in a bundled path (use `/`)"))
+
+    # PD1 — compactness, measured on the BODY so frontmatter length doesn't count.
+    n_lines = body.count("\n") + 1
+    if n_lines > SKILL_BODY_MAX_LINES:
+        out.append(Finding(
+            rel, f"[PD1] SKILL.md body is {n_lines} lines — over the {SKILL_BODY_MAX_LINES}-line "
+                 f"cap; move detail into references/"))
+
+    # PD2 — dangling / empty references.
+    referenced = set(re.findall(r"references/([A-Za-z0-9_.-]+\.[a-z]{2,4})", body))
+    for rf in sorted(referenced):
+        if not os.path.isfile(os.path.join(refdir, rf)):
+            out.append(Finding(rel, f"[PD2] references/{rf} is mentioned but the file is missing"))
+    if os.path.isdir(refdir) and not os.listdir(refdir):
+        out.append(Finding(rel, "[PD2] references/ directory exists but is empty"))
+
+    # RH1 — shipping references nobody is told to open is dead weight in the bundle.
+    gate2 = re.search(
+        r"(?i)\b(read|load|open|consult|review)\b[^\n]{0,120}\breference"
+        r"|\breferences?\b[^\n]{0,120}\b(read|load)\b", body)
+    if os.path.isdir(refdir) and os.listdir(refdir) and not gate2:
+        out.append(Finding(rel, "[RH1] ships references/ but never instructs the model to read them"))
+
+    # RH2 — references must stay one level deep, or loading one pulls a chain.
+    if os.path.isdir(refdir):
+        for rf in sorted(os.listdir(refdir)):
+            rp = os.path.join(refdir, rf)
+            if os.path.isfile(rp) and "references/" in _read_text(rp):
+                out.append(Finding(
+                    os.path.relpath(rp, root),
+                    "[RH2] reference file points at further reference files "
+                    "(keep references one level deep)"))
+
+    # ST2 — a self-check section that isn't a real checklist teaches nothing.
+    selfcheck = _section(body, ("self-check", "self check"))
+    if selfcheck:
+        items = re.findall(r"^\s*(?:[-*]|\d+\.)\s+\S", selfcheck, re.M)
+        if len(items) < 5:
+            out.append(Finding(rel, f"[ST2] self-check has only {len(items)} item(s) (expect >= 5)"))
+
+    # EC1 — a companion skill that doesn't exist is a routing dead end.
+    comp = _section(body, ("companion skill",))
+    cand = {m.lower() for m in re.findall(r"[`*]{1,2}([a-z0-9][a-z0-9-]+)[`*]{1,2}", comp)
+            if "-" in m}
+    for c in sorted(cand - skill_names):
+        out.append(Finding(
+            rel, f"[EC1] references companion skill {c!r} which does not exist in this plugin"))
+
+
+def lint_plugin(plugin_dir: str, root: str | None = None) -> list[Finding]:
+    """Every conformance finding for one plugin directory."""
+    root = root or plugin_dir
+    out: list[Finding] = []
+    allowed = _allowed_domains(plugin_dir)
+    # "." whenever the plugin IS the root, which is the normal case for a standalone
+    # plugin. A finding reported against "." names nothing the reader can open.
+    prel = os.path.relpath(plugin_dir, root)
+    if prel == ".":
+        prel = os.path.basename(os.path.abspath(plugin_dir))
+
+    if not os.path.isfile(os.path.join(plugin_dir, "README.md")):
+        out.append(Finding(prel, "[ST1] plugin has no README.md at its root"))
+
+    sdir = os.path.join(plugin_dir, "skills")
+    if not os.path.isdir(sdir):
+        return out
+    skill_names = _skill_names(plugin_dir)
+    for name in sorted(os.listdir(sdir)):
+        sub = os.path.join(sdir, name)
+        if not os.path.isdir(sub) or not os.path.isfile(os.path.join(sub, "SKILL.md")):
+            continue
+        _check_skill(sub, name, skill_names, root, out, allowed)
+    return out
+
+
+# --- discovery ----------------------------------------------------------------
+
+def find_repo_root(start: str) -> str:
+    """Nearest ancestor holding `.claude-plugin/marketplace.json`, `plugins/`, or `.git`."""
+    cur = os.path.abspath(start)
+    while True:
+        for marker in (os.path.join(".claude-plugin", "marketplace.json"), "plugins", ".git"):
+            if os.path.exists(os.path.join(cur, marker)):
+                return cur
+        parent = os.path.dirname(cur)
+        if parent == cur:
+            return os.path.abspath(start)
+        cur = parent
+
+
+def discover_plugins(root: str) -> list[str]:
+    """Every plugin under `root` — a directory holding `.claude-plugin/plugin.json`."""
+    found = []
+    for dirpath, dirnames, _files in os.walk(root):
+        # `vendor`: third-party copies are not yours to score (lint them with --target).
+        # `runs`: the harness stages a plugin copy into every run workspace.
+        dirnames[:] = [d for d in dirnames
+                       if d not in ("__pycache__", "node_modules", ".git", "vendor",
+                                    "runs", ".runs")]
+        if os.path.isfile(os.path.join(dirpath, ".claude-plugin", "plugin.json")):
+            found.append(dirpath)
+            dirnames[:] = []  # a plugin does not nest inside another plugin
+    return sorted(found)

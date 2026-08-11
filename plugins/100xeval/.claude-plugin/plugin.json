@@ -1,0 +1,12 @@
+{
+  "name": "100xeval",
+  "description": "Behavioral and static evaluation for Claude Code plugins: run a plugin against saved case.yaml testcases with its own MCP attached, grade whether it queried the right data and presented it correctly, plus a run-free design-quality score. Bundles the engine and a skill to manage testcases and run evals.",
+  "version": "0.1.0",
+  "author": {
+    "name": "100x",
+    "url": "https://github.com/100xopensource/100xtools"
+  },
+  "homepage": "https://github.com/100xopensource/100xtools/tree/main/plugins/100xeval",
+  "license": "Apache-2.0",
+  "keywords": ["evals", "testing", "plugins", "skills", "ci"]
+}

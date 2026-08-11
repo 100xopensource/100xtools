@@ -1,0 +1,114 @@
+name: ci
+
+# Everything here is free: stdlib unit tests plus the model-free static layer. No API key,
+# no MCP, no network. Behavioral eval runs cost money and need credentials, so they are not
+# wired into this repo's own CI — see plugins/100xeval/README.md for running them yourself.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.11 is the floor we claim in the README; test the ends of the supported range so
+        # a version-specific stdlib change can't break a user we told it would work for.
+        python-version: ["3.11", "3.13"]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # tests/ sits beside scripts/, not inside it: scripts/ is what ships in the plugin
+      # and what Claude invokes at runtime, so the suite stays out of that payload.
+      # PYTHONPATH puts the engine on the path without the tests having to know where
+      # they live.
+      - name: Engine unit tests
+        working-directory: plugins/100xeval/skills/100xeval
+        env:
+          PYTHONPATH: scripts
+        run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      # Dogfooding: this repo's own plugins go through the linter it ships. If a change to
+      # lint.py makes our own plugins look bad, that is worth finding here rather than in
+      # someone else's repo.
+      - name: Static design quality (this repo's plugins)
+        run: |
+          python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --report static.md
+          { echo '## 100xeval — static design quality'; echo; cat static.md; } >> "$GITHUB_STEP_SUMMARY"
+
+  # The shipped example cases must keep parsing and resolving their vendored plugins.
+  # `--dry-run` proves that with no model call and nothing spent; a case that fails to load
+  # exits 2, so a rotted example fails the build instead of warning into the void.
+  examples:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Example cases load and resolve (no model call)
+        run: |
+          python3 plugins/100xeval/skills/100xeval/scripts/run.py \
+            eval --cases-dir examples/plugin-eval/cases --skip-static --dry-run
+
+  # Separate job so documentation drift reads distinctly from a test failure — they call
+  # for different fixes, and a merged job makes the summary ambiguous.
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+
+      - name: Validate the docs/ knowledge bundle
+        run: python3 scripts/check_docs.py
+
+  manifests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # A malformed manifest fails at install time for a user, with a worse error message
+      # than this one. Cheap to check here.
+      - name: Validate plugin + marketplace manifests
+        run: |
+          set -e
+          for f in .claude-plugin/marketplace.json plugins/*/.claude-plugin/plugin.json; do
+            python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f"
+            echo "ok  $f"
+          done
+          # Every plugin in the marketplace must exist, and every plugin must be listed.
+          python3 - <<'PY'
+          import json, os, sys
+          mp = json.load(open(".claude-plugin/marketplace.json"))
+          listed = {p["name"]: p["source"].lstrip("./") for p in mp["plugins"]}
+          on_disk = {d for d in os.listdir("plugins")
+                     if os.path.isfile(f"plugins/{d}/.claude-plugin/plugin.json")}
+          missing = {n: s for n, s in listed.items() if not os.path.isdir(s)}
+          unlisted = on_disk - {os.path.basename(s) for s in listed.values()}
+          if missing:
+              sys.exit(f"marketplace lists plugins with no directory: {missing}")
+          if unlisted:
+              sys.exit(f"plugins on disk not listed in marketplace.json: {sorted(unlisted)}")
+          print(f"ok  {len(listed)} plugins listed and present")
+          PY
