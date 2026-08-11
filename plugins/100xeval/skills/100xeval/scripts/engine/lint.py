@@ -99,26 +99,16 @@ URL_ALLOWED_DOMAINS = {
 
 _TEXT_SUFFIXES = {".md", ".txt", ".json", ".yaml", ".yml", ".py", ".sh", ".js"}
 
-# SEC2/SEC3 read a file as *instructions to the model*, so they only apply to skill prose.
-# Bundled source legitimately handles relative paths and names hosts in test fixtures;
-# flagging that produced findings on every plugin that ships a script, which is exactly
-# the kind of noise that trains people to ignore the security sub-score. SEC1 (secrets)
-# still runs over every text file — a committed credential is a problem anywhere.
+# SEC2/SEC3 read a file as *instructions to the model*, so they apply to skill prose only —
+# bundled source handles relative paths and names hosts legitimately. SEC1 scans everything.
 _PROSE_SUFFIXES = {".md", ".txt"}
 
-# Licence and notice files are legal boilerplate, never instructions to the model, so the
-# prose checks skip them. Without this, every Apache-licensed plugin that ships its licence
-# inside the skill directory lost 0.25 on security because the Apache text contains
-# `http://www.apache.org/licenses/` — observed on `frontend-design` and `skill-creator`, two
-# of the most-installed plugins there are. SEC1 still scans them: a committed credential is
-# a problem in any file.
+# Licence text is boilerplate, not instructions. Without this every Apache-licensed plugin
+# lost 0.25 on security for the `apache.org/licenses` URL in its own LICENSE file.
 _LICENCE_STEMS = {"license", "licence", "copying", "notice", "copyright"}
 
-# Same reasoning, third case: an `entrypoints/` file is a captured system prompt that the
-# engine hands to a subprocess, not guidance this skill gives the model. Surface prompts
-# name whatever hosts that surface happens to use — a CDN for artifacts, a docs site — and
-# reading those as destinations *this* plugin visits is a category error. SEC1 still scans
-# them, so a credential captured along with a prompt is still caught.
+# Same reasoning: an entrypoint is a captured prompt the engine passes to a subprocess, and
+# it names whatever hosts that surface uses — not destinations this plugin visits.
 _PAYLOAD_DIRS = {"entrypoints"}
 
 # SEC3 fires on a read INSTRUCTION that escapes the skill directory ("Load ../../config"),
@@ -392,14 +382,8 @@ def discover_plugins(root: str) -> list[str]:
     """Every plugin under `root` — a directory holding `.claude-plugin/plugin.json`."""
     found = []
     for dirpath, dirnames, _files in os.walk(root):
-        # `vendor` is skipped like the rest: third-party code copied in for fixtures or
-        # examples is not yours to score, and discovering it turns your own sweep into a
-        # report card on someone else's plugin. Lint it deliberately with --target.
-        #
-        # `runs` for a different reason: the harness stages a COPY of the plugin under test
-        # into each run workspace, so after any behavioral run a plain --static-only started
-        # reporting on `runs/<id>/<case>/run-1/workspace/plugin`. Those are transient copies
-        # of something already being scored, and they multiply with every run.
+        # `vendor`: third-party copies are not yours to score (lint them with --target).
+        # `runs`: the harness stages a plugin copy into every run workspace.
         dirnames[:] = [d for d in dirnames
                        if d not in ("__pycache__", "node_modules", ".git", "vendor", "runs")]
         if os.path.isfile(os.path.join(dirpath, ".claude-plugin", "plugin.json")):

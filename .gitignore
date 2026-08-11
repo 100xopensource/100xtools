@@ -1,15 +1,10 @@
-# Secrets — never commit. Tokens are read from the environment at run time.
+# Secrets — tokens come from the environment at run time.
 .env
 .env.*
 !.env.example
 
-# Eval run output: transcripts, debug logs, and reports from every invocation. Large,
-# machine-specific, and they can contain whatever your MCP returned.
-#
-# `.runs/` is what the runner writes to by default — a dot-directory at the invocation cwd,
-# like .pytest_cache, rather than nested inside the cases it reports on. `**/runs/` stays as
-# a safety net for the old default (`<cases-dir>/runs`), one of which got committed once.
-# A custom `--runs-dir` needs its own entry here, or point it outside the repo.
+# Eval run output. Large, machine-specific, and can contain whatever your MCP returned.
+# `**/runs/` covers the pre-.runs default; a custom --runs-dir needs its own entry.
 .runs/
 **/runs/
 
@@ -26,5 +21,5 @@ venv/
 .vscode/
 *.swp
 
-# Claude Code local settings (machine-specific permissions, not project config)
+# Claude Code local settings, not project config
 .claude/settings.local.json

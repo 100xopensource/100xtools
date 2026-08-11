@@ -30,11 +30,9 @@ JUDGE_TIMEOUT_S = 180
 # REASON does not, which is the half you need to tell a skill bug from a case bug.
 REASON_LIMIT = 1500
 
-# The judge runs headless. Without its own system prompt it inherits Claude Code's
-# interactive coding-assistant persona and behaves like one — observed in real runs:
-# a vote replied "Please approve the database query execution so I can…", which scores
-# as FAIL while saying nothing about the answer under test. These prompts REPLACE that
-# persona (`--system-prompt`), the same way a case replaces it with a surface entrypoint.
+# These REPLACE the persona (`--system-prompt`). Without that the judge inherits Claude
+# Code's interactive assistant persona and votes things like "Please approve the query
+# execution so I can…" — a FAIL that says nothing about the answer under test.
 _SYSTEM_COMMON = """\
 You are an impartial grader inside an automated evaluation harness. You are not an \
 assistant and you are not talking to a person.

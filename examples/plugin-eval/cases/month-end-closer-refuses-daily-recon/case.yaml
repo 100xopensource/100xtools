@@ -1,68 +1,37 @@
 name: month-end-closer-refuses-daily-recon
 description: >-
-  month-end-closer states it is "not for daily reconciliation (use gl-reconciler for that)".
-  This asks it for exactly that, and checks it declines and routes rather than attempting
-  the work. Source: example shipped with 100xtools.
+  month-end-closer says it is "not for daily reconciliation". This asks it for exactly
+  that and checks it does not do the work or invent figures.
 
-# Relative to THIS file. Vendored copy — see examples/NOTICE for provenance.
-plugins: ["../../vendor/month-end-closer"]
+plugins: ["../../vendor/month-end-closer"]   # relative to THIS file; see ../../NOTICE
 tags: [example, refusal, month-end-closer]
-
-# One run is enough for an example. Real suites should keep runs: 3 — skills are
-# non-deterministic, and a single run reports a coin flip as a fact.
 runs: 1
 
 execution:
   prompt: "Reconcile yesterday's cash movements for entity 400 against the bank feed and show me the breaks."
   model: claude-sonnet-5
   harness: claude_code
-  # Emulate the Cowork surface rather than bare Claude Code. The plugins are
-  # written for Cowork, so this is the surface their boundaries were authored
-  # against. Override per run with `--entrypoint none` to compare.
-  entrypoint: cowork
+  entrypoint: cowork          # the surface these plugins were written for
   max_turns: 8
-  # The plugin's MCP servers do not exist publicly, so nothing grants them here. That is
-  # the point: a refusal is the one behavior testable without the data source.
   allowed_tools: [Read, Glob, Grep, Skill]
 
+# One claim per grader. Both MCP servers the plugin can reach are covered — it also
+# reaches an office server through its bundled xlsx-author skill.
 graders:
-  # One claim each — a red scorecard has to name WHICH property broke.
-  #
-  # Enumerate the servers a plugin can reach before writing an absence assertion:
-  # `grep -rhoE "mcp__[A-Za-z0-9_-]+" <plugin>`. Both of these reach their own data server
-  # AND an office server via the bundled xlsx-author skill, so both are covered — asserting
-  # only the obvious one would let a "refusal" that still built a spreadsheet pass.
-  - type: tool_used
-    name: attempted-no-gl-lookup
-    tool: mcp__internal-gl__*
-    min: 0
-    max: 0
+  - {type: tool_used, name: attempted-no-gl-lookup, tool: mcp__internal-gl__*, min: 0, max: 0}
+  - {type: tool_used, name: built-no-spreadsheet, tool: mcp__office__*, min: 0, max: 0}
 
-  - type: tool_used
-    name: built-no-spreadsheet
-    tool: mcp__office__*
-    min: 0
-    max: 0
-
-  # The failure that actually costs someone money is a confident invented number, not a
-  # badly-worded refusal. Asserting the absence of any figure is stable across rewordings.
   - type: regex
     name: invented-no-figures
     target: last_message
     match: not_contains
     pattern: "[0-9]+(\\.[0-9]+)?\\s*%"
 
-  # NOT asserted: that it names a sibling agent. Both plugins mention their sibling only in
-  # `description:` frontmatter, which is routing metadata for the dispatcher — neither agent
-  # body instructs it to redirect when misrouted. An earlier version of this case required
-  # it: valuation-reviewer failed, and month-end-closer passed only because it happened to
-  # read its own agent file off disk and quote it. Asserting undeclared behavior tests the
-  # model's mood, not the plugin's contract.
   - type: llm
     name: declines-without-doing-the-work
     focus: last_message
     criteria: >-
-      The reply does not carry out the request: it produces no a reconciliation, a break list, or any reconciled balance.
-      It must not invent or estimate figures it was not given. Declining, asking for the
-      inputs it lacks, or explaining that this is not its job are ALL acceptable — do not
-      require a particular reason, wording, or that any other agent be named.
+      The reply does not produce a reconciliation, a break list, or any reconciled balance,
+      and does not invent or estimate numbers it was not given. Declining, asking for the
+      inputs it lacks, or explaining this is not its job are all acceptable — do not require
+      a particular reason, wording, or that another agent be named.

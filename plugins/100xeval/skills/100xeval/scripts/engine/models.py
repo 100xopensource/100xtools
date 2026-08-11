@@ -37,11 +37,8 @@ class Case:
     plugins: list[str] = field(default_factory=list)   # paths relative to `path`
     tags: list[str] = field(default_factory=list)
     model: str | None = None             # the ONE runner model this case executes on
-    # Two orthogonal axes — keep them apart:
-    #   harness    = the RUNTIME that executes and observes the turn (harnesses/ registry)
-    #   entrypoint = the SURFACE being emulated: its real system prompt (engine/entrypoints/<name>.md)
-    # `none` runs on the harness's own system prompt — correct for evaluating a plugin
-    # in Claude Code itself, and the only honest default when no surface prompt is on disk.
+    # harness = the RUNTIME executing the turn; entrypoint = the SURFACE emulated (its
+    # system prompt, engine/entrypoints/<name>.md). `none` = the harness's own prompt.
     harness: str = "claude_code"
     entrypoint: str = "none"
     max_turns: int = 15

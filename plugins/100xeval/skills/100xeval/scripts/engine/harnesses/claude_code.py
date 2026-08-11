@@ -31,13 +31,8 @@ TIMEOUT_S = 300      # default only; a case may raise it via `execution.timeout_
 MCP_LIST_TIMEOUT_S = 60
 
 # `claude mcp list` line: "<scope> <name>: <url> [(TRANSPORT)] - <status>"
-#
-# The separator must be a SPACED hyphen. With `\s*-\s*` the URL group backtracks into a
-# hyphen inside the URL itself, so `.../agent-hub-observability/mcp (HTTP) - ! Needs auth`
-# parsed as url=`.../agent` + status=`hub-observability/mcp (HTTP) - ! Needs auth`: a
-# truncated URL that then failed to match the server the plugin declared, silently. The
-# optional `(HTTP)` annotation that plugin-scoped registrations carry has to be consumed
-# explicitly for the same reason.
+# The spaced hyphen and the explicit `(HTTP)` group both matter: `\s*-\s*` backtracks into
+# hyphens inside the URL, silently truncating it so it no longer matches the declared server.
 _MCP_LINE = re.compile(
     r"^(?P<label>.+?):\s*(?P<url>https?://\S+?)"
     r"(?:\s+\([A-Za-z]+\))?"          # optional transport annotation, e.g. " (HTTP)"
@@ -85,11 +80,8 @@ class ClaudeCodeHarness:
             if case.max_turns:
                 cmd += ["--max-turns", str(case.max_turns)]
 
-            # Strict-config path (CI + true plugin-MCP fidelity): a case may name its own
-            # `execution.mcp_config` file; otherwise, when a bearer token is in the env, we
-            # auto-build a config from the plugin's own .mcp.json. Either way the env token
-            # is injected as an Authorization header and the run is isolated with
-            # --strict-mcp-config. No token + no mcp_config → ambient/account MCP.
+            # Strict mode: the case's `mcp_config`, or one auto-built from the plugin's
+            # .mcp.json when a bearer is in the env. Neither → ambient/account MCP.
             strict_cfg = resolve_strict_mcp_config(case)
             if strict_cfg is not None:
                 cfg_path = os.path.join(tmp, "mcp-config.json")
@@ -102,11 +94,8 @@ class ClaudeCodeHarness:
                 # account connector (mcp__claude_ai_X__t) or a strict plugin config
                 # (mcp__X__t). Passing tools that don't exist in a given mode is harmless.
                 cmd += ["--allowedTools", ",".join(expand_tool_aliases(case.allowed_tools))]
-            # Emulate the surface by REPLACING the system prompt with its entrypoint
-            # (--system-prompt, not --append-*: we want the surface's prompt, not Claude
-            # Code's default plus it). Dynamic sections (available skills, env) are still
-            # injected. Passed via subprocess rather than the shell, so a large prompt is
-            # not ARG_MAX-bound. Empty with `entrypoint: none` — the harness's own prompt.
+            # REPLACES the prompt (not --append-*): we want the surface's, not Claude Code's
+            # plus it. Empty with `entrypoint: none`. Not ARG_MAX-bound — no shell involved.
             if entry:
                 cmd += ["--system-prompt", entry]
             if case.append_system_prompt:

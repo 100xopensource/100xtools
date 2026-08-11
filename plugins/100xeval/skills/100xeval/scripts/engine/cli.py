@@ -196,11 +196,8 @@ def _cmd_eval(args) -> int:
     # But the exit code tells the truth, at every return path below.
     load_failed = bool(errors)
 
-    # Entrypoint override. The surface is the one axis you genuinely want to vary without
-    # editing the case: the same question asked of the same plugin can be answered
-    # differently under a different system prompt, and that difference is the thing worth
-    # measuring. Announced rather than applied quietly — a run whose surface silently
-    # differs from the case file is a scorecard nobody can reproduce.
+    # Announced, not applied quietly: a run whose surface differs from the case file
+    # without saying so is a scorecard nobody can reproduce.
     if args.entrypoint:
         for c in cases:
             c.entrypoint = args.entrypoint

@@ -61,11 +61,9 @@ def _grade_tool_used(grader: Grader, result: RunResult, context: dict):
     minimum = int(p.get("min", 1))
     maximum = p.get("max")
 
-    # Glob support matters most for the case it was missing from: asserting a server was
-    # NOT used. You cannot enumerate the tools of a server you do not have, so
-    # `mcp__internal-gl__*` is the only way to say "nothing from the GL server". Under exact
-    # matching that pattern matched nothing, so `min: 0, max: 0` passed even when the plugin
-    # called that server repeatedly — an absence assertion that could not fail.
+    # Globs are what make absence assertions possible: you cannot enumerate the tools of a
+    # server you do not have. Under exact matching `mcp__x__*` matched nothing, so
+    # `min: 0, max: 0` passed however often the server was actually called.
     is_glob = any(ch in tool for ch in "*?[")
 
     def _hit(call) -> bool:
