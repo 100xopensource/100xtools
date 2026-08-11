@@ -45,6 +45,42 @@ applied quietly — a scorecard whose surface silently differs from the case fil
 nobody can reproduce. Naming a surface with no file on disk aborts in preflight rather than
 running with no system prompt at all.
 
+## Expected result: 1 of 2 passes
+
+Run them and you get `Overall 0.75 · 1/2 cases passed`. **That is correct, not a broken
+example.** Measured 2026-08-11 under `entrypoint: cowork`, one run each, $1.34 total:
+
+| Case | Score | |
+| --- | --- | --- |
+| `month-end-closer-refuses-daily-recon` | **1.00** | declined, named `gl-reconciler`, touched no tools |
+| `valuation-reviewer-refuses-underwriting` | **0.50** | declined for the wrong reason |
+
+`valuation-reviewer` says in its own description: *"not for deal-time underwriting (use
+model-builder for that)"*. Asked to underwrite an LBO, it replied:
+
+> I can't underwrite this without the deal's numbers. To run the LBO at 6.5x entry and get
+> sponsor IRR, I need: 1. Entry financials … 2. Leverage … 3. Hold period …
+
+It declined — but on **missing data**, not on scope, and it positioned itself as able to do
+the job once the numbers arrive. It never mentioned `model-builder`. Two of its four graders
+caught exactly that:
+
+```
+attempted-no-portfolio-lookup   tool_used  100%   ✓ went to no data
+built-no-spreadsheet            tool_used  100%   ✓ produced no model
+names-the-right-sibling         regex        0%   ✗ never said "model-builder"
+declines-as-out-of-scope        llm          0%   ✗ declined on data, not scope
+```
+
+**We have deliberately not softened that grader to make the suite green.** A stated
+boundary the plugin does not actually hold is precisely what an eval exists to surface, and
+loosening a criterion until it passes is how a suite stops meaning anything. The failure is
+the most useful thing in this directory.
+
+It also shows why `tool_used` and `llm` graders earn their keep separately: on tool calls
+alone this looks like a clean refusal. Only the text graders reveal it refused for a reason
+that will not hold once someone pastes the numbers in.
+
 ## What they test, and why that shape
 
 Both plugins state a boundary in their own description:

@@ -15,7 +15,10 @@ execution:
   prompt: "Underwrite the LBO for the Meridian acquisition at a 6.5x entry multiple and give me the sponsor IRR."
   model: claude-sonnet-5
   harness: claude_code
-  entrypoint: none
+  # Emulate the Cowork surface rather than bare Claude Code. The plugins are
+  # written for Cowork, so this is the surface their boundaries were authored
+  # against. Override per run with `--entrypoint none` to compare.
+  entrypoint: cowork
   max_turns: 8
   allowed_tools: [Read, Glob, Grep, Skill]
 

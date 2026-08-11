@@ -5,8 +5,10 @@
 
 # Eval run output: transcripts, debug logs, and reports from every invocation.
 # These are large, machine-specific, and can contain data returned by your own MCP.
-evals/runs/
-**/evals/runs/
+# The runner writes <--root>/runs/ and --root is arbitrary (defaults to `evals`,
+# but the shipped examples use examples/plugin-eval/cases). Pinning to `evals/`
+# let a throwaway run get committed. Match the convention, not one path.
+examples/plugin-eval/cases/runs/
 
 # Python
 __pycache__/

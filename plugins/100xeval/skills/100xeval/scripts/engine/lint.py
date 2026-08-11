@@ -395,8 +395,13 @@ def discover_plugins(root: str) -> list[str]:
         # `vendor` is skipped like the rest: third-party code copied in for fixtures or
         # examples is not yours to score, and discovering it turns your own sweep into a
         # report card on someone else's plugin. Lint it deliberately with --target.
+        #
+        # `runs` for a different reason: the harness stages a COPY of the plugin under test
+        # into each run workspace, so after any behavioral run a plain --static-only started
+        # reporting on `runs/<id>/<case>/run-1/workspace/plugin`. Those are transient copies
+        # of something already being scored, and they multiply with every run.
         dirnames[:] = [d for d in dirnames
-                       if d not in ("__pycache__", "node_modules", ".git", "vendor")]
+                       if d not in ("__pycache__", "node_modules", ".git", "vendor", "runs")]
         if os.path.isfile(os.path.join(dirpath, ".claude-plugin", "plugin.json")):
             found.append(dirpath)
             dirnames[:] = []  # a plugin does not nest inside another plugin

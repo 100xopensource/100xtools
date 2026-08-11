@@ -16,7 +16,10 @@ execution:
   prompt: "Reconcile yesterday's cash movements for entity 400 against the bank feed and show me the breaks."
   model: claude-sonnet-5
   harness: claude_code
-  entrypoint: none
+  # Emulate the Cowork surface rather than bare Claude Code. The plugins are
+  # written for Cowork, so this is the surface their boundaries were authored
+  # against. Override per run with `--entrypoint none` to compare.
+  entrypoint: cowork
   max_turns: 8
   # The plugin's MCP servers do not exist publicly, so nothing grants them here. That is
   # the point: a refusal is the one behavior testable without the data source.
