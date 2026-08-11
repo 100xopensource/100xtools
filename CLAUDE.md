@@ -21,7 +21,7 @@ scripts/check_docs.py             bundle conformance + check-ID sync
 Two things about `examples/` that look odd until you know why:
 
 - **`examples/plugin-eval/cases` is a second case root.** The default is `evals/`, so the
-  example cases are only found with `--root examples/plugin-eval/cases`. CI dry-runs them, which proves they parse and
+  example cases are only found with `--cases-dir examples/plugin-eval/cases`. CI dry-runs them, which proves they parse and
   resolve their plugins without a model call.
 - **`vendor/` is skipped by plugin discovery** (`lint.py`). Third-party code copied in for
   fixtures is not ours to score, and discovering it would turn our own sweep into a report

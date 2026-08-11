@@ -77,11 +77,21 @@ def main(argv=None) -> int:
     p_init.add_argument("--plugin", default="<plugin>")
     p_init.add_argument("--tag", default="")
     p_init.add_argument("--prompt", default=None)
-    p_init.add_argument("--root", default=DEFAULT_ROOT)
+    p_init.add_argument("--cases-dir", "--root", dest="root", default=DEFAULT_ROOT,
+                        metavar="DIR", help="where to scaffold the case folder")
     p_init.add_argument("--force", action="store_true")
 
     p_eval = sub.add_parser("eval", help="run static and/or behavioral evals")
-    p_eval.add_argument("--root", default=DEFAULT_ROOT)
+    # `--root` said nothing about what it was the root OF — repo? plugin? output? It is the
+    # directory holding case folders, so `--cases` says so. The old spelling still works;
+    # it is not worth breaking anyone's script over a name.
+    p_eval.add_argument("--cases-dir", "--root", dest="root", default=DEFAULT_ROOT,
+                        metavar="DIR",
+                        help=f"directory holding case folders (default: {DEFAULT_ROOT}/). "
+                             f"`--root` is the deprecated spelling.")
+    p_eval.add_argument("--runs-dir", dest="runs_dir", default=None, metavar="DIR",
+                        help="where run artifacts are written (default: <cases-dir>/runs). "
+                             "Point it outside the repo to keep transcripts out of git.")
     p_eval.add_argument("--tag", action="append", default=[], help="repeatable; all must be present")
     p_eval.add_argument("--case", default=None, help="fnmatch glob on case name")
     p_eval.add_argument("--target", default=None, help="plugin path for --static-only")
@@ -218,9 +228,11 @@ def _cmd_eval(args) -> int:
         print("  Nothing was executed. Drop --dry-run to run it.")
         return 2 if load_failed else 0
 
-    # One self-contained run directory: workspace + artifacts + reports.
+    # One self-contained run directory: workspace + artifacts + reports. Defaults beside
+    # the cases, but `--runs-dir` moves it — transcripts can hold whatever your MCP returned,
+    # so keeping them outside the repo entirely is a reasonable thing to want.
     run_id = _new_run_id()
-    run_dir = os.path.join(args.root, "runs", run_id)
+    run_dir = os.path.join(args.runs_dir or os.path.join(args.root, "runs"), run_id)
     os.makedirs(run_dir, exist_ok=True)
     with open(os.path.join(run_dir, "cases.json"), "w", encoding="utf-8") as fh:
         json.dump([c.as_dict() for c in cases], fh, indent=2)

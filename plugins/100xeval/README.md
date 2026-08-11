@@ -59,7 +59,7 @@ the rough spend without spending it.
 real third-party plugins vendored into the repo — read them before writing your own:
 
 ```bash
-python3 "$RUN" eval --root examples/plugin-eval/cases --skip-static --dry-run   # free
+python3 "$RUN" eval --cases-dir examples/plugin-eval/cases --skip-static --dry-run   # free
 ```
 
 Exit codes: `0` all pass · `1` a case below `--threshold` · `2` usage or engine error. That

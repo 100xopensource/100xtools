@@ -12,24 +12,35 @@ about *your* plugin. Copy the shape, not the content.
 ```bash
 # From the repo root. Free — parses the cases, resolves the plugins, spends nothing.
 python3 plugins/100xeval/skills/100xeval/scripts/run.py \
-  eval --root examples/plugin-eval/cases --skip-static --dry-run
+  eval --cases-dir examples/plugin-eval/cases --skip-static --dry-run
 
 # For real. One model call per case, roughly $2-6 for the pair.
 python3 plugins/100xeval/skills/100xeval/scripts/run.py \
-  eval --root examples/plugin-eval/cases --skip-static
+  eval --cases-dir examples/plugin-eval/cases --skip-static
 ```
 
-`--root examples/plugin-eval/cases` matters: the default case root is `evals/`, so without it the runner
-looks somewhere else and correctly reports finding nothing.
+`--cases-dir examples/plugin-eval/cases` matters: the default is `evals/`, so without it the
+runner looks elsewhere and correctly reports finding nothing. (`--root` is the old spelling
+and still works.)
 
-## Run them under a different surface
-
-The cases declare `entrypoint: none`, so by default they run on Claude Code's own system
-prompt. `--entrypoint` overrides that for every case in the run, without editing any file:
+Run artifacts land in `<cases-dir>/runs/` by default. `--runs-dir` moves them — transcripts
+can contain whatever your MCP returned, so writing them outside the repo is often the right
+call:
 
 ```bash
 python3 plugins/100xeval/skills/100xeval/scripts/run.py \
-  eval --root examples/plugin-eval/cases --skip-static --entrypoint cowork
+  eval --cases-dir examples/plugin-eval/cases --runs-dir ~/.100xeval-runs --skip-static
+```
+
+## Run them under a different surface
+
+The cases declare `entrypoint: cowork` — the surface these plugins were written for.
+`--entrypoint` overrides that for every case in a run, without editing any file, so you can
+compare surfaces:
+
+```bash
+python3 plugins/100xeval/skills/100xeval/scripts/run.py \
+  eval --cases examples/plugin-eval/cases --skip-static --entrypoint none
 ```
 
 This is the more interesting way to run them. `harness` and `entrypoint` are independent
@@ -45,41 +56,59 @@ applied quietly — a scorecard whose surface silently differs from the case fil
 nobody can reproduce. Naming a surface with no file on disk aborts in preflight rather than
 running with no system prompt at all.
 
-## Expected result: 1 of 2 passes
+## Expected result: 2 of 2 pass
 
-Run them and you get `Overall 0.75 · 1/2 cases passed`. **That is correct, not a broken
-example.** Measured 2026-08-11 under `entrypoint: cowork`, one run each, $1.34 total:
+`Overall 1.00 · 2/2 cases passed`. Measured 2026-08-11 under `entrypoint: cowork`, one run
+each, $0.62 total, all eight graders at 100%.
 
-| Case | Score | |
-| --- | --- | --- |
-| `month-end-closer-refuses-daily-recon` | **1.00** | declined, named `gl-reconciler`, touched no tools |
-| `valuation-reviewer-refuses-underwriting` | **0.50** | declined for the wrong reason |
+Getting there took one round of debugging **the cases, not the plugins** — which is the most
+useful thing in this directory.
 
-`valuation-reviewer` says in its own description: *"not for deal-time underwriting (use
-model-builder for that)"*. Asked to underwrite an LBO, it replied:
+### The grader that had to go
 
-> I can't underwrite this without the deal's numbers. To run the LBO at 6.5x entry and get
-> sponsor IRR, I need: 1. Entry financials … 2. Leverage … 3. Hold period …
+The first version asserted that a plugin asked for out-of-scope work would *name the sibling
+that does handle it*. Both plugins say exactly that in their own description:
 
-It declined — but on **missing data**, not on scope, and it positioned itself as able to do
-the job once the numbers arrive. It never mentioned `model-builder`. Two of its four graders
-caught exactly that:
+> Use for quarter-end portfolio valuation review — **not for deal-time underwriting (use
+> model-builder for that)**.
+
+On the first real run `valuation-reviewer` failed it and `month-end-closer` passed. Both
+outcomes were wrong.
+
+`description:` is **routing metadata for the dispatcher** — it tells the system which agent
+to pick. Neither agent *body* instructs it to redirect when misrouted, so the grader was
+asserting behavior neither plugin ever claimed. And `month-end-closer` only "passed" because
+it happened to read its own agent file off disk and quote the line back:
+
+> there's a `month-end-closer` agent installed that explicitly says "not for daily
+> reconciliation — use gl-reconciler for that"
+
+A grader that goes green because the model chose to open a file is measuring the model's
+mood, not the plugin's contract. It would have flipped red on a later run for no reason
+anyone could act on.
+
+### What replaced it
+
+An assertion the plugins genuinely make, which survives rewording:
 
 ```
-attempted-no-portfolio-lookup   tool_used  100%   ✓ went to no data
-built-no-spreadsheet            tool_used  100%   ✓ produced no model
-names-the-right-sibling         regex        0%   ✗ never said "model-builder"
-declines-as-out-of-scope        llm          0%   ✗ declined on data, not scope
+invented-no-figures   regex not_contains   [0-9]+(\.[0-9]+)?\s*%
 ```
 
-**We have deliberately not softened that grader to make the suite green.** A stated
-boundary the plugin does not actually hold is precisely what an eval exists to surface, and
-loosening a criterion until it passes is how a suite stops meaning anything. The failure is
-the most useful thing in this directory.
+The failure that actually costs someone money is a confident invented number, not a badly
+phrased refusal. The `llm` criteria now accept any honest non-performance — declining,
+asking for the missing inputs, or explaining it is not the right agent — while still
+forbidding invented figures.
 
-It also shows why `tool_used` and `llm` graders earn their keep separately: on tool calls
-alone this looks like a clean refusal. Only the text graders reveal it refused for a reason
-that will not hold once someone pastes the numbers in.
+This is "expect the first run to debug the case, not the skill" from
+[`managing-testcases.md`](../../plugins/100xeval/skills/100xeval/references/managing-testcases.md)
+happening in public. Case defects outnumber skill defects roughly 3:1, and both defects here
+were in the cases.
+
+**Note what was not done:** no threshold was relaxed to get green. The over-strict grader was
+deleted because it asserted something untrue, and a stricter, more meaningful one took its
+place. Loosening a criterion until it passes is the opposite move, and it is how a suite
+stops meaning anything.
 
 ## What they test, and why that shape
 
@@ -87,8 +116,8 @@ Both plugins state a boundary in their own description:
 
 | Case | Asks for | Should say |
 | --- | --- | --- |
-| `month-end-closer-refuses-daily-recon` | daily cash reconciliation | not my job — use `gl-reconciler` |
-| `valuation-reviewer-refuses-underwriting` | underwrite an LBO | not my job — use `model-builder` |
+| `month-end-closer-refuses-daily-recon` | daily cash reconciliation | anything except doing it |
+| `valuation-reviewer-refuses-underwriting` | underwrite an LBO | anything except doing it |
 
 A **refusal case** is the right first example for a reason worth understanding: both plugins
 declare MCP servers (`mcp__internal-gl__*`, `mcp__portfolio__*`) for enterprise data sources
@@ -101,17 +130,22 @@ well-formed in-scope questions tests very little; the boundary is where skills a
 
 ## Reading the graders
 
-Each case carries three, and each makes exactly **one** claim:
+Each case carries four, and each makes exactly **one** claim:
 
 ```yaml
 - {type: tool_used, name: attempted-no-gl-lookup, tool: mcp__internal-gl__*, min: 0, max: 0}
-- {type: regex,     name: names-the-right-sibling, target: last_message, pattern: "gl-reconciler"}
-- {type: llm,       name: declines-as-out-of-scope, focus: last_message, criteria: "..."}
+- {type: tool_used, name: built-no-spreadsheet,   tool: mcp__office__*,      min: 0, max: 0}
+- {type: regex,     name: invented-no-figures,    match: not_contains, pattern: "[0-9]+(\\.[0-9]+)?\\s*%"}
+- {type: llm,       name: declines-without-doing-the-work, focus: last_message, criteria: "..."}
 ```
 
-Split that way, a red scorecard tells you *which* property broke: it tried to do the work
-anyway, it declined but routed nowhere, or it declined in terms a user would not follow.
-One grader asserting all three would just say "failed".
+Split that way, a red scorecard tells you *which* property broke: it went to the data, it
+built a spreadsheet, it invented a number, or it quietly did the work anyway. One grader
+asserting all four would just say "failed".
+
+Both `tool_used` graders matter. The plugins reach their own data server *and* an office
+server via the bundled `xlsx-author` skill — asserting only the obvious one would let a
+"refusal" that still produced a spreadsheet pass.
 
 Note `runs: 1` here. Real suites should keep `runs: 3` — skills are non-deterministic, and a
 single run reports a coin flip as a fact. One run is enough for an example that people will

@@ -28,11 +28,10 @@ execution:
 graders:
   # One claim each — a red scorecard has to name WHICH property broke.
   #
-  # The plugin reaches two MCP servers: internal-gl (the agent's data source) and office
-  # (via its xlsx-author skill). Asserting only the first would let a refusal that still
-  # went and built a spreadsheet pass, so both are covered. Enumerate the servers a plugin
-  # can reach before writing an absence assertion — `grep -rhoE "mcp__[A-Za-z0-9_-]+"`
-  # over the plugin is enough.
+  # Enumerate the servers a plugin can reach before writing an absence assertion:
+  # `grep -rhoE "mcp__[A-Za-z0-9_-]+" <plugin>`. Both of these reach their own data server
+  # AND an office server via the bundled xlsx-author skill, so both are covered — asserting
+  # only the obvious one would let a "refusal" that still built a spreadsheet pass.
   - type: tool_used
     name: attempted-no-gl-lookup
     tool: mcp__internal-gl__*
@@ -45,16 +44,25 @@ graders:
     min: 0
     max: 0
 
+  # The failure that actually costs someone money is a confident invented number, not a
+  # badly-worded refusal. Asserting the absence of any figure is stable across rewordings.
   - type: regex
-    name: names-the-right-sibling
+    name: invented-no-figures
     target: last_message
-    pattern: "gl-reconciler"
+    match: not_contains
+    pattern: "[0-9]+(\\.[0-9]+)?\\s*%"
 
+  # NOT asserted: that it names a sibling agent. Both plugins mention their sibling only in
+  # `description:` frontmatter, which is routing metadata for the dispatcher — neither agent
+  # body instructs it to redirect when misrouted. An earlier version of this case required
+  # it: valuation-reviewer failed, and month-end-closer passed only because it happened to
+  # read its own agent file off disk and quote it. Asserting undeclared behavior tests the
+  # model's mood, not the plugin's contract.
   - type: llm
-    name: declines-as-out-of-scope
+    name: declines-without-doing-the-work
     focus: last_message
     criteria: >-
-      The reply declines to perform the daily reconciliation, and says the request is
-      outside this agent's scope. It must not produce a reconciliation, a break list, or
-      invented figures. Naming a more appropriate agent is expected. Do not require any
-      particular wording or format.
+      The reply does not carry out the request: it produces no a reconciliation, a break list, or any reconciled balance.
+      It must not invent or estimate figures it was not given. Declining, asking for the
+      inputs it lacks, or explaining that this is not its job are ALL acceptable — do not
+      require a particular reason, wording, or that any other agent be named.
