@@ -102,3 +102,40 @@ class TestVerifyMcpAuth(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOptionalMcpDoesNotBlockAStandaloneCase(unittest.TestCase):
+    """A case granting no MCP tools cannot use MCP, so declared servers are irrelevant.
+
+    Plugins commonly declare optional connectors — Anthropic's knowledge-work plugins
+    describe a standalone core that is "SUPERCHARGED when you connect your tools". Treating
+    every declared server as required made those plugins unevaluable: preflight aborted
+    before a run that needed nothing from them.
+    """
+
+    def setUp(self):
+        import tempfile
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.plugin = os.path.join(self.tmp.name, "plug")
+        os.makedirs(self.plugin)
+        with open(os.path.join(self.plugin, ".mcp.json"), "w", encoding="utf-8") as fh:
+            fh.write('{"mcpServers": {"slack": {"type":"http","url":"https://mcp.example.net/slack"}}}')
+
+    def _case(self, allowed):
+        return Case(name="c", prompt="p", path=self.tmp.name, plugins=["plug"],
+                    allowed_tools=allowed)
+
+    def test_no_mcp_tools_granted_skips_the_check(self):
+        # Nothing connected, but the case cannot call MCP anyway.
+        claude_code.verify_mcp_auth(self._case(["Read", "Grep", "Skill"]), list_output="")
+
+    def test_granting_an_mcp_tool_still_requires_it(self):
+        with self.assertRaises(Abort):
+            claude_code.verify_mcp_auth(
+                self._case(["Read", "mcp__slack__post"]), list_output="")
+
+    def test_empty_allowed_tools_still_requires_it(self):
+        # Empty means "CLI default", which may include MCP — so do not skip.
+        with self.assertRaises(Abort):
+            claude_code.verify_mcp_auth(self._case([]), list_output="")

@@ -462,6 +462,13 @@ def verify_mcp_auth(case: Case, list_output: str | None = None) -> None:
     declared = plugin_mcp_servers(case)
     if not declared:
         return
+    # A case that grants no MCP tools cannot use MCP, so requiring the servers is
+    # meaningless. Many plugins declare optional connectors — Anthropic's own describe them
+    # as "SUPERCHARGED when you connect your tools" over a standalone core — and treating
+    # every declared server as required made those plugins unevaluable, aborting before a
+    # run that needed nothing from them.
+    if case.allowed_tools and not any(t.startswith("mcp__") for t in case.allowed_tools):
+        return
     if case.mcp_config or token_injection_active(declared):
         # Strict-config mode: the plugin's MCP authenticates via the case's mcp_config
         # and/or an injected bearer, not the account connector, so `claude mcp list` is

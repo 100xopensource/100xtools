@@ -332,10 +332,36 @@ def _scalar(tok: str):
     return tok
 
 
+_DQ_ESCAPES = {"\\": "\\", '"': '"', "n": "\n", "t": "\t", "r": "\r",
+               "0": "\0", "/": "/", " ": " "}
+
+
 def _unquote(tok: str) -> str:
     if len(tok) >= 2 and tok[0] == tok[-1] and tok[0] in "\"'":
         inner = tok[1:-1]
-        if tok[0] == '"':
-            return inner.replace('\\"', '"').replace("\\n", "\n").replace("\\t", "\t")
-        return inner.replace("''", "'")
+        if tok[0] != '"':
+            return inner.replace("''", "'")
+        # One left-to-right pass. Sequential .replace() got `\\` wrong twice over: it was
+        # not handled at all, so a grader pattern written `"\\s*%"` reached `re` as a
+        # literal backslash and matched nothing — and for a not_contains grader a pattern
+        # that matches nothing is one that cannot fail. Chained replaces also mis-handle
+        # `"\\n"`, turning an escaped backslash followed by n into a newline.
+        out, i = [], 0
+        while i < len(inner):
+            ch = inner[i]
+            if ch == "\\" and i + 1 < len(inner):
+                nxt = inner[i + 1]
+                if nxt in _DQ_ESCAPES:
+                    out.append(_DQ_ESCAPES[nxt])
+                    i += 2
+                    continue
+                # Not a YAML escape (`\s`, `\b`, `\d` …). Keep it verbatim: these are
+                # regex escapes, and dropping the backslash would silently break them.
+                out.append(ch)
+                out.append(nxt)
+                i += 2
+                continue
+            out.append(ch)
+            i += 1
+        return "".join(out)
     return tok

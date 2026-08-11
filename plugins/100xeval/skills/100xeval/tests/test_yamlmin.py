@@ -134,3 +134,38 @@ class TestBlockScalars(unittest.TestCase):
     def test_sql_survives_a_round_trip_into_a_grader(self):
         crit = self.data["graders"][0]["criteria"]
         self.assertIn("'SB Northgate'", crit)    # quotes intact
+
+
+class TestDoubleQuotedEscapes(unittest.TestCase):
+    """Double-quoted scalars process escapes, as YAML requires.
+
+    `\\\\` was not handled at all, so a grader pattern written "\\\\s*%" reached `re` as a
+    literal backslash and matched nothing — and a not_contains grader whose pattern matches
+    nothing is one that cannot fail. Chained .replace() also turned an escaped backslash
+    followed by n into a newline.
+    """
+
+    def _v(self, src):
+        return yamlmin.load(src)["a"]
+
+    def test_escaped_backslash_becomes_one(self):
+        self.assertEqual(self._v(r'a: "x\\by"'), r"x\by")
+
+    def test_regex_pattern_survives_intact(self):
+        self.assertEqual(self._v(r'a: "[0-9]+(\\.[0-9]+)?\\s*%"'), r"[0-9]+(\.[0-9]+)?\s*%")
+
+    def test_newline_escape(self):
+        self.assertEqual(self._v(r'a: "line\nnext"'), "line\nnext")
+
+    def test_escaped_backslash_then_n_is_not_a_newline(self):
+        self.assertEqual(self._v(r'a: "lit\\nnext"'), r"lit\nnext")
+
+    def test_escaped_quote(self):
+        self.assertEqual(self._v(r'a: "say \"hi\""'), 'say "hi"')
+
+    def test_regex_escapes_are_kept_verbatim(self):
+        # `\s` is not a YAML escape; dropping the backslash would break the pattern.
+        self.assertEqual(self._v(r'a: "\s+\d\b"'), r"\s+\d\b")
+
+    def test_single_quotes_are_literal(self):
+        self.assertEqual(self._v(r"a: '\s+'"), r"\s+")

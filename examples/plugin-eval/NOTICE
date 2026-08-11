@@ -5,10 +5,10 @@ The plugins under `examples/plugin-eval/vendor/` are NOT part of 100xtools. They
 third-party work, included so the example eval cases resolve and run from a clean clone
 with no network access.
 
-    Source:    https://github.com/anthropics/financial-services
-    Path:      plugins/agent-plugins/{month-end-closer, valuation-reviewer}
-    Commit:    38652224c10610fa52eee2acee3ac712dcff01f2
-    Date:      2026-08-04
+    Source:    https://github.com/anthropics/knowledge-work-plugins
+    Path:      {design, engineering}
+    Commit:    2cf42948f0b79c5492bb38981752b815fc6788ec
+    Date:      2026-08-10
     Copyright: Anthropic, PBC
     Licence:   Apache License 2.0 — see examples/plugin-eval/vendor/LICENSE
 
@@ -35,4 +35,4 @@ Note for readers
 is not ours to score. Lint it deliberately if you want to:
 
     python3 plugins/100xeval/skills/100xeval/scripts/run.py \
-      eval --static-only --target examples/plugin-eval/vendor/month-end-closer
+      eval --static-only --target examples/plugin-eval/vendor/design

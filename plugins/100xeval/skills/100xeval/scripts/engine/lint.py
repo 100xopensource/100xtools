@@ -430,7 +430,8 @@ def discover_plugins(root: str) -> list[str]:
         # `vendor`: third-party copies are not yours to score (lint them with --target).
         # `runs`: the harness stages a plugin copy into every run workspace.
         dirnames[:] = [d for d in dirnames
-                       if d not in ("__pycache__", "node_modules", ".git", "vendor", "runs")]
+                       if d not in ("__pycache__", "node_modules", ".git", "vendor",
+                                    "runs", ".runs")]
         if os.path.isfile(os.path.join(dirpath, ".claude-plugin", "plugin.json")):
             found.append(dirpath)
             dirnames[:] = []  # a plugin does not nest inside another plugin

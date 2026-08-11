@@ -416,12 +416,15 @@ class TestVendorIsNotDiscovered(PluginFixture):
     def test_run_workspaces_are_skipped_by_discovery(self):
         # The harness stages a copy of the plugin under test into each run workspace, so
         # after any behavioral run a plain sweep started scoring transient duplicates.
-        staged = os.path.join(self.root, "cases", "runs", "20260101-000000-abc",
-                              "some-case", "run-1", "workspace", "plugin")
-        write(os.path.join(staged, ".claude-plugin", "plugin.json"), '{"name": "staged"}')
+        # Both spellings: the default moved from `<cases>/runs` to `.runs`, and the dot
+        # meant the original skip silently stopped matching.
+        for runs_dir in ("runs", ".runs"):
+            staged = os.path.join(self.root, runs_dir, "20260101-000000-abc",
+                                  "some-case", "run-1", "workspace", "plugin")
+            write(os.path.join(staged, ".claude-plugin", "plugin.json"), '{"name": "staged"}')
         found = lint.discover_plugins(self.root)
         self.assertIn(self.plugin, found)
-        self.assertTrue(all("runs" not in p.split(os.sep) for p in found), found)
+        self.assertTrue(all(not {"runs", ".runs"} & set(p.split(os.sep)) for p in found), found)
 
     def test_vendor_is_still_lintable_with_an_explicit_target(self):
         # Skipped by discovery, never hidden — you can always ask for it by name, and it
