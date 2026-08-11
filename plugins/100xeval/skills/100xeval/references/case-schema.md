@@ -69,7 +69,7 @@ Scaffold a stub with `python3 "$RUN" init <name> --plugin plugins/<p> --tag <ski
 | `prompt` | str | **required** | The user question, **verbatim**. Do not tidy it — how a real user phrases it is part of what's under test. |
 | `model` | str | `null` | The one runner model. `null` → the CLI default. |
 | `harness` | str | `claude_code` | The **runtime**. Only `claude_code` is implemented; `codex` is a registered seam that aborts with guidance. Surface names (`cowork`, `claude_chat`) are rejected — those are entrypoints. |
-| `entrypoint` | str | `none` | The **surface** emulated: its real system prompt at `engine/entrypoints/<name>.md`. `none` passes no system prompt, so the harness's own applies. Any other name with no file **aborts in preflight** rather than emulating nothing. No entrypoint files ship — see `engine/entrypoints/README.md`. |
+| `entrypoint` | str | `none` | The **surface** emulated: its real system prompt at `engine/entrypoints/<name>.md`. `none` passes no system prompt, so the harness's own applies. Any other name with no file **aborts in preflight** rather than emulating nothing. `cowork` ships; override per run with `--entrypoint`. See `engine/entrypoints/README.md`. |
 | `max_turns` | int | `15` | Agent tool-loop budget, passed to the CLI as `--max-turns`. Raise it for long multi-step work (a report build needs far more than a single question). |
 | `timeout_s` | int | `300` | Per-**run** wall clock, in seconds. A multi-step build is killed at the default; `--timeout` overrides it for a whole invocation. |
 | `allowed_tools` | list[str] | `[]` | Tools granted to the run. Both `mcp__X__t` and `mcp__claude_ai_X__t` spellings are expanded automatically, so either works. |

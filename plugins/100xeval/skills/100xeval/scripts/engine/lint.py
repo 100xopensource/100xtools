@@ -114,6 +114,13 @@ _PROSE_SUFFIXES = {".md", ".txt"}
 # a problem in any file.
 _LICENCE_STEMS = {"license", "licence", "copying", "notice", "copyright"}
 
+# Same reasoning, third case: an `entrypoints/` file is a captured system prompt that the
+# engine hands to a subprocess, not guidance this skill gives the model. Surface prompts
+# name whatever hosts that surface happens to use — a CDN for artifacts, a docs site — and
+# reading those as destinations *this* plugin visits is a category error. SEC1 still scans
+# them, so a credential captured along with a prompt is still caught.
+_PAYLOAD_DIRS = {"entrypoints"}
+
 # SEC3 fires on a read INSTRUCTION that escapes the skill directory ("Load ../../config"),
 # not on every `../` in the file. Relative paths are ordinary in config examples — a case
 # file's `plugins: ["../../plugins/x"]` is data the skill never opens — and flagging those
@@ -222,7 +229,8 @@ def _scan_text_file(path: str, rel: str, out: list[Finding], allowed: set[str]) 
             out.append(Finding(rel, f"[SEC1] possible {label} committed in plugin content", "warn"))
             break
     stem, ext = os.path.splitext(os.path.basename(path))
-    if ext not in _PROSE_SUFFIXES or stem.lower() in _LICENCE_STEMS:
+    parent = os.path.basename(os.path.dirname(path)).lower()
+    if ext not in _PROSE_SUFFIXES or stem.lower() in _LICENCE_STEMS or parent in _PAYLOAD_DIRS:
         return
     domains = {d.lower() for d in re.findall(r"https?://([\w.-]+)", content)}
     odd = {d for d in domains

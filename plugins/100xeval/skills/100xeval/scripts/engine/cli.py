@@ -86,6 +86,9 @@ def main(argv=None) -> int:
     p_eval.add_argument("--case", default=None, help="fnmatch glob on case name")
     p_eval.add_argument("--target", default=None, help="plugin path for --static-only")
     p_eval.add_argument("--runs", type=int, default=None, help="override runs per case")
+    p_eval.add_argument("--entrypoint", default=None, metavar="NAME",
+                        help="override every case's entrypoint (the SURFACE emulated), e.g. "
+                             "`cowork`, or `none` for the harness's own prompt")
     p_eval.add_argument("--judge-model", default="claude-haiku-4-5-20251001")
     p_eval.add_argument("--judge-votes", type=int, default=3)
     p_eval.add_argument("--judge-system-prompt", default=None, metavar="PATH_OR_TEXT",
@@ -176,6 +179,17 @@ def _cmd_eval(args) -> int:
     # stayed green. The valid cases still run: one bad case must not block a suite of fifty.
     # But the exit code tells the truth, at every return path below.
     load_failed = bool(errors)
+
+    # Entrypoint override. The surface is the one axis you genuinely want to vary without
+    # editing the case: the same question asked of the same plugin can be answered
+    # differently under a different system prompt, and that difference is the thing worth
+    # measuring. Announced rather than applied quietly — a run whose surface silently
+    # differs from the case file is a scorecard nobody can reproduce.
+    if args.entrypoint:
+        for c in cases:
+            c.entrypoint = args.entrypoint
+        print(f"↺ entrypoint overridden to {args.entrypoint!r} for {len(cases)} case(s)")
+
     # Deliberately-skipped cases are announced every run: a silent skip becomes a
     # permanent one nobody remembers to revisit.
     all_cases, _ = loader.load_all(args.root, tags=args.tag or None, case_glob=args.case,

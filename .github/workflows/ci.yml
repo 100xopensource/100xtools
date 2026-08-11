@@ -68,7 +68,7 @@ jobs:
       - name: Example cases load and resolve (no model call)
         run: |
           python3 plugins/100xeval/skills/100xeval/scripts/run.py \
-            eval --root examples/cases --skip-static --dry-run
+            eval --root examples/plugin-eval/cases --skip-static --dry-run
 
   # Separate job so documentation drift reads distinctly from a test failure — they call
   # for different fixes, and a merged job makes the summary ambiguous.

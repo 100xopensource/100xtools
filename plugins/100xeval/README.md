@@ -55,11 +55,11 @@ score — it will not quietly hand you a passing number for a path that isn't th
 lands around $3–5 for a single case. Use `--dry-run` first; it lists what would execute and
 the rough spend without spending it.
 
-**4. See a worked case.** [`examples/`](../../examples/README.md) ships two, running against
+**4. See a worked case.** [`examples/plugin-eval/`](../../examples/plugin-eval/README.md) ships two, running against
 real third-party plugins vendored into the repo — read them before writing your own:
 
 ```bash
-python3 "$RUN" eval --root examples/cases --skip-static --dry-run   # free
+python3 "$RUN" eval --root examples/plugin-eval/cases --skip-static --dry-run   # free
 ```
 
 Exit codes: `0` all pass · `1` a case below `--threshold` · `2` usage or engine error. That
@@ -121,9 +121,10 @@ Scaffold one with `python3 "$RUN" init <name> --plugin plugins/<p> --tag <skill>
 
 `harness` and `entrypoint` are independent axes and easy to confuse. `harness` is the
 **runtime** (`claude_code`). `entrypoint` is the **surface** whose system prompt gets
-swapped in. No entrypoint files ship with this repo — a surface's system prompt belongs to
-whoever operates that surface — so the default `none` runs on Claude Code's own prompt. See
-`skills/100xeval/scripts/engine/entrypoints/README.md` to add your own.
+swapped in. The default `none` runs on Claude Code's own prompt. One entrypoint ships — `cowork` —
+and `--entrypoint <name>` overrides every case in a run without editing files. See
+`skills/100xeval/scripts/engine/entrypoints/README.md` before adding another: a surface's
+system prompt usually belongs to whoever operates that surface.
 
 ---
 

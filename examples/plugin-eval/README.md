@@ -12,15 +12,38 @@ about *your* plugin. Copy the shape, not the content.
 ```bash
 # From the repo root. Free — parses the cases, resolves the plugins, spends nothing.
 python3 plugins/100xeval/skills/100xeval/scripts/run.py \
-  eval --root examples/cases --skip-static --dry-run
+  eval --root examples/plugin-eval/cases --skip-static --dry-run
 
 # For real. One model call per case, roughly $2-6 for the pair.
 python3 plugins/100xeval/skills/100xeval/scripts/run.py \
-  eval --root examples/cases --skip-static
+  eval --root examples/plugin-eval/cases --skip-static
 ```
 
-`--root examples/cases` matters: the default case root is `evals/`, so without it the runner
+`--root examples/plugin-eval/cases` matters: the default case root is `evals/`, so without it the runner
 looks somewhere else and correctly reports finding nothing.
+
+## Run them under a different surface
+
+The cases declare `entrypoint: none`, so by default they run on Claude Code's own system
+prompt. `--entrypoint` overrides that for every case in the run, without editing any file:
+
+```bash
+python3 plugins/100xeval/skills/100xeval/scripts/run.py \
+  eval --root examples/plugin-eval/cases --skip-static --entrypoint cowork
+```
+
+This is the more interesting way to run them. `harness` and `entrypoint` are independent
+axes: the harness is the *runtime* executing the turn, the entrypoint is the *surface* whose
+system prompt gets swapped in. Same plugin, same question, different surface — and the
+answer can legitimately differ, because a surface's prompt shapes how a skill behaves.
+
+That difference is the thing worth measuring. If a plugin respects its own scope boundary
+under one surface and ignores it under another, you want to know before your users do.
+
+The override is announced in the output (`↺ entrypoint overridden to 'cowork'`) rather than
+applied quietly — a scorecard whose surface silently differs from the case file is one
+nobody can reproduce. Naming a surface with no file on disk aborts in preflight rather than
+running with no system prompt at all.
 
 ## What they test, and why that shape
 
@@ -74,7 +97,7 @@ python3 plugins/100xeval/skills/100xeval/scripts/run.py \
 ```
 
 Then read
-[`managing-testcases.md`](../plugins/100xeval/skills/100xeval/references/managing-testcases.md)
+[`managing-testcases.md`](../../plugins/100xeval/skills/100xeval/references/managing-testcases.md)
 for the lifecycle and the mistakes that have actually bitten, and
-[`case-schema.md`](../plugins/100xeval/skills/100xeval/references/case-schema.md) for every
+[`case-schema.md`](../../plugins/100xeval/skills/100xeval/references/case-schema.md) for every
 field.

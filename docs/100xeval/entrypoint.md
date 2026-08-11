@@ -21,11 +21,11 @@ experiences.
 
 ## `none` is the default, and that is deliberate
 
-**No entrypoint files ship with this repo**, and `.gitignore` keeps it that way. A surface's
-system prompt belongs to whoever operates that surface — including when a third-party site
-has published a capture of it. Redistributing someone else's prompt is not ours to do.
+One entrypoint is tracked here — `cowork` — by explicit decision. Everything else in that
+directory stays gitignored, because a surface's system prompt usually belongs to whoever
+operates that surface, including when a third-party site has published a capture of it.
 
-So the default is `entrypoint: none`: no `--system-prompt` is passed and the run uses the
+The default is still `entrypoint: none`: no `--system-prompt` is passed and the run uses the
 harness's own prompt. That is the honest default, and it is the right one when the surface
 you care about *is* Claude Code.
 

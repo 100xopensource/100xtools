@@ -12,7 +12,7 @@ from a clean clone, with no install step.
 ```
 .claude-plugin/marketplace.json   one entry per plugin; CI checks it against plugins/
 docs/                             OKF knowledge bundle — concepts, NOT shipped with plugins
-examples/                         worked eval cases + vendored third-party plugins
+examples/<tool>/                  worked eval cases + vendored third-party plugins
 plugins/<name>/                   self-contained plugin: manifest, README, skills/
 scripts/check_docs.py             bundle conformance + check-ID sync
 .github/workflows/ci.yml          test · static · examples · docs · manifests
@@ -20,8 +20,8 @@ scripts/check_docs.py             bundle conformance + check-ID sync
 
 Two things about `examples/` that look odd until you know why:
 
-- **`examples/cases` is a second case root.** The default is `evals/`, so the example cases
-  are only found with `--root examples/cases`. CI dry-runs them, which proves they parse and
+- **`examples/plugin-eval/cases` is a second case root.** The default is `evals/`, so the
+  example cases are only found with `--root examples/plugin-eval/cases`. CI dry-runs them, which proves they parse and
   resolve their plugins without a model call.
 - **`vendor/` is skipped by plugin discovery** (`lint.py`). Third-party code copied in for
   fixtures is not ours to score, and discovering it would turn our own sweep into a report
@@ -146,9 +146,10 @@ the **surface** emulated, its real system prompt swapped in with `--system-promp
 (replacing, not appending). A surface is never a harness — the loader rejects
 `harness: cowork` and `harness: claude_chat` with a message naming the right pair.
 
-**No entrypoint files ship**, and `.gitignore` keeps it that way: a surface's system prompt
-belongs to whoever operates that surface. Default `entrypoint: none` passes no
-`--system-prompt`. Any *other* name must resolve to a file or preflight aborts — a case that
+Default `entrypoint: none` passes no `--system-prompt`. **`cowork` is the one entrypoint
+tracked here**, by explicit decision — see the git history for that file. Any *other*
+surface prompt stays gitignored by default, because it usually belongs to whoever operates
+that surface. `--entrypoint <name>` overrides every case in a run. Any *other* name must resolve to a file or preflight aborts — a case that
 emulates nothing still scores, and a pass for the wrong reason is worse than a failure.
 
 **The static layer — lint → check ID → sub-score.** `lint.py` emits `Finding`s whose `.msg`

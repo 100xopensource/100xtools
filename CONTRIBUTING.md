@@ -20,9 +20,11 @@ contributing from a company that uses these tools internally, scrub before you p
 connector URLs, real plugin names, real store or customer names, and captured `claude mcp
 list` output all count.
 
-**Don't commit a system prompt you don't own.** `engine/entrypoints/` deliberately ships
-empty. A surface's system prompt belongs to whoever operates that surface — including when
-a third-party site has published a capture of it.
+**Think before committing a system prompt.** `engine/entrypoints/` tracks `cowork` and
+ignores everything else by default. A surface's system prompt usually belongs to whoever
+operates that surface — including when a third-party site has published a capture of it —
+so adding another should be a deliberate decision, not the by-product of dropping a file
+in that directory.
 
 ## Development
 

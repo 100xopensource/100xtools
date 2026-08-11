@@ -1,7 +1,7 @@
-Third-party content vendored into examples/vendor/
+Third-party content vendored into examples/plugin-eval/vendor/
 ==================================================
 
-The plugins under `examples/vendor/` are NOT part of 100xtools. They are copies of
+The plugins under `examples/plugin-eval/vendor/` are NOT part of 100xtools. They are copies of
 third-party work, included so the example eval cases resolve and run from a clean clone
 with no network access.
 
@@ -10,7 +10,7 @@ with no network access.
     Commit:    38652224c10610fa52eee2acee3ac712dcff01f2
     Date:      2026-08-04
     Copyright: Anthropic, PBC
-    Licence:   Apache License 2.0 — see examples/vendor/LICENSE
+    Licence:   Apache License 2.0 — see examples/plugin-eval/vendor/LICENSE
 
     Modifications: NONE. Both plugin directories are byte-for-byte copies of the
     upstream directories at the commit above.
@@ -31,8 +31,8 @@ plugins actually behave, not how they ought to.
 
 Note for readers
 ----------------
-`examples/vendor/` is excluded from this repo's own static sweep — vendored third-party code
+`examples/plugin-eval/vendor/` is excluded from this repo's own static sweep — vendored third-party code
 is not ours to score. Lint it deliberately if you want to:
 
     python3 plugins/100xeval/skills/100xeval/scripts/run.py \
-      eval --static-only --target examples/vendor/month-end-closer
+      eval --static-only --target examples/plugin-eval/vendor/month-end-closer
