@@ -22,7 +22,7 @@ skills". Add house-style rules in your own fork rather than here.
 Check IDs
 ---------
 FM — frontmatter_quality
-  FM1  frontmatter `name` does not match the skill's directory name
+  FM1  frontmatter `name` shares no words with the skill's directory name
   FM2  skill name unusable: over the length limit, exactly a reserved name, or too vague to trigger
   FM3  no description — the model cannot decide when to load the skill
   FM4  unrecognized frontmatter key (likely a typo)
@@ -48,7 +48,7 @@ EC — ecosystem_coherence
 
 SEC — security
   SEC1 possible secret committed in plugin content
-  SEC2 network destination outside the allowed set
+  SEC2 instructs sending data to a host outside the allowed set
   SEC3 a read instruction escaping the skill directory via `../`
 """
 
@@ -65,7 +65,7 @@ SKILL_FM_KNOWN = {
     "name", "description", "when_to_use", "argument-hint", "arguments",
     "disable-model-invocation", "user-invocable", "allowed-tools",
     "disallowed-tools", "model", "effort", "context", "agent", "hooks",
-    "paths", "shell", "license", "version", "metadata",
+    "paths", "shell", "license", "version", "metadata", "triggers",
 }
 
 VAGUE_SKILL_NAMES = {"helper", "helpers", "util", "utils", "tools", "misc"}
@@ -86,16 +86,30 @@ SECRET_PATTERNS = [
     ("private key block", re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----")),
     ("hardcoded credential", re.compile(
         r"(?i)\b(api[_-]?key|auth[_-]?token|secret|password)\b\s*[:=]\s*"
-        r"['\"][A-Za-z0-9+/_-]{16,}['\"]")),
+        r"['\"](?P<value>[A-Za-z0-9+/_-]{16,})['\"]")),
 ]
 
-# SEC2 flags URLs outside this set. Docs/vendor hosts a plugin legitimately links to.
-# Point `EVAL_LINT_ALLOWED_DOMAINS` (comma-separated) at your own list to extend it —
-# an unknown host is a notice, not a failure, so a false positive costs little.
+# A value that names its own key is a placeholder, not a credential: `password:
+# 'meeting-password'` in a code sample matched the pattern above and read as a leak in
+# Anthropic's Zoom plugin. Real secrets do not describe themselves.
+_PLACEHOLDER_VALUE = re.compile(
+    r"(?i)^(your|my|example|sample|test|dummy|fake|placeholder|change|replace|xxx|<)"
+    r"|(key|token|secret|password|credential)$")
+
+# SEC2 second-stage filter, applied only to hosts a skill is told to SEND to.
+# Extend with `EVAL_LINT_ALLOWED_DOMAINS` (comma-separated).
 URL_ALLOWED_DOMAINS = {
     "code.claude.com", "docs.claude.com", "platform.claude.com", "claude.com",
     "claude.ai", "anthropic.com", "github.com", "example.com", "localhost",
 }
+
+# SEC2 fires on an instruction to SEND somewhere, not on any URL in the file. Matching
+# every URL against an allowlist cannot work: a plugin that integrates with a vendor links
+# to that vendor's docs, so the Zoom plugin drew 226 findings for `developers.zoom.us` and
+# scored 0.16. You cannot enumerate the legitimate internet — but exfiltration has a verb.
+_EXFIL_RE = re.compile(
+    r"(?i)\b(post|put|upload|send|submit|export|transmit|exfiltrate)\b[^\n]{0,40}"
+    r"https?://([\w.-]+)")
 
 _TEXT_SUFFIXES = {".md", ".txt", ".json", ".yaml", ".yml", ".py", ".sh", ".js"}
 
@@ -129,6 +143,11 @@ class Finding:
 
 
 # --- small parsing helpers ----------------------------------------------------
+
+def _tokens(name: str) -> set[str]:
+    """Words in a skill or directory name, for the FM1 relatedness test."""
+    return {t for t in re.split(r"[-_\s]+", name.lower()) if t}
+
 
 def _read_text(path: str) -> str:
     try:
@@ -204,9 +223,27 @@ def _skill_names(plugin_dir: str) -> set[str]:
     return names
 
 
-def _allowed_domains() -> set[str]:
+def _own_domains(plugin_dir: str) -> set[str]:
+    """Registrable domains the plugin itself declares — its own vendor is not "external".
+
+    A Zoom plugin sending to `api.zoom.us` is doing its job. Judged against a global
+    allowlist it looked like exfiltration 35 times over, because the allowlist cannot know
+    which vendor a given plugin integrates with. The plugin already says so: its
+    `.mcp.json` server URLs and its manifest `homepage` name the hosts it is built around.
+    """
+    out: set[str] = set()
+    for rel in (".mcp.json", os.path.join(".claude-plugin", "plugin.json")):
+        for url in re.findall(r"https?://([\w.-]+)", _read_text(os.path.join(plugin_dir, rel))):
+            parts = url.lower().split(".")
+            if len(parts) >= 2:
+                out.add(".".join(parts[-2:]))   # registrable domain, so api.x.com covers x.com
+    return out
+
+
+def _allowed_domains(plugin_dir: str | None = None) -> set[str]:
     extra = os.environ.get("EVAL_LINT_ALLOWED_DOMAINS", "")
-    return URL_ALLOWED_DOMAINS | {d.strip().lower() for d in extra.split(",") if d.strip()}
+    allowed = URL_ALLOWED_DOMAINS | {d.strip().lower() for d in extra.split(",") if d.strip()}
+    return allowed | (_own_domains(plugin_dir) if plugin_dir else set())
 
 
 # --- the checks ---------------------------------------------------------------
@@ -215,20 +252,25 @@ def _scan_text_file(path: str, rel: str, out: list[Finding], allowed: set[str]) 
     """SEC1 over any text file; SEC2/SEC3 over skill prose only (see _PROSE_SUFFIXES)."""
     content = _read_text(path)
     for label, pat in SECRET_PATTERNS:
-        if pat.search(content):
+        m = pat.search(content)
+        if m and not (m.groupdict().get("value")
+                      and _PLACEHOLDER_VALUE.search(m.group("value"))):
             out.append(Finding(rel, f"[SEC1] possible {label} committed in plugin content", "warn"))
             break
     stem, ext = os.path.splitext(os.path.basename(path))
     parent = os.path.basename(os.path.dirname(path)).lower()
     if ext not in _PROSE_SUFFIXES or stem.lower() in _LICENCE_STEMS or parent in _PAYLOAD_DIRS:
         return
-    domains = {d.lower() for d in re.findall(r"https?://([\w.-]+)", content)}
-    odd = {d for d in domains
+    targets = {d.lower() for _verb, d in _EXFIL_RE.findall(content)}
+    # `your-auth-service.com`, `your_token_service_base_url` — documentation placeholders,
+    # not destinations. A host with no dot is not a host at all.
+    targets = {d for d in targets
+               if "." in d and not re.match(r"^(your|my|example|sample)[-_.]", d)}
+    odd = {d for d in targets
            if not any(d == a or d.endswith("." + a) for a in allowed)}
     if odd:
         out.append(Finding(
-            rel, f"[SEC2] network destination(s) outside the allowed set: "
-                 f"{', '.join(sorted(odd)[:4])}"))
+            rel, f"[SEC2] instructs sending data to: {', '.join(sorted(odd)[:4])}"))
     for line in content.splitlines():
         if _TRAVERSAL_RE.search(line) and "CLAUDE_PLUGIN_ROOT" not in line \
                 and "CLAUDE_SKILL_DIR" not in line:
@@ -239,8 +281,11 @@ def _scan_text_file(path: str, rel: str, out: list[Finding], allowed: set[str]) 
 def _check_frontmatter(rel: str, dirname: str, fm: dict, out: list[Finding]) -> None:
     name = fm.get("name", "")
     desc = fm.get("description", "")
-    if name and name != dirname:
-        out.append(Finding(rel, f"[FM1] frontmatter name {name!r} != directory name {dirname!r}"))
+    # Namespacing a skill against its plugin is a convention, not a defect — Anthropic's own
+    # Zoom plugin ships `zoom-cobrowse-sdk` in `cobrowse-sdk/`. Only flag when the directory
+    # name's words are absent from the skill name, which is a genuine mismatch.
+    if name and not _tokens(dirname) <= _tokens(name):
+        out.append(Finding(rel, f"[FM1] frontmatter name {name!r} unrelated to directory {dirname!r}"))
     if len(name) > SKILL_NAME_MAX:
         out.append(Finding(rel, f"[FM2] skill name is {len(name)} chars (limit {SKILL_NAME_MAX})"))
     if name.lower() in RESERVED_NAMES:
@@ -341,7 +386,7 @@ def lint_plugin(plugin_dir: str, root: str | None = None) -> list[Finding]:
     """Every conformance finding for one plugin directory."""
     root = root or plugin_dir
     out: list[Finding] = []
-    allowed = _allowed_domains()
+    allowed = _allowed_domains(plugin_dir)
     # "." whenever the plugin IS the root, which is the normal case for a standalone
     # plugin. A finding reported against "." names nothing the reader can open.
     prel = os.path.relpath(plugin_dir, root)

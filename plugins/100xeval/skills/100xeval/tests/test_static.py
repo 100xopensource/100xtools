@@ -37,11 +37,19 @@ class TestStaticScorer(unittest.TestCase):
         self.assertLess(low["design_score"], high["design_score"])
         self.assertEqual(low["sub_scores"]["token_efficiency"], 0.0)
 
-    def test_penalty_floor(self):
-        # Many findings can't push design_score arbitrarily low (floor 0.5 penalty).
-        many = ["[PD1] x"] * 50
-        r = static.score_from_findings(many, 1.0)
-        self.assertGreaterEqual(r["design_score"], 0.0)  # sub-scores floor at 0 though
+    def test_repeating_one_check_is_one_problem(self):
+        """Scored on distinct IDs. Counting occurrences made the score track plugin size:
+        a 30-skill plugin floored at 0.16 while a 31-skill one scored far higher."""
+        once = static.score_from_findings(["[PD1] x"], 1.0)
+        fifty = static.score_from_findings(["[PD1] x"] * 50, 1.0)
+        self.assertEqual(once["design_score"], fifty["design_score"])
+        self.assertEqual(fifty["flags"], 1)
+        self.assertEqual(fifty["occurrences"], 50)
+
+    def test_distinct_checks_do_accumulate(self):
+        one = static.score_from_findings(["[PD1] x"], 1.0)["design_score"]
+        two = static.score_from_findings(["[PD1] x", "[PD2] y"], 1.0)["design_score"]
+        self.assertLess(two, one)
 
 
 

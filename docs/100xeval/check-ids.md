@@ -21,7 +21,7 @@ a check.
 
 | ID | Fires when |
 | --- | --- |
-| `FM1` | frontmatter `name` does not match the skill's directory name |
+| `FM1` | frontmatter `name` shares no words with the skill's directory name |
 | `FM2` | skill name unusable: over the length limit, exactly a reserved name, or too vague to trigger |
 | `FM3` | no description — the model cannot decide when to load the skill |
 | `FM4` | unrecognized frontmatter key (likely a typo) |
@@ -62,7 +62,7 @@ a check.
 | ID | Fires when |
 | --- | --- |
 | `SEC1` | possible secret committed in plugin content |
-| `SEC2` | network destination outside the allowed set |
+| `SEC2` | instructs sending data to a host outside the allowed set |
 | `SEC3` | a read instruction escaping the skill directory via `../` |
 
 ## Scoping worth knowing

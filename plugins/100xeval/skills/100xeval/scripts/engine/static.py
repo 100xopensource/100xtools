@@ -68,8 +68,12 @@ def score_from_findings(finding_msgs: list[str], token_efficiency: float) -> dic
     a new check ends up firing while changing no number — the failure mode the derived
     mapping exists to prevent, so it must not be reintroduced here.
     """
-    counts: dict[str, int] = {k: 0 for k in _WEIGHTS}
-    flags = 0
+    # Scored on DISTINCT check IDs, not occurrences. One design flaw repeated across 30
+    # skills is one flaw; counting it 30 times made the score a proxy for plugin size — a
+    # 30-skill plugin floored at 0.16 while a 31-skill one with a lower defect rate scored
+    # far higher. The findings list still reports every occurrence.
+    seen: dict[str, set[str]] = {k: set() for k in _WEIGHTS}
+    occurrences = 0
     for msg in finding_msgs:
         m = _ID_RE.match(msg)
         if m is None:
@@ -79,22 +83,24 @@ def score_from_findings(finding_msgs: list[str], token_efficiency: float) -> dic
             raise UnknownCheckPrefix(
                 f"check-ID prefix {prefix!r} has no sub-score in _PREFIX_TO_SUBCHECK "
                 f"(known: {', '.join(sorted(_PREFIX_TO_SUBCHECK))}) — from finding: {msg!r}")
-        counts[_PREFIX_TO_SUBCHECK[prefix]] += 1
-        flags += 1
+        seen[_PREFIX_TO_SUBCHECK[prefix]].add(msg[1:msg.index("]")])
+        occurrences += 1
+    distinct = sum(len(v) for v in seen.values())
 
     sub_scores: dict[str, float] = {}
     for sub in _WEIGHTS:
         if sub == "token_efficiency":
             sub_scores[sub] = round(max(0.0, min(1.0, token_efficiency)), 3)
         else:
-            # Each finding in a category costs 0.25, floored at 0.
-            sub_scores[sub] = round(max(0.0, 1.0 - 0.25 * counts[sub]), 3)
+            # Each distinct check that fired in a category costs 0.25, floored at 0.
+            sub_scores[sub] = round(max(0.0, 1.0 - 0.25 * len(seen[sub])), 3)
 
     weighted = sum(_WEIGHTS[s] * sub_scores[s] for s in _WEIGHTS)
     base = weighted / sum(_WEIGHTS.values())
-    penalty = max(0.5, 1.0 - 0.05 * flags)  # broad-but-shallow problems still cost
+    penalty = max(0.5, 1.0 - 0.05 * distinct)  # breadth of problems, not their volume
     design_score = round(base * penalty, 3)
-    return {"design_score": design_score, "sub_scores": sub_scores, "flags": flags}
+    return {"design_score": design_score, "sub_scores": sub_scores,
+            "flags": distinct, "occurrences": occurrences}
 
 
 def token_efficiency(plugin_dir: str) -> float:
