@@ -22,3 +22,7 @@ venv/
 
 # Claude Code local settings, not project config
 .claude/settings.local.json
+
+# Your org's private leak patterns for the pre-commit hook. Listing the internal names you
+# are blocking would publish them, which is the thing the hook exists to prevent.
+scripts/hooks/leak-patterns.local

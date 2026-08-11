@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+# Pre-commit gate. Enable once with:
+#
+#     git config core.hooksPath scripts/hooks
+#
+# Runs the whole CI suite plus a leak sweep, in about two seconds. Everything here is
+# cheap, so nothing is conditional on which files you staged — a check that decides for
+# itself whether to run is a check that silently stops running.
+#
+# `git commit --no-verify` skips it. That is deliberate: a hook you cannot bypass is a hook
+# people disable permanently.
+set -uo pipefail
+
+fail=0
+step() { printf "  %-34s" "$1"; }
+ok()   { printf "ok\n"; }
+bad()  { printf "FAIL\n"; fail=1; }
+
+echo "pre-commit"
+
+# ── 1. Leak sweep ────────────────────────────────────────────────────────────────
+# First because it is the only failure here that cannot be undone: once a secret or an
+# internal reference is in git history, removing it is a rewrite, not a revert. Scans the
+# STAGED blob rather than the working tree — those differ, and the staged one is what ships.
+#
+# Only generic secret shapes live here. Organisation-specific terms — customer names,
+# internal hostnames, ticket prefixes — go in leak-patterns.local, which is gitignored,
+# because a public list of the names you are hiding publishes them. Same reason
+# test_lint.py assembles its secret fixtures at run time.
+step "no secrets or internal refs"
+PATTERNS='AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{22,}'
+PATTERNS="$PATTERNS"'|xox[baprs]-[A-Za-z0-9-]{10,}|sk-[A-Za-z0-9]{32,}|AIza[0-9A-Za-z_-]{35}'
+PATTERNS="$PATTERNS"'|BEGIN [A-Z ]*PRIVATE KEY'
+
+local_patterns="$(dirname "$0")/leak-patterns.local"
+if [ -f "$local_patterns" ]; then
+  while IFS= read -r line; do
+    case "$line" in ''|'#'*) continue ;; esac
+    PATTERNS="$PATTERNS|$line"
+  done < "$local_patterns"
+fi
+
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+leaks=""
+if [ -n "$staged" ]; then
+  while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    # Vendored third-party trees are not ours and were reviewed at import.
+    case "$f" in examples/*/vendor/*) continue ;; esac
+    hit=$(git show ":$f" 2>/dev/null | grep -InEo "$PATTERNS" | head -3)
+    [ -n "$hit" ] && leaks="${leaks}\n    $f: $(echo "$hit" | tr '\n' ' ')"
+  done <<< "$staged"
+fi
+if [ -n "$leaks" ]; then bad; printf "%b\n" "$leaks"; else ok; fi
+
+# ── 2. Manifests ─────────────────────────────────────────────────────────────────
+step "manifests parse"
+if for f in .claude-plugin/marketplace.json plugins/*/.claude-plugin/plugin.json; do
+     python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f" || exit 1
+   done >/dev/null 2>&1; then ok; else bad; fi
+
+# ── 3. Docs bundle ───────────────────────────────────────────────────────────────
+step "docs bundle"
+docs_out=$(python3 scripts/check_docs.py 2>&1) && ok || { bad; echo "$docs_out" | sed 's/^/    /'; }
+
+# ── 4. Static: this repo's own plugins must stay at 1.00 ─────────────────────────
+step "own plugins score 1.00"
+static_out=$(python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only 2>&1)
+if [ $? -ne 0 ] || echo "$static_out" | grep -qE "design_score 0\."; then
+  bad; echo "$static_out" | grep -E "design_score|^- .*\[" | sed 's/^/    /'
+else ok; fi
+
+# ── 5. Engine tests ──────────────────────────────────────────────────────────────
+step "engine tests"
+test_out=$(cd plugins/100xeval/skills/100xeval && PYTHONPATH=scripts \
+  python3 -m unittest discover -s tests -p 'test_*.py' 2>&1) && ok \
+  || { bad; echo "$test_out" | grep -E "^(FAIL|ERROR):|AssertionError" | head -5 | sed 's/^/    /'; }
+
+if [ "$fail" -ne 0 ]; then
+  echo
+  echo "commit blocked. fix the above, or 'git commit --no-verify' to bypass."
+  exit 1
+fi
+exit 0

@@ -122,6 +122,12 @@ CI runs exactly these. If they pass locally they pass there. Behavioral eval run
 and need credentials, so they are **not** wired into this repo's CI — see
 `plugins/100xeval/README.md` to run them.
 
+`scripts/hooks/pre-commit` runs all of the above plus a secret and internal-reference sweep
+over **staged** content, in about two seconds. Enable per clone with `git config
+core.hooksPath scripts/hooks`; `--no-verify` bypasses it. Generic secret shapes live in the
+hook; org-specific names go in the gitignored `scripts/hooks/leak-patterns.local` (copy the
+`.example`) — a public list of the names you are hiding publishes them.
+
 ## Plugins
 
 ### 100xeval — behavioral + static evaluation

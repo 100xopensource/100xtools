@@ -45,7 +45,29 @@ and what Claude invokes at runtime, so the suite stays out of that payload. Test
 python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only
 ```
 
-CI runs exactly these two commands. If they pass locally they pass there.
+CI runs these two plus `scripts/check_docs.py` and a manifest-consistency check. If they
+pass locally they pass there.
+
+### The pre-commit hook
+
+Optional, recommended, and enabled once per clone:
+
+```bash
+git config core.hooksPath scripts/hooks
+```
+
+It runs everything CI runs, plus a sweep for internal references and secret-shaped strings,
+in about two seconds. Nothing is conditional on which files you staged — a check that
+decides for itself whether to run is a check that silently stops running.
+
+The leak sweep is first because it is the only failure here you cannot undo: once an
+internal reference is in git history, removing it is a rewrite, not a revert. This repo has
+already had one such leak reach a commit and get caught only on a second manual pass. It
+reads the **staged** blob rather than the working tree, so scrubbing a file after
+`git add` does not smuggle the earlier version through.
+
+`git commit --no-verify` skips the hook — intentionally, because a hook you cannot bypass is
+a hook people disable permanently. CI is the real gate; this just moves the feedback earlier.
 
 ## Changing the linter
 

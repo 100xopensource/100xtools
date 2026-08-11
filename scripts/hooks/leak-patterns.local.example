@@ -1,0 +1,26 @@
+# Extra leak patterns for the pre-commit hook. Copy to `leak-patterns.local` and edit:
+#
+#     cp scripts/hooks/leak-patterns.local.example scripts/hooks/leak-patterns.local
+#
+# `leak-patterns.local` is gitignored on purpose. This repo was extracted from a private
+# one, so the terms worth blocking are customer names, internal hostnames, and ticket
+# prefixes — and a public list of the names you are hiding publishes them.
+#
+# One extended-regex (grep -E) pattern per line, case-sensitive. Blank lines and lines
+# starting with # are ignored. Keep them anchored enough not to fire on ordinary prose:
+# a bare company name that is also an English word will block every commit until someone
+# deletes the file, and a check people delete is worse than one that never existed.
+#
+# Do not use `(?i)` — BSD grep honours it, GNU grep does not, so a pattern tested on a Mac
+# silently matches nothing on Linux. Write `[Aa]cme` instead.
+
+# Internal ticket prefixes
+# \b(ABC|DEF)-[0-9]+
+
+# Internal hosts and domains
+# internal\.example\.com
+# connector\.example\.net
+
+# Customer, tenant, and store names
+# acmeretail
+# northwind
