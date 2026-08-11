@@ -36,7 +36,7 @@ class Harness(Protocol):
         """Invoke the plugin once and return the observable outcome.
 
         `workspace` (if given) is a persistent dir the harness may stage into, so the run
-        is inspectable under evals/runs/<run_id>/; None → use an ephemeral temp dir.
+        is inspectable under .runs/<run_id>/; None → use an ephemeral temp dir.
         """
         ...
 

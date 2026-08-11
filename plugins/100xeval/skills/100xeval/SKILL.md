@@ -73,7 +73,7 @@ python3 "$RUN" eval --tag <skill> --report eval.md --json eval.json --html eval.
 
 Useful flags: `--runs N` (default 3), `--threshold X` (default 1.0), `--judge-model`,
 `--judge-votes`, `--verbose`. Every run writes a self-contained folder under
-`evals/runs/<run_id>/<case>/` — go there to debug. Per run you get: `result.json`
+`.runs/<run_id>/<case>/` — go there to debug. Per run you get: `result.json`
 (RunResult plus the exact `command`, `returncode`, `stderr`), `workspace/claude-debug.log`
 (Claude's own `--debug-file` trace), `transcript.jsonl` (tool calls), plus `scorecard.json`
 and `report.{md,json,html}`.

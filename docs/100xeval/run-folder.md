@@ -11,7 +11,7 @@ generated:
 
 # Run folder
 
-Every invocation writes a self-contained folder under `evals/runs/<run_id>/<case>/`. When a
+Every invocation writes a self-contained folder under `.runs/<run_id>/<case>/`. When a
 case fails, the answer is in there — the score tells you *that* something broke, and this
 tells you *what*.
 

@@ -19,6 +19,11 @@ from . import loader, reporter
 from .orchestrator import run_case
 
 DEFAULT_ROOT = "evals"
+# A dot-directory at the invocation cwd, like .pytest_cache — conventionally ignored,
+# and not nested inside the cases it reports on. The old default wrote to
+# `<cases-dir>/runs`, which put machine-specific transcripts inside a tracked tree
+# and depended on every case root being separately gitignored.
+DEFAULT_RUNS_DIR = ".runs"
 # `run.py` beside the engine package — used to print copy-pasteable next steps.
 RUN_PY = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "run.py")
 
@@ -89,9 +94,10 @@ def main(argv=None) -> int:
                         metavar="DIR",
                         help=f"directory holding case folders (default: {DEFAULT_ROOT}/). "
                              f"`--root` is the deprecated spelling.")
-    p_eval.add_argument("--runs-dir", dest="runs_dir", default=None, metavar="DIR",
-                        help="where run artifacts are written (default: <cases-dir>/runs). "
-                             "Point it outside the repo to keep transcripts out of git.")
+    p_eval.add_argument("--runs-dir", dest="runs_dir", default=DEFAULT_RUNS_DIR, metavar="DIR",
+                        help=f"where run artifacts are written (default: {DEFAULT_RUNS_DIR}/). "
+                             f"Point it outside the repo entirely to keep transcripts off disk "
+                             f"here.")
     p_eval.add_argument("--tag", action="append", default=[], help="repeatable; all must be present")
     p_eval.add_argument("--case", default=None, help="fnmatch glob on case name")
     p_eval.add_argument("--target", default=None, help="plugin path for --static-only")
@@ -228,11 +234,11 @@ def _cmd_eval(args) -> int:
         print("  Nothing was executed. Drop --dry-run to run it.")
         return 2 if load_failed else 0
 
-    # One self-contained run directory: workspace + artifacts + reports. Defaults beside
-    # the cases, but `--runs-dir` moves it — transcripts can hold whatever your MCP returned,
-    # so keeping them outside the repo entirely is a reasonable thing to want.
+    # One self-contained run directory: workspace + artifacts + reports. `--runs-dir` moves
+    # it — transcripts can hold whatever your MCP returned, so writing them somewhere outside
+    # the repo entirely is a reasonable thing to want.
     run_id = _new_run_id()
-    run_dir = os.path.join(args.runs_dir or os.path.join(args.root, "runs"), run_id)
+    run_dir = os.path.join(args.runs_dir or DEFAULT_RUNS_DIR, run_id)
     os.makedirs(run_dir, exist_ok=True)
     with open(os.path.join(run_dir, "cases.json"), "w", encoding="utf-8") as fh:
         json.dump([c.as_dict() for c in cases], fh, indent=2)

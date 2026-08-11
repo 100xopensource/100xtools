@@ -86,7 +86,7 @@ misleading dataless run — but if your MCP sits behind an IP allowlist, confirm
 is allowed before starting a large suite.
 
 **4. Read the run folder.** Every invocation writes a self-contained
-`evals/runs/<run_id>/<case>/`: the full `cases.json`, per-run `result.json` + transcript +
+`.runs/<run_id>/<case>/`: the full `cases.json`, per-run `result.json` + transcript +
 `claude --debug-file` log, `scorecard.json`, and `report.{md,json,html}` with cost and
 token usage split run vs judge. When something fails, the answer is in there.
 

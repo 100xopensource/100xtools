@@ -23,7 +23,7 @@ python3 plugins/100xeval/skills/100xeval/scripts/run.py \
 runner looks elsewhere and correctly reports finding nothing. (`--root` is the old spelling
 and still works.)
 
-Run artifacts land in `<cases-dir>/runs/` by default. `--runs-dir` moves them — transcripts
+Run artifacts land in `.runs/` by default, which is gitignored. `--runs-dir` moves them — transcripts
 can contain whatever your MCP returned, so writing them outside the repo is often the right
 call:
 

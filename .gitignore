@@ -3,12 +3,15 @@
 .env.*
 !.env.example
 
-# Eval run output: transcripts, debug logs, and reports from every invocation.
-# These are large, machine-specific, and can contain data returned by your own MCP.
-# The runner writes <--root>/runs/ and --root is arbitrary (defaults to `evals`,
-# but the shipped examples use examples/plugin-eval/cases). Pinning to `evals/`
-# let a throwaway run get committed. Match the convention, not one path.
-examples/plugin-eval/cases/runs/
+# Eval run output: transcripts, debug logs, and reports from every invocation. Large,
+# machine-specific, and they can contain whatever your MCP returned.
+#
+# `.runs/` is what the runner writes to by default — a dot-directory at the invocation cwd,
+# like .pytest_cache, rather than nested inside the cases it reports on. `**/runs/` stays as
+# a safety net for the old default (`<cases-dir>/runs`), one of which got committed once.
+# A custom `--runs-dir` needs its own entry here, or point it outside the repo.
+.runs/
+**/runs/
 
 # Python
 __pycache__/

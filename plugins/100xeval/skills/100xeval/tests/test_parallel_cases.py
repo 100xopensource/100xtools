@@ -116,10 +116,13 @@ class TestCliRunsCasesInParallel(unittest.TestCase):
         self.tmp.cleanup()
 
     def _run(self, *extra):
-        rc = cli.main(["eval", "--root", self.root, "--skip-static", *extra])
-        run_dirs = sorted(os.listdir(os.path.join(self.root, "runs")))
-        with open(os.path.join(self.root, "runs", run_dirs[-1], "report.json"),
-                  encoding="utf-8") as fh:
+        # Artifacts default to `.runs/` at the invocation cwd, so the test names its own
+        # location rather than depending on where it happens to be run from.
+        runs = os.path.join(self.root, "artifacts")
+        rc = cli.main(["eval", "--cases-dir", self.root, "--runs-dir", runs,
+                       "--skip-static", *extra])
+        run_dirs = sorted(os.listdir(runs))
+        with open(os.path.join(runs, run_dirs[-1], "report.json"), encoding="utf-8") as fh:
             return rc, json.load(fh)
 
     def test_cases_overlap_and_report_stays_in_case_order(self):
@@ -140,3 +143,26 @@ class TestCliRunsCasesInParallel(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestDefaultRunsDir(unittest.TestCase):
+    """Artifacts default to `.runs/` at the cwd, not inside the cases directory.
+
+    The old default wrote to `<cases-dir>/runs`, which put machine-specific transcripts
+    inside a tracked tree and made staying out of git depend on every case root being
+    separately ignored. One of those got committed before this changed.
+    """
+
+    def test_default_is_dot_runs_at_cwd(self):
+        import contextlib
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            case_dir = os.path.join(tmp, "cases", "c1")
+            os.makedirs(case_dir)
+            with open(os.path.join(case_dir, "case.yaml"), "w", encoding="utf-8") as fh:
+                fh.write(CASE_YAML.format(name="c1", harness="fake_cli"))
+            with contextlib.chdir(tmp):
+                cli.main(["eval", "--cases-dir", "cases", "--skip-static"])
+                self.assertTrue(os.path.isdir(".runs"), "expected .runs/ at the cwd")
+                self.assertFalse(os.path.isdir(os.path.join("cases", "runs")),
+                                 "must not write inside the cases directory")

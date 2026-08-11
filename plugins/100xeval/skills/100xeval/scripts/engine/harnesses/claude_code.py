@@ -58,7 +58,7 @@ class ClaudeCodeHarness:
         verify_mcp_auth(case)
 
     def run(self, case: Case, model: str | None, workspace: str | None = None) -> RunResult:
-        # Persistent workspace (under evals/runs/<run_id>/…) when given, else ephemeral temp.
+        # Persistent workspace (under .runs/<run_id>/…) when given, else ephemeral temp.
         if workspace:
             os.makedirs(workspace, exist_ok=True)
             return self._run_in(case, model, workspace)
