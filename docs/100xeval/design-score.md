@@ -53,6 +53,12 @@ what it loads into context.
 
 It does not measure tokens. It measures the habit that wastes them.
 
+## Comparable only within a scoring version
+
+The rules that produce the number change. `scoringVersion` is printed with every report and
+carried in the JSON; a score is only comparable to another from the same version. Pin it
+alongside any threshold you gate CI on — see the repo's CHANGELOG.
+
 ## What a score means
 
 Nothing on its own. `0.89` is not a grade — it is a prompt to read the findings, which name

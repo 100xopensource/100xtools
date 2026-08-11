@@ -197,3 +197,42 @@ class TestInitSubstitutesPlugin(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestScoringVersion(unittest.TestCase):
+    """A score is only comparable within a scoring version, so reports must carry it.
+
+    The semantics moved several times before the first release — weights, what counts as a
+    finding, occurrence vs distinct counting. Without a version on the output, a threshold
+    pinned in someone's CI cannot be traced to the rules that produced it.
+    """
+
+    def test_run_reports_the_scoring_version(self):
+        import os
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            plug = os.path.join(tmp, "plugins", "demo")
+            os.makedirs(os.path.join(plug, ".claude-plugin"))
+            with open(os.path.join(plug, ".claude-plugin", "plugin.json"), "w") as fh:
+                fh.write('{"name": "demo"}')
+            rep = static.run(tmp)
+        self.assertEqual(rep["scoringVersion"], static.SCORING_VERSION)
+
+    def test_the_rendered_report_shows_it(self):
+        from engine import cli
+        rendered = cli.static_render({"scoringVersion": 7, "plugins": [], "ok": True})
+        self.assertIn("scoring v7", rendered)
+
+    def test_version_is_documented_in_the_changelog(self):
+        import os
+        # Walk up rather than counting dirnames — a miscount makes this skip silently,
+        # which is the same as not having the test.
+        cur = os.path.dirname(os.path.abspath(__file__))
+        while cur != os.path.dirname(cur):
+            path = os.path.join(cur, "CHANGELOG.md")
+            if os.path.isfile(path):
+                with open(path, encoding="utf-8") as fh:
+                    self.assertIn(f"Scoring version **{static.SCORING_VERSION}**", fh.read())
+                return
+            cur = os.path.dirname(cur)
+        self.skipTest("CHANGELOG.md not found (plugin installed without the repo)")

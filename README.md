@@ -72,6 +72,7 @@ rather than a whole guide.
 
 ```
 .claude-plugin/marketplace.json   the marketplace manifest (one entry per plugin)
+CHANGELOG.md                      releases + the scoring-version contract
 docs/                             OKF knowledge bundle — concepts, not how-to
 plugins/
 ├── 100xeval/                     eval engine + skill
@@ -95,6 +96,35 @@ The house-style rules we run internally are deliberately **not** here. The stati
 encodes published Claude Code guidance plus generic hygiene, so a finding means "this is
 probably wrong", not "this differs from how we write skills". Add your own conventions in
 your fork.
+
+## What this gets wrong
+
+Worth knowing before you wire it into anything.
+
+**The static layer is heuristics over prose, and it has been wrong repeatedly.** Running it
+against Anthropic's own published plugins found five false-positive classes in one pass — it
+flagged licence files, a plugin's own vendor documentation, and `password: 'meeting-password'`
+from a code sample. Each is fixed and tested, but the same *class* of bug will recur: a rule
+that reads documentation as instruction. **Read the findings, don't just take the number.**
+If more than about one in five is noise for your plugins, the tool is costing you attention.
+
+**Absence assertions fail open.** `min: 0, max: 0` passes when nothing matched — and a wrong
+pattern also matches nothing, so a typo gives you a grader that cannot fail. Check the same
+pattern can pass with `min: 1` on a run where the tool *was* used.
+
+**Behavioral runs are non-deterministic and cost money.** Roughly $1–2 per run. `runs: 3` is
+the default because a single run reports a coin flip as a fact. Expect the first run to
+debug your *case*, not your skill — case defects outran skill defects about 3:1 for us.
+
+**`design_score` is comparable only within a scoring version.** It is printed with every
+report and carried in the JSON. If you gate CI on a threshold, pin the version you tuned it
+against — see [CHANGELOG.md](./CHANGELOG.md).
+
+**drift-check is a draft.** It works, but it has not been run against a real multi-plugin
+repo under load.
+
+**Nobody outside 100x has used this yet.** It is dogfooded — CI scores this repo's own
+plugins on every push — but dogfooding is not the same as external validation.
 
 ## Roadmap
 

@@ -21,6 +21,12 @@ import re
 
 from . import lint
 
+# Bump when a change would move an unchanged plugin's score: weights, the penalty, what
+# counts as a finding, or which checks feed which sub-score. Emitted with every report so a
+# threshold pinned in someone's CI can be traced to the rules that produced it — a score is
+# only comparable against another from the same version. See CHANGELOG.md.
+SCORING_VERSION = 1
+
 # A check ID's PREFIX names the sub-check it feeds (`FM3` → frontmatter_quality), so the
 # mapping is derived rather than hand-maintained. That is deliberate: the old per-ID table
 # had to be edited in lockstep with lint.py, and forgetting made the new check silently
@@ -202,4 +208,4 @@ def run(root: str, targets: list[str] | None = None) -> dict:
         except Exception as exc:  # a broken plugin shouldn't crash the whole static run
             plugins.append({"path": t, "design_score": 0.0, "sub_scores": {}, "error": str(exc)})
             ok = False
-    return {"plugins": plugins, "ok": ok}
+    return {"scoringVersion": SCORING_VERSION, "plugins": plugins, "ok": ok}

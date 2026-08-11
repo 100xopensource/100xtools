@@ -386,7 +386,11 @@ def static_render(report) -> str:
     an undocumented `python3 -c` incantation — a sub-score of 0.75 named a category and
     nothing you could fix.
     """
-    lines = ["# 100xeval — static design quality", ""]
+    ver = report.get("scoringVersion")
+    header = "# 100xeval — static design quality"
+    if ver is not None:
+        header += f"  (scoring v{ver})"
+    lines = [header, ""]
     for plugin in report.get("plugins", []):
         lines.append(f"## {plugin['path']} — design_score {plugin['design_score']:.2f}")
         if plugin.get("error"):
