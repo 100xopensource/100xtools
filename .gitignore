@@ -8,11 +8,6 @@
 evals/runs/
 **/evals/runs/
 
-# Surface system prompts are supplied by whoever operates that surface and are often
-# not redistributable. Keep local copies out of git; the engine only needs them at run time.
-plugins/100xeval/skills/100xeval/scripts/engine/entrypoints/*.md
-!plugins/100xeval/skills/100xeval/scripts/engine/entrypoints/README.md
-
 # Python
 __pycache__/
 *.py[cod]
