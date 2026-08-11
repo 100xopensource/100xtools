@@ -68,9 +68,7 @@ than scoring nothing, and `TestCheckIdContract` fails both ways — on a prefix 
 sub-score, and on a sub-score no check feeds (which would sit at 1.00 forever and dilute
 every result). `engine/lint.py`'s docstring is the ID reference; keep it in step.
 
-A new check also needs a row in [`docs/100xeval/check-ids.md`](./docs/100xeval/check-ids.md).
-`scripts/check_docs.py` compares that page against `lint.py` and fails CI if they disagree,
-so this is enforced rather than remembered.
+A new check also wants a row in [`docs/100xeval/check-ids.md`](./docs/100xeval/check-ids.md).
 
 ## Changing a trust-boundary file
 

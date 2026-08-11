@@ -14,7 +14,7 @@ from a clean clone, with no install step.
 docs/                             OKF knowledge bundle — concepts, NOT shipped with plugins
 examples/<tool>/                  worked eval cases + vendored third-party plugins
 plugins/<name>/                   self-contained plugin: manifest, README, skills/
-scripts/check_docs.py             bundle conformance + check-ID sync
+scripts/check_docs.py             OKF bundle conformance + link check
 .github/workflows/ci.yml          test · static · examples · docs · manifests
 ```
 
@@ -83,8 +83,8 @@ It is concept-only by design and must never become load-bearing for operating a 
 invariant 1. Links inside it are relative rather than bundle-absolute so they resolve on
 GitHub; `docs/index.md` records that deviation.
 
-`scripts/check_docs.py` enforces all of the above, plus check-ID sync and link resolution.
-It fails on a leftover v0.1 `timestamp` field, so a spec migration cannot half-happen.
+`scripts/check_docs.py` enforces all of the above plus link resolution, and fails on a
+leftover v0.1 `timestamp` field so a spec migration cannot half-happen.
 
 ## Commands
 

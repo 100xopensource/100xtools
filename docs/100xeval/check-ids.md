@@ -14,8 +14,8 @@ generated:
 Every finding from the static linter starts with a bracketed ID. The **prefix names the
 [sub-score](design-score.md) it feeds**; the number is just an identifier, not a severity.
 
-CI verifies this page against `engine/lint.py`, so a check that exists in one and not the
-other fails the build. If you add a check, add it here.
+`engine/lint.py`'s docstring is the source of truth; keep this page in step when you add
+a check.
 
 ## `FM` — frontmatter_quality
 

@@ -76,7 +76,7 @@ docs/                             OKF knowledge bundle — concepts, not how-to
 plugins/
 ├── 100xeval/                     eval engine + skill
 └── drift-check/                  drift review skill + GitHub Actions workflow
-scripts/check_docs.py             bundle conformance + check-ID sync (runs in CI)
+scripts/check_docs.py             OKF bundle conformance + link check (runs in CI)
 ```
 
 One repo, one folder per tool. Each plugin is self-contained: you can copy a single
