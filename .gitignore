@@ -4,9 +4,8 @@
 !.env.example
 
 # Eval run output. Large, machine-specific, and can contain whatever your MCP returned.
-# `**/runs/` covers the pre-.runs default; a custom --runs-dir needs its own entry.
+# This is the default location; a custom --runs-dir needs its own entry here.
 .runs/
-**/runs/
 
 # Python
 __pycache__/
