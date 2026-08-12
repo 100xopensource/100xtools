@@ -96,8 +96,9 @@ A new check also wants a row in [`docs/100xeval/check-ids.md`](./docs/100xeval/c
 
 These drive what CI does with model output and what permissions the model gets:
 
-- `plugins/drift-check/workflows/drift-check.yml`
-- `plugins/drift-check/skills/drift-check/SKILL.md`
+- `plugins/100xdrift-check/templates/workflows/drift-check.yml`
+- `plugins/100xdrift-check/templates/skills/drift-check/SKILL.md`
+- `.claude/skills/drift-check/SKILL.md` (this repo's vendored copy)
 - `.github/workflows/*`
 
 Changes here need review by someone other than the author, and checks should only ever
