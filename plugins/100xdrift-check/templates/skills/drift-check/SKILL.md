@@ -32,7 +32,7 @@ is usually deliberate; the point is to surface the cases where it isn't.
   Never widen it because a file "looks drift-relevant", and never narrow it because a
   match "isn't really a skill" — a repo that watches `**/hooks/**` wants its hooks
   reviewed. If the workflow is missing, fall back to the shipped default —
-  `'**/SKILL.md' '**/commands/**/*.md' '**/agents/**/*.md'` — and say in the report that
+  `'**/SKILL.md' '**/commands/**' '**/agents/**'` — and say in the report that
   you assumed it.
 - See the actual change per file with: `git diff BASE HEAD -- <file>`
 - Some listed files may have been DELETED — read the pre-deletion version with

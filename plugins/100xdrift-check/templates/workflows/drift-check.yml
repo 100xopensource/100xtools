@@ -40,8 +40,8 @@ on:
       # that get copied between plugins and drift the same way, so all three are watched
       # by default. Delete a line your repo does not use.
       - "**/SKILL.md"
-      - "**/commands/**/*.md"            # slash commands
-      - "**/agents/**/*.md"              # subagent definitions
+      - "**/commands/**"                 # slash commands
+      - "**/agents/**"                   # subagent definitions
       #
       # Uncomment what else your plugins actually contain. These are config and code
       # rather than prompts — reviewable, but "the same fix applies" is a weaker claim
@@ -118,8 +118,8 @@ jobs:
           # Mirror of the `paths:` watch list — add every glob you added there, quoted.
           git diff --name-only --diff-filter=ACMRD "$BASE" HEAD -- \
             '**/SKILL.md' \
-            '**/commands/**/*.md' \
-            '**/agents/**/*.md' > changed-skill-files.txt
+            '**/commands/**' \
+            '**/agents/**' > changed-skill-files.txt
           COUNT=$(grep -c . changed-skill-files.txt || true)
           echo "count=$COUNT" >> "$GITHUB_OUTPUT"
           echo "base=$BASE"   >> "$GITHUB_OUTPUT"

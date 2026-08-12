@@ -16,6 +16,7 @@ directory, so nothing here is ever load-bearing for using a tool.
 ## Tools
 
 * [100xeval](100xeval/index.md) - Behavioral and static evaluation for Claude Code plugins
+* [100xdrift-check](100xdrift-check/index.md) - Drift review across the plugins in one repository
 
 ## Conventions
 

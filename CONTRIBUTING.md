@@ -98,7 +98,6 @@ These drive what CI does with model output and what permissions the model gets:
 
 - `plugins/100xdrift-check/templates/workflows/drift-check.yml`
 - `plugins/100xdrift-check/templates/skills/drift-check/SKILL.md`
-- `.claude/skills/drift-check/SKILL.md` (this repo's vendored copy)
 - `.github/workflows/*`
 
 Changes here need review by someone other than the author, and checks should only ever

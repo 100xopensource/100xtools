@@ -190,8 +190,8 @@ config file, and the reviewer skill reads that list instead of assuming what a
 ```yaml
 paths:
   - "**/SKILL.md"
-  - "**/commands/**/*.md"            # slash commands
-  - "**/agents/**/*.md"              # subagent definitions
+  - "**/commands/**"                 # slash commands
+  - "**/agents/**"                   # subagent definitions
 ```
 
 The three prompt surfaces — the files that are literally instructions to a model, where

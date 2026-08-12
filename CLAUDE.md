@@ -55,9 +55,8 @@ caught only on a second pass.
 
 **4. Trust-boundary files need author ≠ reviewer.** `.github/workflows/*`,
 `plugins/100xdrift-check/templates/workflows/drift-check.yml`,
-`plugins/100xdrift-check/templates/skills/drift-check/SKILL.md`, and this repo's vendored
-`.claude/skills/drift-check/SKILL.md` decide what CI does with model output and
-what tools the model gets. Checks there only ever tighten; if a change relaxes a guard, say
+and `plugins/100xdrift-check/templates/skills/drift-check/SKILL.md` decide what CI does with
+model output and what tools the model gets. Checks there only ever tighten; if a change relaxes a guard, say
 so explicitly rather than letting a reviewer find it.
 
 **5. Every plugin scores 1.00** on the static linter this repo ships. CI dogfoods it, so a
@@ -212,9 +211,9 @@ the workflow's `/drift-check` prompt resolves against the vendored copy or nothi
 It also pins the contract to the commit under review. The cost: the copy goes stale
 silently, and in the consuming repo anyone who can open a PR can edit it.
 
-This repo vendors its own copy at `.claude/skills/drift-check/`, so a clean clone can run
-`/drift-check` with no install. It is a *copy* of the template and drifts from it — change
-one, re-run `/100xdrift-check:install-skill` to sync the other.
+This repo does **not** vendor a copy — `.claude/skills/` carries only the two `-concepts`
+skills, which explain the tools rather than operate them. To try the reviewer here, install
+it into a scratch repo, or use the fixture under `examples/plugin-drift-check/`.
 
 `templates/skills/drift-check/SKILL.md` and `templates/workflows/drift-check.yml` are **one
 contract split across two files**. The skill writes `drift-report.md` whose first line must

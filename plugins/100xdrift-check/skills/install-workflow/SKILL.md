@@ -33,9 +33,8 @@ review is a diff, so a repo is the precondition. Say so and suggest `git init`.
 
 ### 2. Look at what will be reviewed
 
-The template watches the three prompt surfaces: `**/SKILL.md`, `**/commands/**/*.md`,
-`**/agents/**/*.md`. Count what this repo has of each, plus what it has that stays
-unwatched:
+The template watches the three prompt surfaces: `**/SKILL.md`, `**/commands/**`,
+`**/agents/**`. Count what this repo has of each, plus what it has that stays unwatched:
 
 ```bash
 # Watched by default.
