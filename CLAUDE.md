@@ -54,9 +54,9 @@ committing — a captured `claude mcp list` fixture leaked through the first por
 caught only on a second pass.
 
 **4. Trust-boundary files need author ≠ reviewer.** `.github/workflows/*`,
-`plugins/drift-check/workflows/drift-check.yml`, and
-`plugins/drift-check/skills/drift-check/SKILL.md` decide what CI does with model output and
-what tools the model gets. Checks there only ever tighten; if a change relaxes a guard, say
+`plugins/100xdrift-check/templates/workflows/drift-check.yml`,
+and `plugins/100xdrift-check/templates/skills/drift-check/SKILL.md` decide what CI does with
+model output and what tools the model gets. Checks there only ever tighten; if a change relaxes a guard, say
 so explicitly rather than letting a reviewer find it.
 
 **5. Every plugin scores 1.00** on the static linter this repo ships. CI dogfoods it, so a
@@ -190,21 +190,52 @@ than whichever account is logged in, so runs behave identically locally and in C
 expired token surfaces as `tool_used` "called 0×", not as an auth error.** Check the token
 before blaming the skill.
 
-### drift-check — cross-plugin drift review
+### 100xdrift-check — cross-plugin drift review
 
-`skills/drift-check/SKILL.md` and `workflows/drift-check.yml` are **one contract split
-across two files**. The skill writes `drift-report.md` whose first line must be
-`<!-- drift-status: critical|warning|good -->`; the workflow's `github-script` step parses
-that marker to pick the comment's icon and headline, and classifies marker-less
+**Nothing in `skills/` reviews anything.** The plugin exposes exactly two installer skills;
+the reviewer and the workflow live under `templates/` and are copied into the *user's* repo:
+
+| Plugin path | Installed to | By |
+| --- | --- | --- |
+| `templates/skills/drift-check/` | `.claude/skills/drift-check/` | `install-skill` |
+| `templates/workflows/drift-check.yml` | `.github/workflows/drift-check.yml` | `install-workflow` |
+
+`install-workflow` installs the reviewer too **if absent**, and deliberately does not
+refresh an existing copy — refreshing is `install-skill`'s job, so a repo that edited its
+vendored copy keeps it. A file added under `templates/` is a file written into someone
+else's repo.
+
+**The vendoring is load-bearing, not a convenience.** The Action starts a bare Claude Code
+session with no plugins installed, and the plugin ships no reviewer skill of its own, so
+the workflow's `/drift-check` prompt resolves against the vendored copy or nothing at all.
+It also pins the contract to the commit under review. The cost: the copy goes stale
+silently, and in the consuming repo anyone who can open a PR can edit it.
+
+This repo does **not** vendor a copy — `.claude/skills/` carries only the two `-concepts`
+skills, which explain the tools rather than operate them. To try the reviewer here, install
+it into a scratch repo, or use the fixture under `examples/plugin-drift-check/`.
+
+`templates/skills/drift-check/SKILL.md` and `templates/workflows/drift-check.yml` are **one
+contract split across two files**. The skill writes `drift-report.md` whose first line must
+be `<!-- drift-status: critical|warning|good -->`; the workflow's `github-script` step
+parses that marker to pick the comment's icon and headline, and classifies marker-less
 skip/fallback notes itself. Change the vocabulary in one file without the other and every
 report silently degrades to "warning".
 
 The tool allowlist lives in the **workflow**, never in the skill — permissions belong to the
 caller.
 
-The workflow is a copy-paste template for *other* repos, not active here. Its `paths:`
-filter and the `git diff -- '<pathspec>'` in the collect step must change together; if they
-disagree, the job runs and finds nothing.
+**Scope is one repository and there is no setting for it.** Siblings are the repo's other
+plugins; the reviewer never reads `../`, never clones, never fetches. What counts as a
+reviewable file is the workflow's `paths:` list — the single scope knob, which the reviewer
+reads rather than assuming. That list and the `git diff -- '<pathspec>'` in the collect step
+must change together; if they disagree, the job runs and finds nothing.
+
+The workflow is not active in this repo — it is a template for repos that install it.
+
+**No `disable-model-invocation` on these skills**, though all three want it: three SKILL.md
+files carrying that one line read as duplication to `token_efficiency`, which counts
+frontmatter. Re-add it together with a fix excluding frontmatter from that metric.
 
 ## Adding a plugin
 

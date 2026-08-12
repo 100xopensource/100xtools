@@ -1,0 +1,12 @@
+{
+  "name": "100xdrift-check",
+  "description": "Drift review for a repo that holds several Claude Code plugins. When a PR edits a watched plugin file, a headless Claude run finds the sibling copies in the repo's other plugins and posts a non-blocking report saying which siblings the change likely applies to and which are legitimate variation. Two setup skills: install-skill vendors the reviewer into your repo, install-workflow adds the GitHub Actions workflow.",
+  "version": "0.1.0",
+  "author": {
+    "name": "100x",
+    "url": "https://github.com/100xopensource/100xtools"
+  },
+  "homepage": "https://github.com/100xopensource/100xtools/tree/main/plugins/100xdrift-check",
+  "license": "Apache-2.0",
+  "keywords": ["drift", "review", "skills", "plugins", "ci", "github-actions"]
+}

@@ -15,15 +15,28 @@
       "description": "Behavioral and static evaluation for Claude Code plugins: run a plugin against saved testcases, grade whether it queried the right data and presented it correctly, plus a run-free design-quality score.",
       "version": "0.1.0",
       "license": "Apache-2.0",
-      "keywords": ["evals", "testing", "plugins", "skills", "ci"]
+      "keywords": [
+        "evals",
+        "testing",
+        "plugins",
+        "skills",
+        "ci"
+      ]
     },
     {
-      "name": "drift-check",
-      "source": "./plugins/drift-check",
-      "description": "Cross-plugin drift review: when a PR edits a skill, find the sibling skills in your other plugins and report which siblings the change likely applies to. Non-blocking, report-only.",
+      "name": "100xdrift-check",
+      "source": "./plugins/100xdrift-check",
+      "description": "Drift review for a repo holding several plugins: when a PR edits a watched plugin file, find the sibling copies in the repo's other plugins and report which siblings the change likely applies to. Non-blocking, report-only.",
       "version": "0.1.0",
       "license": "Apache-2.0",
-      "keywords": ["drift", "review", "skills", "plugins", "ci", "github-actions"]
+      "keywords": [
+        "drift",
+        "review",
+        "skills",
+        "plugins",
+        "ci",
+        "github-actions"
+      ]
     }
   ]
 }

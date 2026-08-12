@@ -38,7 +38,7 @@ safety:
 
 ## Notes for operators
 
-- **Artifacts are readable by anyone with repo read access.** The drift-check workflow
+- **Artifacts are readable by anyone with repo read access.** The 100xdrift-check workflow
   uploads the full execution transcript. Don't enable it on a repo where the skill content
   itself is sensitive.
 - **`CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token` is a personal credential** and

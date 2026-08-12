@@ -23,7 +23,9 @@ First public release. Scoring version **1**.
 - `--cases-dir` selects the case root, `--runs-dir` the artifact location (default
   `.runs/`), `--entrypoint` overrides the emulated surface for a whole run.
 
-### drift-check
+### 100xdrift-check
 
-- Cross-plugin drift review skill plus a copy-paste GitHub Actions workflow.
+- Two install skills — `install-skill` vendors the reviewer to `.claude/skills/drift-check/`,
+  `install-workflow` adds the GitHub Actions job — plus the reviewer and workflow templates
+  they install.
 - **Draft.** Usable, but it has not been run against a real multi-plugin repo in anger.

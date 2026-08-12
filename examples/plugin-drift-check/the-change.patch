@@ -1,0 +1,50 @@
+diff --git a/plugins/acme-north/agents/reconciler.md b/plugins/acme-north/agents/reconciler.md
+index f7abc0f..494cacd 100644
+--- a/plugins/acme-north/agents/reconciler.md
++++ b/plugins/acme-north/agents/reconciler.md
+@@ -5,8 +5,11 @@ description: Reconciles the weekly sales summary against the ledger for Acme Nor
+ 
+ You reconcile the weekly sales summary against `ledger.weekly` for Acme North.
+ 
+-Match each report row to a ledger row on the report's **end date**, then report the
++Match each report row to a ledger row on the report's **ISO week number**, then report the
+ variance per store. A store missing from the ledger is a variance, not a zero.
+ 
++Joining on the end date broke whenever a report was re-run a day late: the same week
++produced two different keys. The week number is stable whatever day you run it.
++
+ Report currency in whole units. State the window you reconciled and the ledger snapshot
+ you read. Never write to the ledger — you read and report.
+diff --git a/plugins/acme-north/commands/export-csv.md b/plugins/acme-north/commands/export-csv.md
+index d573f2f..a38d148 100644
+--- a/plugins/acme-north/commands/export-csv.md
++++ b/plugins/acme-north/commands/export-csv.md
+@@ -6,7 +6,10 @@ description: Exports the North weekly sales summary to a CSV file.
+ 
+ Run the weekly report for Acme North, then write it to CSV.
+ 
+-Name the file `orders-<YYYY-MM-DD>.csv`, where the date is **the day the export runs**.
++Name the file `orders-<YYYY-MM-DD>.csv`, where the date is **the Monday of the ISO week the
++report covers**. Two exports of the same week now land on one filename instead of two that
++differ only by which day someone happened to run them.
++
+ Write it to `./exports/`, creating the directory if it is missing.
+ 
+ Print the path you wrote and the row count. Never overwrite an existing file — if the name
+diff --git a/plugins/acme-north/skills/weekly-report/SKILL.md b/plugins/acme-north/skills/weekly-report/SKILL.md
+index e7b11e5..c4efc2d 100644
+--- a/plugins/acme-north/skills/weekly-report/SKILL.md
++++ b/plugins/acme-north/skills/weekly-report/SKILL.md
+@@ -9,7 +9,11 @@ Read the orders table at `reports.orders` and summarise the week.
+ 
+ ## Window
+ 
+-Sum every order from **the last 7 days ending today**, inclusive.
++Sum every order in the **ISO week, Monday to Sunday**, inclusive. Label the report with
++that week's ISO week number.
++
++A rolling 7-day window double-counted whichever day the report ran on: a Tuesday run and a
++Wednesday run both claimed to cover "last week" and disagreed by one day's takings.
+ 
+ ## Output
+ 

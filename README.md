@@ -15,7 +15,7 @@ editing them:
 | Tool | What it does |
 | --- | --- |
 | [**100xeval**](./plugins/100xeval) | Runs a plugin for real against saved testcases and grades the answers — did it query the right data, present it correctly, get the numbers right? Plus a free, model-free design-quality score. |
-| [**drift-check**](./plugins/drift-check) | On every PR that edits a skill, finds the sibling skills in your other plugins and reports which ones the change probably applies to. Report-only, never blocks a merge. |
+| [**100xdrift-check**](./plugins/100xdrift-check) | On every PR that edits a plugin file, finds the sibling copies in your other plugins **in the same repo** and reports which ones the change probably applies to. Report-only, never blocks a merge. |
 
 Both are ordinary Claude Code plugins, and both are usable as CI gates.
 
@@ -36,26 +36,26 @@ python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --tar
 
 ```bash
 claude --plugin-dir plugins/100xeval      # then: "run the evals for <skill>"
-claude --plugin-dir plugins/drift-check   # then: /drift-check
+claude --plugin-dir plugins/100xdrift-check   # then: /100xdrift-check:install-skill
 ```
 
 **Or install from the marketplace:**
 
 ```
 /plugin marketplace add 100xopensource/100xtools
-/plugin install 100xeval
-/plugin install drift-check
+/plugin install 100xeval@100xtools
+/plugin install 100xdrift-check@100xtools
 ```
 
 Each plugin's README carries its own full setup — start there:
-[100xeval](./plugins/100xeval/README.md) · [drift-check](./plugins/drift-check/README.md).
+[100xeval](./plugins/100xeval/README.md) · [100xdrift-check](./plugins/100xdrift-check/README.md).
 
 ## Requirements
 
 - **Python 3.11+** for the eval engine — stdlib only. No `pip install`, no virtualenv, no
   lockfile. This is deliberate: an eval harness that needs its own dependency management is
   one more thing to break on a Friday.
-- **Claude Code** on `PATH` for behavioral eval runs and for the drift-check skill.
+- **Claude Code** on `PATH` for behavioral eval runs and for the drift review skill.
 - **An Anthropic API key or Claude Code login** for anything that actually calls a model.
   The static layer needs neither.
 
@@ -76,7 +76,7 @@ CHANGELOG.md                      releases + the scoring-version contract
 docs/                             OKF knowledge bundle — concepts, not how-to
 plugins/
 ├── 100xeval/                     eval engine + skill
-└── drift-check/                  drift review skill + GitHub Actions workflow
+└── 100xdrift-check/              two install skills + the reviewer and workflow they install
 scripts/check_docs.py             OKF bundle conformance + link check (runs in CI)
 ```
 
@@ -87,7 +87,7 @@ directory into your own repo and it will work.
 
 - **Not a general LLM eval framework.** It grades Claude Code *plugins* — skills, their
   tool calls, their MCP servers. If you want to benchmark models, use something else.
-- **Not a replacement for review.** drift-check is advisory. It tells you where to look; it
+- **Not a replacement for review.** 100xdrift-check is advisory. It tells you where to look; it
   does not decide.
 - **Not a hosted service.** There is no server to run and no account to create. Everything
   here executes in your CI or on your laptop.
@@ -120,8 +120,8 @@ debug your *case*, not your skill — case defects outran skill defects about 3:
 report and carried in the JSON. If you gate CI on a threshold, pin the version you tuned it
 against — see [CHANGELOG.md](./CHANGELOG.md).
 
-**drift-check is a draft.** It works, but it has not been run against a real multi-plugin
-repo under load.
+**100xdrift-check is a draft.** It works, but it has not been run against a real
+multi-plugin repo under load.
 
 **Nobody outside 100x has used this yet.** It is dogfooded — CI scores this repo's own
 plugins on every push — but dogfooding is not the same as external validation.
