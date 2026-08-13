@@ -19,6 +19,10 @@ together. **Python 3.11+, stdlib only** — no `pip install`, no virtualenv, no 
 
 ## Get started
 
+> **Not a developer?** Start with [GETTING-STARTED.md](./GETTING-STARTED.md) instead — same
+> tool, no assumed vocabulary, and the free path first. This section assumes you already
+> know what a plugin, an MCP server, and a grader are.
+
 **1. Install it.** From Claude Code:
 
 ```
@@ -65,7 +69,7 @@ python3 "$RUN" eval --cases-dir examples/plugin-eval/cases --skip-static --dry-r
 Exit codes: `0` all pass · `1` a case below `--threshold` · `2` usage or engine error. That
 makes `eval` usable directly as a CI gate.
 
-**3. Behavioral runs need model auth**, and MCP auth if your plugin declares an MCP server.
+**5. Behavioral runs need model auth**, and MCP auth if your plugin declares an MCP server.
 Set `ANTHROPIC_API_KEY` (or be logged into Claude Code), then either authenticate the
 connector interactively (`claude` → `/mcp`) or inject a bearer token for headless runs:
 
@@ -85,7 +89,7 @@ zero. The runner checks `claude mcp list` and aborts with guidance rather than p
 misleading dataless run — but if your MCP sits behind an IP allowlist, confirm your egress
 is allowed before starting a large suite.
 
-**4. Read the run folder.** Every invocation writes a self-contained
+**6. Read the run folder.** Every invocation writes a self-contained
 `.runs/<run_id>/<case>/`: the full `cases.json`, per-run `result.json` + transcript +
 `claude --debug-file` log, `scorecard.json`, and `report.{md,json,html}` with cost and
 token usage split run vs judge. When something fails, the answer is in there.
