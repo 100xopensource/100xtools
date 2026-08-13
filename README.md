@@ -43,10 +43,6 @@ claude plugin install 100xeval@100xtools
 claude plugin install 100xdrift-check@100xtools
 ```
 
-A *marketplace* is just a folder that lists plugins — here, the one you cloned. **The `./`
-matters:** a bare `.` is rejected. From somewhere else, use an absolute path or a relative
-one like `../100xtools`.
-
 **Then just ask.** Open the folder your plugin is in and say what you want in plain words:
 
 > *"static-check my plugin"* · *"why did it score 0.77?"* · *"what should I fix first?"*

@@ -76,8 +76,7 @@ claude plugin install 100xdrift-check@100xtools
 ```
 
 Adjust `../100xtools` if you cloned it elsewhere — any folder holding
-`.claude-plugin/marketplace.json` works as a marketplace. A path must start with `./`,
-`../`, or `/`; a bare `.` is rejected.
+`.claude-plugin/marketplace.json` works as a marketplace.
 
 If Claude Code says `Run /reload-plugins to activate.`, type `/reload-plugins`.
 

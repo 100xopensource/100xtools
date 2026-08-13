@@ -50,9 +50,6 @@ claude plugin marketplace add ./
 claude plugin install 100xeval@100xtools
 ```
 
-**The `./` matters** — a bare `.` is rejected. From another folder, use an absolute path or
-`../100xtools`.
-
 **How to tell it worked:** ask Claude *"static-check my plugin"* and it should offer to run
 the check rather than ask you what you mean.
 
