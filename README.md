@@ -21,8 +21,9 @@ Pick by the problem you have, not by the tool name.
 | *"We have several plugins, and a fix in one never made it to the others."* | [**100xdrift-check**](./plugins/100xdrift-check/README.md) | Claude usage per review |
 
 If you only try one thing, make it the **free static check**. It takes about five minutes,
-cannot change or break anything, and it finds real mistakes — a misspelled `descriptionn`
-that Claude had been silently ignoring, for example.
+cannot change or break anything, and it catches the mistakes you cannot spot by reading: a
+skill with no description, so Claude never knows when to use it; a setting name spelled just
+wrongly enough to be ignored without complaint; a password left sitting in a file.
 
 ## Start here
 
