@@ -79,15 +79,41 @@ claude plugin install 100xeval@100xtools
 
 **How to tell it worked:** the first line answers `Successfully added marketplace: 100xtools`.
 
-**3. Ask.** Point Claude at the folder your plugin is in:
+**3. Open Claude and ask.** Start Claude Code, or open the Claude desktop app, in the folder
+your plugin lives in. From here you only type plain English — copy any line below.
 
-> *"add a testcase for askinventory"* · *"run the evals for asksales"* ·
-> *"did my change regress anything?"* · *"static-check my plugin"* ·
-> *"why did it score 0.77?"*
+**Start here — free, instant, changes nothing:**
 
-Free and instant, if you want to see something work before spending anything:
-*"static-check my plugin"*. It only reads files — nothing is edited, uploaded, or sent over
-the network.
+> *"static-check my plugin"*
+
+It only reads files. Nothing is edited, uploaded, or sent over the network, and it costs
+nothing. Then, once you have a result:
+
+> *"explain that score in plain english"*
+> *"what should I fix first?"*
+> *"is that finding a real problem, or a false alarm?"*
+
+**Building up testcases** — the part that keeps the plugin working over time:
+
+> *"what should I be testing in this plugin?"*
+> *"add a testcase for askinventory"*
+> *"turn this bug report into a testcase: <paste the report>"*
+> *"show me the testcases we already have"*
+
+**Running them** — this is the part that costs money, so ask the price first:
+
+> *"how much would it cost to run these testcases?"*
+> *"run the evals for asksales, just once"*
+> *"did my change break anything?"*
+> *"why did that case fail?"*
+
+**If you get stuck**, ask Claude that too — it has the tool's own documentation:
+
+> *"I don't understand this result, walk me through it"*
+> *"what does token_efficiency mean?"*
+
+You never have to learn a command or a flag. Everything below this section is the manual for
+people who want to drive the engine directly.
 
 ---
 
