@@ -12,14 +12,16 @@ sentence, the plugin quietly gets worse, and you find out when a user complains.
 
 | Your problem                                                 | Use                                                          | What it costs                    |
 | ------------------------------------------------------------ | ------------------------------------------------------------ | -------------------------------- |
-| *"Is anything obviously wrong with my plugin?"*              | **[100xeval](./plugins/100xeval/README.md)** — static check  | **Nothing.** No key, no internet |
-| *"Does it still give the right answers after we edited it?"* | **[100xeval](./plugins/100xeval/README.md)** — real test run | ~$1–2 per run                    |
+| *"Does my plugin still answer correctly after we edited it?"* | **[100xeval](./plugins/100xeval/README.md)** — testcases      | ~$1–2 per run                    |
+| *"Is anything obviously wrong with my plugin?"*               | **[100xeval](./plugins/100xeval/README.md)** — static check   | **Nothing.** No key, no internet |
 | *"A fix in one plugin never reached the others."*            | **[100xdrift-check](./plugins/100xdrift-check/README.md)**   | Claude usage per review          |
 
 
-Start with the **free static check**. Five minutes, changes nothing, and it catches what you
-cannot spot by reading: a skill with no description, a setting name spelled just wrongly
-enough to be ignored, a password left in a file.
+**100xeval is testcases for plugins.** You save the questions your plugin must get right and
+run them after every change, so quality survives months of edits and more than one person
+editing them. It also ships a free static check — a quick run-free pass over the files, useful
+on every commit, but it cannot tell you whether the plugin still *answers* correctly. Only a
+case does that.
 
 ## Start here
 
