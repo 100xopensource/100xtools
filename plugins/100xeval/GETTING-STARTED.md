@@ -73,15 +73,19 @@ cd 100xtools
 > **If this fails with "repository not found":** the repo is private until 14 Aug. You need
 > to be added to the `100xopensource` GitHub organisation. Ask Thuan.
 
-**Step 2. Install the tool.** Start Claude Code in that folder, then type these two lines.
-The first tells Claude where to find the tools; the second installs the one you want.
+**Step 2. Install the tool.** Two more lines in the same terminal. The first tells Claude
+where to find the tools; the second installs the one you want.
 
-```
-/plugin marketplace add .
-/plugin install 100xeval@100xtools
+```bash
+claude plugin marketplace add ./
+claude plugin install 100xeval@100xtools
 ```
 
-If Claude tells you to run `/reload-plugins`, do that.
+> **Type `./` and not `.`** — a bare dot is rejected with *"Invalid marketplace source
+> format"*. The `/` is not a typo.
+
+**How to tell it worked:** the first line should answer
+`Successfully added marketplace: 100xtools`.
 
 **Step 3. Ask for a check.** Point Claude at the folder your plugin is in, and say:
 

@@ -40,20 +40,18 @@ Everything ships in one folder — the skill Claude talks to and the Python engi
 > ground with nothing assumed — no jargon, free path first. This section is quicker and
 > expects you to know what a plugin and a data connection are.
 
-**1. Install it.** Clone the repo, then start Claude Code in that folder and add it as a
-marketplace before installing:
+**1. Install it.** Clone the repo, register it as a marketplace, then install — all in the
+terminal:
 
 ```bash
 git clone https://github.com/100xopensource/100xtools.git
 cd 100xtools
+claude plugin marketplace add ./
+claude plugin install 100xeval@100xtools
 ```
 
-```
-/plugin marketplace add .
-/plugin install 100xeval@100xtools
-```
-
-If you are told to run `/reload-plugins`, do that.
+**The `./` matters** — a bare `.` is rejected. From another folder, use an absolute path or
+`../100xtools`.
 
 **How to tell it worked:** ask Claude *"static-check my plugin"* and it should offer to run
 the check rather than ask you what you mean.

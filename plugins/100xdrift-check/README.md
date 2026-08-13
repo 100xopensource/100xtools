@@ -57,7 +57,7 @@ Everything is typed **inside Claude Code** unless a block says `bash` — those 
 terminal. You never have to edit a file by hand.
 
 > **New to plugins?** A *plugin* adds new `/commands` to Claude Code. A *marketplace* is
-> just a place plugins are listed — here, this GitHub repository. You add the marketplace
+> just a place plugins are listed — here, the folder you cloned. You add the marketplace
 > once, then install from it.
 
 ### Step 1 — install the plugin
@@ -68,15 +68,16 @@ Clone this repo somewhere alongside your own:
 git clone https://github.com/100xopensource/100xtools.git
 ```
 
-Then open Claude Code **in the repository you want checked**, and point it at that clone:
+Then, from **the repository you want checked**, point at that clone and install:
 
-```
-/plugin marketplace add ../100xtools
-/plugin install 100xdrift-check@100xtools
+```bash
+claude plugin marketplace add ../100xtools
+claude plugin install 100xdrift-check@100xtools
 ```
 
 Adjust `../100xtools` if you cloned it elsewhere — any folder holding
-`.claude-plugin/marketplace.json` works as a marketplace.
+`.claude-plugin/marketplace.json` works as a marketplace. A path must start with `./`,
+`../`, or `/`; a bare `.` is rejected.
 
 If Claude Code says `Run /reload-plugins to activate.`, type `/reload-plugins`.
 
@@ -88,9 +89,9 @@ If Claude Code says `Run /reload-plugins to activate.`, type `/reload-plugins`.
 
 Once this repo is public you can skip the clone and add it straight from GitHub:
 
-```
-/plugin marketplace add 100xopensource/100xtools
-/plugin install 100xdrift-check@100xtools
+```bash
+claude plugin marketplace add 100xopensource/100xtools
+claude plugin install 100xdrift-check@100xtools
 ```
 
 Just trying it out, without installing anything? Start Claude Code from a clone of this

@@ -26,33 +26,26 @@ that Claude had been silently ignoring, for example.
 
 ## Start here
 
-Three steps. After them you can just ask Claude for what you want.
+Two steps in your terminal. After them you can just ask Claude for what you want.
 
-**1. Clone this repo.** In your terminal:
+**1. Clone this repo:**
 
 ```bash
 git clone https://github.com/100xopensource/100xtools.git
 cd 100xtools
 ```
 
-**2. Add it as a marketplace.** Start Claude Code in that folder, then type:
+**2. Register it and install the tool you need:**
 
-```
-/plugin marketplace add .
-```
-
-A *marketplace* is just a folder that lists plugins — here, the one you cloned. Any path
-works, so you can also add it from another project with
-`/plugin marketplace add ../100xtools`.
-
-**3. Install the tool you need:**
-
-```
-/plugin install 100xeval@100xtools
-/plugin install 100xdrift-check@100xtools
+```bash
+claude plugin marketplace add ./
+claude plugin install 100xeval@100xtools
+claude plugin install 100xdrift-check@100xtools
 ```
 
-If you are told to run `/reload-plugins`, do that.
+A *marketplace* is just a folder that lists plugins — here, the one you cloned. **The `./`
+matters:** a bare `.` is rejected. From somewhere else, use an absolute path or a relative
+one like `../100xtools`.
 
 **Then just ask.** Open the folder your plugin is in and say what you want in plain words:
 
