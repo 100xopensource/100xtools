@@ -12,6 +12,10 @@ a comment saying which ones probably need the same fix — and which are differe
 > **Wrong tool?** If you have one plugin and want to know whether it is any good, you want
 > [100xeval](../100xeval/README.md) instead. This one only helps when copies exist to compare.
 
+> **Draft.** Usable, and it does what this page describes — but it has not yet been run
+> against a large multi-plugin repo under load. Treat early reports as advice to check, not
+> as a verdict.
+
 One repository is the whole scope: the diff, the siblings, and the PR comment all belong
 to the repo the workflow runs in. Nothing is cloned or fetched, and no run — CI or local —
 reads another repository. See [One repository, by design](#one-repository-by-design).
