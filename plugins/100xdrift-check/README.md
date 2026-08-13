@@ -1,14 +1,16 @@
-# 100xdrift-check — keep sibling plugin files from silently diverging
+# 100xdrift-check — stop fixes from landing in only one copy
 
-**For a repo that holds several plugins.** If two of them carry copies of a skill,
-command, agent or hook that share a shape — one per team, per tenant, or per product
-line — a bug fixed in one copy stays broken in the others, and nobody notices until a
-user hits it.
+**For a repo that holds several plugins.** Teams usually end up with near-identical copies
+of the same skill, command or agent — one per team, per customer, per product line. Those
+copies are *siblings*. Fix a bug in one sibling, forget the other four, and the bug lives on
+where nobody is looking.
 
-100xdrift-check is the reviewer that notices. When a PR edits a watched plugin file, a
-headless Claude run reads the diff, finds the sibling copies **elsewhere in the same
-repo**, and posts a non-blocking PR comment saying which siblings the change probably
-applies to and which are legitimately different.
+100xdrift-check is the reviewer that notices. When a pull request edits a file it watches,
+Claude reads the change, finds the sibling copies **elsewhere in the same repo**, and leaves
+a comment saying which ones probably need the same fix — and which are different on purpose.
+
+> **Wrong tool?** If you have one plugin and want to know whether it is any good, you want
+> [100xeval](../100xeval/README.md) instead. This one only helps when copies exist to compare.
 
 One repository is the whole scope: the diff, the siblings, and the PR comment all belong
 to the repo the workflow runs in. Nothing is cloned or fetched, and no run — CI or local —

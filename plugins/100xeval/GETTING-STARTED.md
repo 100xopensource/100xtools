@@ -29,12 +29,15 @@ part is at the end, clearly marked.
 
 ## Before you start
 
-You need two things.
+**Claude Code or the Claude desktop app**, which you probably already have.
 
-**1. A terminal.** On Mac, press `Cmd + Space`, type `Terminal`, press Enter. A window with
-text appears. That is it — that is the terminal.
+**Python 3.11 or newer.** The tool is written in Python, so it has to be there — but you
+almost never interact with it directly. To check, you need a terminal:
 
-**2. Python 3.11 or newer.** Copy this line into the terminal and press Enter:
+- On Mac, press `Cmd + Space`, type `Terminal`, press Enter. A window with text appears.
+  That is it — that is the terminal.
+
+Copy this line into it and press Enter:
 
 ```bash
 python3 --version
@@ -57,30 +60,35 @@ deliberate: a testing tool that needs its own installation is one more thing tha
 
 ## Part 1 — Your first check (about 5 minutes, free)
 
-**Step 1. Get the code.** Copy and paste:
+**The easiest way is to let Claude do it.** You install the tool once, then ask for things in
+plain words. You never type a command.
 
-```bash
-git clone https://github.com/100xopensource/100xtools.git
-cd 100xtools
+**Step 1. Install the tool.** In Claude Code or the Claude desktop app, type:
+
 ```
+/plugin marketplace add 100xopensource/100xtools
+/plugin install 100xeval@100xtools
+```
+
+If Claude tells you to run `/reload-plugins`, do that.
 
 > **If this fails with "repository not found":** the repo is private until 14 Aug. You need
 > to be added to the `100xopensource` GitHub organisation. Ask Thuan.
 
-**Step 2. Check a plugin.** Replace `<your-plugin-folder>` with the path to the plugin you
-want to check:
+**Step 2. Ask for a check.** Point Claude at the folder your plugin is in, and say:
 
-```bash
-python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --target <your-plugin-folder>
-```
+> *"static-check my plugin"*
 
-Nothing to try it on yet? Use one that ships with the repo:
+**How to tell it worked:** Claude runs the check and shows you a score with a list of
+findings underneath. If instead it asks what you mean, the tool did not install — go back to
+step 1.
 
-```bash
-python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --target examples/plugin-eval/vendor/design
-```
+That is the whole thing. No key, no internet, no cost, and nothing on your computer is
+changed — the check only *reads* files.
 
-That is the whole thing. No key, no network, no cost.
+Other things worth asking once you have a result:
+
+> *"why did it score 0.77?"* · *"what should I fix first?"* · *"is that finding a real problem?"*
 
 ---
 
@@ -135,24 +143,31 @@ comparable.
 
 ---
 
-## Part 3 — Let Claude do it for you
+## Part 3 — If you would rather type the command yourself
 
-This is the easiest path, and the one most non-developers should use.
+You do not need this section. It is here for people who prefer seeing the command, or who
+want to run the check without installing anything.
 
-Install the plugin into Claude Code:
+**Step 1. Get the code.**
 
+```bash
+git clone https://github.com/100xopensource/100xtools.git
+cd 100xtools
 ```
-/plugin marketplace add 100xopensource/100xtools
-/plugin install 100xeval
+
+**Step 2. Run the check.** Replace `<your-plugin-folder>` with the folder you want checked:
+
+```bash
+python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --target <your-plugin-folder>
 ```
 
-Then just talk to Claude normally:
+Nothing to try it on yet? Use a plugin that ships with the repo:
 
-> *"static-check my plugin"*
-> *"why did it score 0.77?"*
-> *"what should I fix first?"*
+```bash
+python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --target examples/plugin-eval/vendor/design
+```
 
-Claude runs the commands and explains the result. You never type a command yourself.
+This is the same check Claude runs for you in Part 1 — same output, same cost of nothing.
 
 ---
 

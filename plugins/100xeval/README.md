@@ -1,45 +1,65 @@
-# 100xeval — run evals on a plugin, and grow the eval dataset
+# 100xeval — check whether a plugin is any good
 
-100xeval answers one question: **did this plugin actually give the right answer?** It runs
-a plugin for real, then grades what came back.
+100xeval answers one question: **did this plugin actually give the right answer?**
 
-Two layers:
+It works in two ways, and they are very different in cost. Start with the free one.
 
-- **Behavioral** — really runs the plugin with its own MCP attached, then checks that it
-  queried the right data (`tool_used`), presented it correctly (`llm` format judge), and,
-  where it matters, that the *numbers* are right (`llm` agentic judge against a ground-truth
-  query you supply).
-- **Static** — a free, run-free design-quality score per plugin from the bundled linter.
-  No model, no network, no API key.
+| | What it does | Cost | Needs |
+| --- | --- | --- | --- |
+| **Static check** | Reads your plugin's files and reports problems it can see, without running anything | **Free** | Just Python |
+| **Real test run** | Actually runs your plugin on saved questions and grades the answers | **~$1–2 per run** | An API key |
 
-It is a self-contained plugin: the skill (the front door) and the Python engine ship
-together. **Python 3.11+, stdlib only** — no `pip install`, no virtualenv, no lockfile.
+The **static check** is the one most people use. It catches things you cannot see by
+reading — a skill with no description, a misspelled setting Claude has been silently
+ignoring, a password left in a file.
+
+The **real test run** is for when you need to know that an edit did not change the answers.
+It runs the plugin for real with its data connection attached, then checks three things:
+did it look up the right data, did it present the result properly, and are the numbers
+right. Details in [The eval dataset](#the-eval-dataset).
+
+Everything ships in one folder — the skill Claude talks to and the Python engine underneath.
+**Python 3.11+, standard library only:** no `pip install`, no virtualenv, no lockfile.
+
+---
+
+## What you need
+
+- **For the static check: Python 3.11 or newer, and nothing else.** No API key, no internet
+  connection, no account. Check yours with `python3 --version`.
+- **For real test runs:** an `ANTHROPIC_API_KEY`, or to be logged in to Claude Code. If your
+  plugin connects to a data source you may also need a token — see step 5.
+- **Claude Code or the Claude desktop app**, if you would rather ask for things in plain
+  words than type commands.
 
 ---
 
 ## Get started
 
-> **Not a developer?** Start with [GETTING-STARTED.md](./GETTING-STARTED.md) instead — same
-> tool, no assumed vocabulary, and the free path first. This section assumes you already
-> know what a plugin, an MCP server, and a grader are.
+> **Prefer a slower walkthrough?** [GETTING-STARTED.md](./GETTING-STARTED.md) covers the same
+> ground with nothing assumed — no jargon, free path first. This section is quicker and
+> expects you to know what a plugin and a data connection are.
 
-**1. Install it.** From Claude Code:
+**1. Install it.** In Claude Code or the Claude desktop app, type:
 
 ```
 /plugin marketplace add 100xopensource/100xtools
-/plugin install 100xeval
+/plugin install 100xeval@100xtools
 ```
 
-Or point at a clone: `claude --plugin-dir plugins/100xeval`.
+If you are told to run `/reload-plugins`, do that. Or skip installing and point at a clone
+for one session: `claude --plugin-dir plugins/100xeval`.
 
-**2. Just ask.** The skill drives the engine, so you don't need any flags — this is the
-whole interface for most people:
+**How to tell it worked:** ask Claude *"static-check my plugin"* and it should offer to run
+the check rather than ask you what you mean.
+
+**2. Just ask for what you want.** Claude drives the engine, so there are no flags to learn.
+For most people this is the whole interface:
 
 > *"static-check my plugin"* · *"run the evals for asksales"* ·
 > *"add a testcase for askinventory"* · *"why did it score 0.92?"*
 
-**3. Or drive the engine directly.** Start with the static check: it is free, needs no API
-key, and touches no network.
+**3. Or run it yourself.** Start with the static check — free, no API key, no network:
 
 ```bash
 RUN=plugins/100xeval/skills/100xeval/scripts/run.py
@@ -51,13 +71,17 @@ python3 "$RUN" eval --case '<case-name>' --runs 1              # one case, for r
 python3 "$RUN" eval --tag <suite>                              # a whole suite
 ```
 
-The static check prints the findings behind each score, so a `0.92` tells you *which* rule
-fired and in which file. A `--target` that is not a plugin is an error (exit `2`), not a
-score — it will not quietly hand you a passing number for a path that isn't there.
+**Read the findings, not the score.** The number is only a summary. Under it the check lists
+each problem and the file it is in, and that list is what you act on. Below about `0.85`,
+read every line. How to interpret the rest is in
+[GETTING-STARTED](./GETTING-STARTED.md#part-2--reading-your-scorecard).
 
-**Behavioral runs cost real money.** Roughly $1–2 per run, and `runs: 3` with `llm` graders
-lands around $3–5 for a single case. Use `--dry-run` first; it lists what would execute and
-the rough spend without spending it.
+A `--target` that is not a plugin is an error (exit `2`), not a score — it will not quietly
+hand you a passing number for a folder that isn't there.
+
+**Real test runs cost real money.** Roughly $1–2 per run, and the default of 3 runs with
+`llm` graders lands around $3–5 for a single test. **Always use `--dry-run` first** — it
+lists exactly what would happen and the rough price, and spends nothing.
 
 **4. See a worked case.** [`examples/plugin-eval/`](../../examples/plugin-eval/README.md) ships two, running against
 real third-party plugins vendored into the repo — read them before writing your own:

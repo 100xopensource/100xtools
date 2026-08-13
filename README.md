@@ -1,63 +1,77 @@
 # 100xtools
 
-Open-source tooling for building and maintaining **Claude Code plugins and skills** — the
-parts we needed badly enough to build, extracted from running a plugin fleet in production.
+**Two tools that check your Claude Code plugins for problems.** Open source, free to run,
+and built while maintaining a fleet of plugins in production.
 
-Two problems show up the moment you have more than one plugin and more than one person
-editing them:
+A *plugin* is a folder of written instructions that tells Claude how to do a job. The
+trouble with instructions is that nothing checks them. There is no spell-check, no compiler,
+and no test that goes red. Someone edits a sentence, the plugin quietly gets worse, and you
+find out when a user complains.
 
-1. **You can't tell whether a skill still works.** Prompt changes have no compiler. A
-   reworded instruction that quietly stops the model from filtering by store looks exactly
-   like a change that didn't break anything.
-2. **Sibling skills drift apart.** The same skill copied across five plugins gets fixed in
-   one and stays broken in four, and nobody finds out until a user does.
+These tools are that missing check.
 
-| Tool | What it does |
-| --- | --- |
-| [**100xeval**](./plugins/100xeval) | Runs a plugin for real against saved testcases and grades the answers — did it query the right data, present it correctly, get the numbers right? Plus a free, model-free design-quality score. |
-| [**100xdrift-check**](./plugins/100xdrift-check) | On every PR that edits a plugin file, finds the sibling copies in your other plugins **in the same repo** and reports which ones the change probably applies to. Report-only, never blocks a merge. |
+## Which one do you need?
 
-Both are ordinary Claude Code plugins, and both are usable as CI gates.
+Pick by the problem you have, not by the tool name.
 
-## Quick start
+| Your problem | Use | What it costs |
+| --- | --- | --- |
+| *"Is anything obviously wrong with my plugin?"* | [**100xeval**](./plugins/100xeval/README.md) — the free static check | **Nothing.** No key, no internet, no setup |
+| *"Does my plugin still give the right answers after we edited it?"* | [**100xeval**](./plugins/100xeval/README.md) — a real test run | About $1–2 per run |
+| *"We have several plugins, and a fix in one never made it to the others."* | [**100xdrift-check**](./plugins/100xdrift-check/README.md) | Claude usage per review |
 
-```bash
-git clone https://github.com/100xopensource/100xtools.git
-cd 100xtools
-```
+If you only try one thing, make it the **free static check**. It takes about five minutes,
+cannot change or break anything, and it finds real mistakes — a misspelled `descriptionn`
+that Claude had been silently ignoring, for example.
 
-**Score a plugin's design — free, no model, no API key, no install:**
+## Start here
 
-```bash
-python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --target <your-plugin-dir>
-```
+**Not a developer, or you'd rather not use a terminal?**
+→ [**Getting started, step by step**](./plugins/100xeval/GETTING-STARTED.md). No jargon, free
+path first, and you can do it all by talking to Claude.
 
-**Load a tool into Claude Code:**
-
-```bash
-claude --plugin-dir plugins/100xeval      # then: "run the evals for <skill>"
-claude --plugin-dir plugins/100xdrift-check   # then: /100xdrift-check:install-skill
-```
-
-**Or install from the marketplace:**
+**Using the Claude desktop app?** Install a tool from inside the app, then just ask for what
+you want in plain words:
 
 ```
 /plugin marketplace add 100xopensource/100xtools
 /plugin install 100xeval@100xtools
-/plugin install 100xdrift-check@100xtools
 ```
 
-Each plugin's README carries its own full setup — start there:
+> *"static-check my plugin"* · *"why did it score 0.77?"* · *"what should I fix first?"*
+
+**Comfortable in a terminal?** Clone the repo and run the free check directly — nothing to
+install first:
+
+```bash
+git clone https://github.com/100xopensource/100xtools.git
+cd 100xtools
+python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --target <your-plugin-folder>
+```
+
+To try a tool without installing it, point Claude Code at a folder for one session:
+
+```bash
+claude --plugin-dir plugins/100xeval            # then: "run the evals for <skill>"
+claude --plugin-dir plugins/100xdrift-check     # then: /100xdrift-check:install-skill
+```
+
+Each tool's own README has the full setup:
 [100xeval](./plugins/100xeval/README.md) · [100xdrift-check](./plugins/100xdrift-check/README.md).
 
-## Requirements
+## What you need
 
-- **Python 3.11+** for the eval engine — stdlib only. No `pip install`, no virtualenv, no
-  lockfile. This is deliberate: an eval harness that needs its own dependency management is
-  one more thing to break on a Friday.
-- **Claude Code** on `PATH` for behavioral eval runs and for the drift review skill.
-- **An Anthropic API key or Claude Code login** for anything that actually calls a model.
-  The static layer needs neither.
+For the **free static check — nothing but Python.** No account, no key, no internet.
+
+- **Python 3.11 or newer.** Check with `python3 --version`. If that command is not found or
+  the number is lower, see
+  [Getting started](./plugins/100xeval/GETTING-STARTED.md#before-you-start). There is
+  nothing else to install — these tools use only what Python already ships with, on purpose:
+  a testing tool that needs its own installation is one more thing that breaks.
+- **Claude Code or the Claude desktop app** — only for the parts that actually run your
+  plugin, and for the drift reviewer.
+- **An Anthropic API key, or being logged in to Claude** — only for the parts that call a
+  model and cost money. The static check needs neither.
 
 ## Concepts
 
