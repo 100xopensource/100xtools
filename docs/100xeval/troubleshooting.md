@@ -16,7 +16,7 @@ generated:
 | `command not found: python3` | Python is not installed | Install Python 3.11+ |
 | `100xeval needs Python 3.11 or newer` | Your Python is too old | Install a newer one, then use `python3.12` |
 | `Invalid marketplace source format` | You typed `.` instead of `./` | Add the slash — a bare dot is rejected |
-| `` `claude` CLI not found on PATH `` | Test runs need Claude Code itself | Install Claude Code; the static check still works without it |
+| `` `claude` CLI not found on PATH `` | Test runs need Claude Code itself | [Install Claude Code](https://code.claude.com/docs/en/quickstart); the static check still works without it |
 | `is not a directory` (exit 2) | The `--target` path is wrong | Check it. The tool refuses to invent a score for a folder that isn't there |
 | `No findings. Nothing to fix.` | Nothing detectable is wrong | This is a pass |
 | A case says a tool was `called 0×` | Usually a bad or expired token, not a broken plugin | Check the token before blaming the skill — see [MCP auth](mcp-auth.md) |

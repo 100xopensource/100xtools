@@ -20,7 +20,7 @@ reintroducing last year's bug.
 
 | | What it does | Cost | Needs |
 | --- | --- | --- | --- |
-| **Test run** | Runs your plugin on saved cases and grades the answers | **~$1–2 per run** | Claude Code CLI |
+| **Test run** | Runs your plugin on saved cases and grades the answers | **~$1–2 per run** | [Claude Code CLI](https://code.claude.com/docs/en/quickstart) |
 | **Static check** | A quick run-free pass over the plugin's files | **Free** | Just Python |
 
 The **static check** is a cheap extra, not a substitute: it reads the files and reports
@@ -37,7 +37,7 @@ Everything ships in one folder — the skill Claude talks to and the Python engi
 | | Needs |
 | --- | --- |
 | **Static check** | Python 3.11+ — check with `python3 --version`. Nothing else: no key, no internet, no account |
-| **Test runs** | That, plus the Claude Code CLI on your `PATH` |
+| **Test runs** | That, plus the [Claude Code CLI](https://code.claude.com/docs/en/quickstart) on your `PATH` |
 
 The runner executes your plugin by shelling out to `claude`, so the CLI has to be installed
 and working. On an old Python the tool says so plainly rather than showing a traceback.
