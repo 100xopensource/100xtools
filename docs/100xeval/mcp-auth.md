@@ -1,7 +1,7 @@
 ---
 type: concept
 title: MCP auth
-description: Two authentication paths that produce two different tool-name schemes, and the failure that looks like nothing.
+description: Two authentication paths that produce two different tool-name schemes, how to set the token, and the failure that looks like nothing.
 resource: ../../plugins/100xeval/skills/100xeval/scripts/engine/harnesses/claude_code.py
 tags: [100xeval, mcp, auth]
 generated:

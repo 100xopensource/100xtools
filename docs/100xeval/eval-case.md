@@ -1,7 +1,7 @@
 ---
 type: concept
 title: Eval case
-description: The unit of work — one scenario, one folder, one case.yaml declaring the plugin, the prompt, and the graders.
+description: The unit of work — one scenario, one folder, one case.yaml declaring the plugin, the prompt, and the graders, and how to write one.
 resource: ../../plugins/100xeval/skills/100xeval/scripts/engine/loader.py
 tags: [100xeval, evals, cases]
 generated:
@@ -25,12 +25,6 @@ means adding a folder.
   in `evals/<name>/` points at `../../plugins/<p>`.
 * **The graders**, one claim each.
 * **`runs`**, defaulting to 3.
-
-## Why `runs: 3` is the default
-
-Skills are non-deterministic. One case in our own corpus answered `0.148×` (correct) and
-`0.24×` (62% off) to the same prompt on different runs. A single run reports a coin flip as
-a fact. Three runs turn a pass into a rate you can reason about — see [scoring](scoring.md).
 
 ## What one looks like
 
@@ -68,6 +62,12 @@ python3 "$RUN" init <name> --plugin plugins/<p> --tag <skill> --prompt "<questio
 Two worked cases ship in
 [`examples/plugin-eval/`](../../examples/plugin-eval/README.md), running against real
 third-party plugins vendored into the repo. Read them before writing your first.
+
+## Why `runs: 3` is the default
+
+Skills are non-deterministic. One case in our own corpus answered `0.148×` (correct) and
+`0.24×` (62% off) to the same prompt on different runs. A single run reports a coin flip as
+a fact. Three runs turn a pass into a rate you can reason about — see [scoring](scoring.md).
 
 ## Cover more than the happy path
 

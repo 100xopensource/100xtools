@@ -1,7 +1,7 @@
 ---
 type: concept
 title: Design score
-description: The static layer's 0-1 verdict on plugin design, folded from weighted sub-scores and a flag penalty.
+description: The static layer's 0-1 verdict on plugin design — how it is folded from sub-scores, how to run it, and where it is wrong.
 resource: ../../plugins/100xeval/skills/100xeval/scripts/engine/static.py
 tags: [100xeval, static, scoring]
 generated:
@@ -91,23 +91,22 @@ python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --tar
 - skills/report/SKILL.md: [FM4] unrecognized frontmatter key 'descriptionn' (did you mean 'description'?)
 ```
 
-**Read the findings, not the number.** The number only summarises; the findings say what to
-do. Here they earn their keep — someone typed `descriptionn` with two n's, and Claude was
-silently ignoring the description. Below about `0.85`, read every line.
+The findings are the output that matters — here one earns its keep: someone typed
+`descriptionn` with two n's, so Claude was silently ignoring the description. Below about
+`0.85`, read every line.
 
 A `--target` that is not a plugin is an error (exit `2`), not a score. It will not quietly
 hand back a passing number for a folder that isn't there.
 
-## Where it is wrong
+## It is heuristics, and it has been wrong
 
-* **It is heuristics over prose, and has been wrong repeatedly.** Run against Anthropic's own
-  published plugins it produced five classes of false positive in one pass. If more than
-  about one finding in five is noise for you, it is costing attention rather than saving it.
-* **`token_efficiency` never emits a finding.** It is measured, not detected, so a low score
-  there beside an empty findings list is normal rather than a display bug.
-* **A score only compares within its scoring version**, printed on every report and carried
-  in the JSON as `scoringVersion`. If you gate CI on a threshold, pin the version you tuned
-  it against — see [CHANGELOG.md](../../CHANGELOG.md).
+The layer reads prose and guesses. Run against Anthropic's own published plugins it produced
+five classes of false positive in one pass — flagging licence files, a plugin's own vendor
+documentation, and a `password:` line lifted from a code sample. Each is fixed and tested,
+but the same *class* of bug recurs: a rule that reads documentation as instruction.
+
+If more than about one finding in five is noise for your plugins, it is costing attention
+rather than saving it. That is worth reporting as a bug in the check.
 
 ## See also
 

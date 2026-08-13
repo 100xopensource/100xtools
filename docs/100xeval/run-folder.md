@@ -1,7 +1,7 @@
 ---
 type: concept
 title: Run folder
-description: The self-contained evidence every invocation writes, and where to look when a case goes red.
+description: What a run costs, how to check the price before spending it, and the self-contained evidence every invocation writes.
 resource: ../../plugins/100xeval/skills/100xeval/scripts/engine/reporter.py
 tags: [100xeval, debugging, reports]
 generated:
@@ -48,14 +48,12 @@ asserting all three would leave you opening the transcript to find out which.
 
 ## Cost lives here too
 
+A test run costs roughly **$1–2 per run**, and the default `runs: 3` lands around **$3–5 for
+a single case**. There is no free tier and no undo.
+
 Reports break out run cost against judge cost. Judges can be several extra model calls per
 case, so a case at `runs: 3` can spend more on grading than on the thing being graded. If a
 suite feels expensive, that split usually says why.
-
-## Check the price before you spend
-
-A test run costs roughly **$1–2 per run**, and the default `runs: 3` lands around **$3–5 for
-a single case**. There is no free tier and no undo.
 
 `--dry-run` lists exactly what would execute and the rough spend, without spending it:
 
@@ -70,11 +68,8 @@ python3 "$RUN" eval --tag <suite>                     # a whole suite
 Exit codes: `0` all pass · `1` a case below `--threshold` · `2` usage or engine error — which
 is what makes `eval` usable directly as a CI gate.
 
-## Preflight before a large suite
-
-A blocked endpoint otherwise burns a whole suite scoring zero. The runner checks
-`claude mcp list` and aborts with guidance rather than producing a misleading dataless run.
-If your MCP sits behind an IP allowlist, confirm your egress is allowed before starting.
+The runner preflights the MCP connection before spending anything — see
+[MCP auth](mcp-auth.md).
 
 ## See also
 
