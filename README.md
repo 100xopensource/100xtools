@@ -42,7 +42,7 @@ claude plugin install 100xdrift-check@100xtools
 
 > *"static-check my plugin"* · *"why did it score 0.77?"* · *"what should I fix first?"*
 
-New to this? **[Getting started](./plugins/100xeval/GETTING-STARTED.md)** walks the same path
+New to this? [**100xeval's README**](./plugins/100xeval/README.md) walks the same path more
 slowly, with a troubleshooting table.
 
 ## What you need

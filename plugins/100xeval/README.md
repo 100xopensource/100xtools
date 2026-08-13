@@ -2,21 +2,23 @@
 
 100xeval answers one question: **did this plugin actually give the right answer?**
 
-It works in two ways, and they are very different in cost. Start with the free one.
+A *plugin* is a folder of instructions telling Claude how to do a job. Nothing checks
+instructions — there is no spell-check and no test that goes red. This is that check.
+
+It works in two ways, very different in cost. Start with the free one.
 
 | | What it does | Cost | Needs |
 | --- | --- | --- | --- |
 | **Static check** | Reads your plugin's files and reports problems it can see, without running anything | **Free** | Just Python |
-| **Real test run** | Actually runs your plugin on saved questions and grades the answers | **~$1–2 per run** | An API key |
+| **Real test run** | Actually runs your plugin on saved questions and grades the answers | **~$1–2 per run** | Claude Code CLI, and a login or API key |
 
-The **static check** is the one most people use. It catches things you cannot see by
-reading — a skill with no description, a misspelled setting Claude has been silently
-ignoring, a password left in a file.
+The **static check** is the one most people use, and most never need more. It catches what
+you cannot see by reading — a skill with no description, a misspelled setting Claude has been
+silently ignoring, a password left in a file.
 
-The **real test run** is for when you need to know that an edit did not change the answers.
-It runs the plugin for real with its data connection attached, then checks three things:
-did it look up the right data, did it present the result properly, and are the numbers
-right. Details in [The eval dataset](#the-eval-dataset).
+The **real test run** is for proving an edit did not change the answers. It runs the plugin
+for real with its data connection attached, then checks three things: did it look up the
+right data, did it present the result properly, and are the numbers right.
 
 Everything ships in one folder — the skill Claude talks to and the Python engine underneath.
 **Python 3.11+, standard library only:** no `pip install`, no virtualenv, no lockfile.
@@ -25,41 +27,131 @@ Everything ships in one folder — the skill Claude talks to and the Python engi
 
 ## What you need
 
-- **For the static check: Python 3.11 or newer, and nothing else.** No API key, no internet
-  connection, no account. Check yours with `python3 --version`.
-- **For real test runs:** an `ANTHROPIC_API_KEY`, or to be logged in to Claude Code. If your
-  plugin connects to a data source you may also need a token — see step 5.
-- **Claude Code or the Claude desktop app**, if you would rather ask for things in plain
-  words than type commands.
+**For the static check: Python 3.11 or newer, and nothing else.** No API key, no internet, no
+account. Check yours:
+
+```bash
+python3 --version
+```
+
+`3.11` or higher is fine. If the number is lower, install a newer one (`brew install
+python@3.12` on Mac) and use `python3.12` below. If the command is not found at all, get
+Python from [python.org/downloads](https://www.python.org/downloads/). Run it on an old
+Python and the tool says so in plain words rather than showing a wall of red text.
+
+**For real test runs: the Claude Code CLI on your `PATH`**, plus a login or an
+`ANTHROPIC_API_KEY`. The runner executes your plugin by shelling out to `claude`, so a key on
+its own is not enough — without the CLI it stops before spending anything and tells you to
+install Claude Code. If your plugin connects to a data source you may also need a token, see
+[Real test runs](#real-test-runs).
+
+**Claude Code or the Claude desktop app**, if you would rather ask in plain words than type
+commands.
 
 ---
 
 ## Get started
 
-> **Prefer a slower walkthrough?** [GETTING-STARTED.md](./GETTING-STARTED.md) covers the same
-> ground with nothing assumed — no jargon, free path first. This section is quicker and
-> expects you to know what a plugin and a data connection are.
+The easiest way is to let Claude drive. Install once, then ask for things in plain words —
+you never type an engine command.
 
-**1. Install it.** Clone the repo, register it as a marketplace, then install — all in the
-terminal:
+**1. Get the code.** In a terminal:
 
 ```bash
 git clone https://github.com/100xopensource/100xtools.git
 cd 100xtools
+```
+
+**2. Install the plugin.** Two more lines in the same terminal — the first tells Claude where
+to find the tools, the second installs this one:
+
+```bash
 claude plugin marketplace add ./
 claude plugin install 100xeval@100xtools
 ```
 
-**How to tell it worked:** ask Claude *"static-check my plugin"* and it should offer to run
-the check rather than ask you what you mean.
+> **Type `./` and not `.`** — a bare dot is rejected with *"Invalid marketplace source
+> format"*. The `/` is not a typo.
 
-**2. Just ask for what you want.** Claude drives the engine, so there are no flags to learn.
-For most people this is the whole interface:
+**How to tell it worked:** the first line answers `Successfully added marketplace: 100xtools`.
 
-> *"static-check my plugin"* · *"run the evals for asksales"* ·
-> *"add a testcase for askinventory"* · *"why did it score 0.92?"*
+**3. Ask for a check.** Point Claude at the folder your plugin is in, and say:
 
-**3. Or run it yourself.** Start with the static check — free, no API key, no network:
+> *"static-check my plugin"*
+
+**How to tell it worked:** Claude runs the check and shows a score with findings underneath.
+If it instead asks what you mean, the plugin did not install — repeat step 2.
+
+That is the whole thing: no key, no internet, no cost, and nothing on your computer is
+changed. The static check only *reads* files. It never edits your plugin, never uploads it,
+and never touches the network.
+
+Worth asking once you have a result:
+
+> *"why did it score 0.77?"* · *"what should I fix first?"* · *"is that finding real?"* ·
+> *"run the evals for asksales"* · *"add a testcase for askinventory"*
+
+---
+
+## Reading your scorecard
+
+A real result from a plugin with problems:
+
+```
+# 100xeval — static design quality  (scoring v1)
+
+## demo-plugin — design_score 0.77
+- frontmatter_quality: 0.50
+- progressive_disclosure: 1.00
+- reference_hygiene: 1.00
+- structural_completeness: 0.75
+- token_efficiency: 1.00
+- ecosystem_coherence: 1.00
+- security: 1.00
+
+### findings (3)
+- demo-plugin: [ST1] plugin has no README.md at its root
+- skills/report/SKILL.md: [FM3] skill has no description — the model cannot decide when to load it
+- skills/report/SKILL.md: [FM4] unrecognized frontmatter key 'descriptionn' (did you mean 'description'?)
+```
+
+**Read the findings, not the number.** The number only summarises; the findings tell you what
+to do. Here they earn their keep: someone typed `descriptionn` with two n's, and Claude was
+silently ignoring the description.
+
+| Score | Meaning |
+| --- | --- |
+| **1.00** | Nothing found. Does not prove the plugin *works* — only that nothing obvious is broken. |
+| **0.85–0.99** | Small things. Worth a look, not urgent. |
+| **below 0.85** | Read every finding. Something real is usually in there. |
+
+You do not need to learn the check IDs (`ST1`, `FM3`). The message beside each says what is
+wrong in plain words.
+
+**Three honest warnings:**
+
+**This tool is sometimes wrong.** It reads your writing and guesses. Run against Anthropic's
+own published plugins, it produced five classes of false alarm in one pass. If more than about
+**one finding in five** is nonsense for your plugin, the tool is wasting your attention — say
+so; that is a bug in the tool, not in you.
+
+**`token_efficiency` never shows a finding.** It is measured, not detected — it counts
+repeated text across your files. A low score there with an empty findings list is normal, not
+a display bug.
+
+**Scores only compare within the same `scoring v1`**, printed at the top. If the rules change
+the number moves, and old numbers stop being comparable. See [Known traps](#known-traps) if
+you gate CI on a threshold.
+
+A `--target` that is not a plugin is an error (exit `2`), not a score — it will not quietly
+hand you a passing number for a folder that isn't there.
+
+---
+
+## Running the engine yourself
+
+You do not need this section; Claude runs these for you. It is here for people who prefer
+seeing the command.
 
 ```bash
 RUN=plugins/100xeval/skills/100xeval/scripts/run.py
@@ -71,20 +163,15 @@ python3 "$RUN" eval --case '<case-name>' --runs 1              # one case, for r
 python3 "$RUN" eval --tag <suite>                              # a whole suite
 ```
 
-**Read the findings, not the score.** The number is only a summary. Under it the check lists
-each problem and the file it is in, and that list is what you act on. Below about `0.85`,
-read every line. How to interpret the rest is in
-[GETTING-STARTED](./GETTING-STARTED.md#part-2--reading-your-scorecard).
+Nothing to try it on yet? Use a plugin that ships with the repo:
 
-A `--target` that is not a plugin is an error (exit `2`), not a score — it will not quietly
-hand you a passing number for a folder that isn't there.
+```bash
+python3 "$RUN" eval --static-only --target examples/plugin-eval/vendor/design
+```
 
-**Real test runs cost real money.** Roughly $1–2 per run, and the default of 3 runs with
-`llm` graders lands around $3–5 for a single test. **Always use `--dry-run` first** — it
-lists exactly what would happen and the rough price, and spends nothing.
-
-**4. See a worked case.** [`examples/plugin-eval/`](../../examples/plugin-eval/README.md) ships two, running against
-real third-party plugins vendored into the repo — read them before writing your own:
+**See a worked case.** [`examples/plugin-eval/`](../../examples/plugin-eval/README.md) ships
+two, running against real third-party plugins vendored into the repo — read them before
+writing your own:
 
 ```bash
 python3 "$RUN" eval --cases-dir examples/plugin-eval/cases --skip-static --dry-run   # free
@@ -93,9 +180,31 @@ python3 "$RUN" eval --cases-dir examples/plugin-eval/cases --skip-static --dry-r
 Exit codes: `0` all pass · `1` a case below `--threshold` · `2` usage or engine error. That
 makes `eval` usable directly as a CI gate.
 
-**5. Behavioral runs need model auth**, and MCP auth if your plugin declares an MCP server.
-Set `ANTHROPIC_API_KEY` (or be logged into Claude Code), then either authenticate the
-connector interactively (`claude` → `/mcp`) or inject a bearer token for headless runs:
+---
+
+## Real test runs
+
+**Read this before running anything here — it costs real money.**
+
+A real test run executes your plugin and asks Claude to grade the answers. Roughly **$1–2 per
+run**, and the default of 3 runs lands around **$3–5 for a single test**. There is no free
+tier and no undo.
+
+**Always check the price first.** `--dry-run` lists exactly what would execute and the rough
+spend, without spending it:
+
+```bash
+python3 "$RUN" eval --case '<case-name>' --dry-run
+```
+
+**Expect the first run to fail for a boring reason.** Usually the *test* is wrong, not the
+plugin — for us, case defects outnumbered skill defects about **3:1**.
+
+### Auth
+
+Set `ANTHROPIC_API_KEY`, or be logged into Claude Code. If your plugin declares an MCP server,
+either authenticate the connector interactively (`claude` → `/mcp`) or inject a bearer token
+for headless runs:
 
 ```bash
 export EVAL_MCP_BEARER='<service-token>'      # applied to every declared server
@@ -104,26 +213,43 @@ python3 "$RUN" eval --tag <suite>
 
 Token injection is also the **higher-fidelity** path: the runner isolates the run to the
 plugin's *own* declared MCP with `--mcp-config … --strict-mcp-config`, ignoring whatever
-account connector happens to be logged in on your machine. Runs then behave the same
-locally and in CI. The token is read from the environment only — never committed, never
-written into any `.mcp.json`.
+account connector happens to be logged in on your machine, so runs behave the same locally and
+in CI. The token is read from the environment only — never committed, never written into any
+`.mcp.json`.
 
-**Preflight before you spend.** A blocked endpoint otherwise burns a whole suite scoring
-zero. The runner checks `claude mcp list` and aborts with guidance rather than producing a
-misleading dataless run — but if your MCP sits behind an IP allowlist, confirm your egress
-is allowed before starting a large suite.
+**Preflight before you spend.** A blocked endpoint otherwise burns a whole suite scoring zero.
+The runner checks `claude mcp list` and aborts with guidance rather than producing a
+misleading dataless run — but if your MCP sits behind an IP allowlist, confirm your egress is
+allowed before starting a large suite.
 
-**6. Read the run folder.** Every invocation writes a self-contained
-`.runs/<run_id>/<case>/`: the full `cases.json`, per-run `result.json` + transcript +
-`claude --debug-file` log, `scorecard.json`, and `report.{md,json,html}` with cost and
-token usage split run vs judge. When something fails, the answer is in there.
+### The run folder
+
+Every invocation writes a self-contained `.runs/<run_id>/<case>/`: the full `cases.json`,
+per-run `result.json` + transcript + `claude --debug-file` log, `scorecard.json`, and
+`report.{md,json,html}` with cost and token usage split run vs judge. When something fails,
+the answer is in there.
+
+---
+
+## If something goes wrong
+
+| What you see | What it means | What to do |
+| --- | --- | --- |
+| `command not found: python3` | Python is not installed | Install it — see [What you need](#what-you-need) |
+| `100xeval needs Python 3.11 or newer` | Your Python is too old | Install a newer one, then use `python3.12` |
+| `Invalid marketplace source format` | You typed `.` instead of `./` | Add the slash |
+| `repository not found` | You lack access to the repo | Ask to be added to `100xopensource` |
+| `is not a directory` (exit 2) | The folder path is wrong | Check it. **The tool refuses to invent a score for a folder that isn't there** |
+| `No findings. Nothing to fix.` | Nothing detectable is wrong | This is a pass |
+| A test says a tool was `called 0×` | Usually a **bad or expired token**, not a broken plugin | Check the token before blaming the skill |
+| A wall of red text | A real bug in the tool | Please report it, with the command you ran |
 
 ---
 
 ## The eval dataset
 
-Cases live at `evals/<case-name>/case.yaml` — one scenario per folder, plain YAML, no
-index or registry. A case names the plugin, the prompt, and the graders:
+Cases live at `evals/<case-name>/case.yaml` — one scenario per folder, plain YAML, no index or
+registry. A case names the plugin, the prompt, and the graders:
 
 ```yaml
 name: asksales-slowest-hours
@@ -148,9 +274,9 @@ Scaffold one with `python3 "$RUN" init <name> --plugin plugins/<p> --tag <skill>
 "<question>"`, then edit.
 
 `harness` and `entrypoint` are independent axes and easy to confuse. `harness` is the
-**runtime** (`claude_code`). `entrypoint` is the **surface** whose system prompt gets
-swapped in. The default `none` runs on Claude Code's own prompt. One entrypoint ships — `cowork` —
-and `--entrypoint <name>` overrides every case in a run without editing files. See
+**runtime** (`claude_code`). `entrypoint` is the **surface** whose system prompt gets swapped
+in. The default `none` runs on Claude Code's own prompt. One entrypoint ships — `cowork` — and
+`--entrypoint <name>` overrides every case in a run without editing files. See
 `skills/100xeval/scripts/engine/entrypoints/README.md` before adding another: a surface's
 system prompt usually belongs to whoever operates that surface.
 
@@ -164,35 +290,29 @@ Distilled from actually running it — the full versions, with the evidence, are
 **Assert the query shape, not the figure.** `tool_used` with `input_match` survives next
 week's data; a hard-coded number is a scheduled false failure.
 
-**When you must check numbers, hardcode the query in the criteria.** Left to itself the
-judge writes a different query per vote and the "ground truth" moves, so a failure tells
-you nothing. Verify the query by lifting it from a successful run — and don't trust the
-plugin's own docs for table names.
+**When you must check numbers, hardcode the query in the criteria.** Left to itself the judge
+writes a different query per vote and the "ground truth" moves, so a failure tells you nothing.
+Verify the query by lifting it from a successful run — and don't trust the plugin's own docs
+for table names.
 
 **Keep `runs: 3`.** Skills are non-deterministic: one case answered `0.148×` (correct) and
 `0.24×` (62% off) to the same prompt. A single run reports a coin flip as a fact.
 
-**One claim per grader.** When a case fails you want the scorecard to name *which*
-property broke.
+**One claim per grader.** When a case fails you want the scorecard to name *which* property
+broke.
 
-**Grade what the prompt asks.** A criterion the user never requested fails correct
-answers. If you add a stricter rule of your own, say so in a comment.
+**Grade what the prompt asks.** A criterion the user never requested fails correct answers. If
+you add a stricter rule of your own, say so in a comment.
 
-**Cover more than the happy path.** A suite of well-formed in-scope questions tests
-little. Include a case the plugin should **refuse** (assert `tool_used` `min: 0, max: 0`),
-one a sibling skill owns, and one exercising a documented business rule.
+**Cover more than the happy path.** A suite of well-formed in-scope questions tests little.
+Include a case the plugin should **refuse** (assert `tool_used` `min: 0, max: 0`), one a
+sibling skill owns, and one exercising a documented business rule.
 
-**Expect the first run to debug the case, not the skill.** Measured across the first six
-cases we wrote, case defects outnumbered skill defects about **3:1** — wrong table,
-ungranted tool, over-strict criteria, an off-by-one date bound. Budget a `--runs 1` pass
-for it.
+**Park, don't delete.** `skip: "<reason>"` keeps the scenario and prints the reason every run.
+Deleting a case deletes the regression it guards — and never delete one to make a suite green.
 
-**Park, don't delete.** `skip: "<reason>"` keeps the scenario and prints the reason every
-run. Deleting a case deletes the regression it guards — and never delete one to make a
-suite green.
-
-**Mind the cost.** Judges are up to nine extra model calls per case; a case at `runs: 3`
-lands around $3–5. Reports break out `Run $ / Judge $ / Total $`.
+**Mind the cost.** Judges are up to nine extra model calls per case; a case at `runs: 3` lands
+around $3–5. Reports break out `Run $ / Judge $ / Total $`.
 
 **No secrets in a case, ever.** `mcp_config` holds a *path*; the config it points to uses
 `Bearer ${EVAL_MCP_BEARER}`, expanded from the environment at run time.
@@ -214,14 +334,14 @@ plugin and emits tagged findings; `engine/static.py` maps them to sub-scores:
 | `security` (weight ×2) | `SEC1`–`SEC3` | committed secrets, unknown network destinations, `../` traversal |
 | `token_efficiency` (weight ×0.5) | — | instruction blocks copy-pasted between sibling skills, or repeated inside one |
 
-A check ID's **prefix is its sub-score** (`FM3` → `frontmatter_quality`), so the two are
-wired together by construction rather than by a lookup table someone has to remember to
-update. `engine/lint.py`'s docstring lists every ID and what it means.
+A check ID's **prefix is its sub-score** (`FM3` → `frontmatter_quality`), so the two are wired
+together by construction rather than by a lookup table someone has to remember to update.
+`engine/lint.py`'s docstring lists every ID and what it means.
 
 These encode *published* Claude Code skill guidance plus generic hygiene, deliberately
 conservative: a finding should mean "this is probably wrong", not "this differs from how we
-write skills". House-style rules belong in your fork of `lint.py`, not here. Extend the
-allowed network destinations with `EVAL_LINT_ALLOWED_DOMAINS=internal.corp,cdn.example`.
+write skills". House-style rules belong in your fork of `lint.py`, not here. Extend the allowed
+network destinations with `EVAL_LINT_ALLOWED_DOMAINS=internal.corp,cdn.example`.
 
 ---
 
@@ -229,16 +349,18 @@ allowed network destinations with `EVAL_LINT_ALLOWED_DOMAINS=internal.corp,cdn.e
 
 Two ways this tool can report success without having checked anything. Both have bitten us.
 
-**Absence assertions fail open.** `min: 0, max: 0` passes when nothing matched — and a
-mistyped pattern also matches nothing, so a typo silently gives you a grader that *cannot*
-fail. Before trusting one, confirm the same pattern can pass with `min: 1` on a run where the
-tool really was used.
+**Absence assertions fail open.** `min: 0, max: 0` passes when nothing matched — and a mistyped
+pattern also matches nothing, so a typo silently gives you a grader that *cannot* fail. Before
+trusting one, confirm the same pattern can pass with `min: 1` on a run where the tool really
+was used.
 
-**`design_score` is only comparable within a scoring version.** The version is printed on
-every report and carried in the JSON as `scoringVersion`. It is bumped whenever a change
-would move an unchanged plugin's score, so a number from one version means nothing against
-another. If you gate CI on a threshold, pin the version you tuned it against — see
+**`design_score` is only comparable within a scoring version.** The version is printed on every
+report and carried in the JSON as `scoringVersion`. It is bumped whenever a change would move
+an unchanged plugin's score, so a number from one version means nothing against another. If you
+gate CI on a threshold, pin the version you tuned it against — see
 [CHANGELOG.md](../../CHANGELOG.md).
+
+---
 
 ## Layout
 
@@ -264,7 +386,7 @@ cd plugins/100xeval/skills/100xeval
 PYTHONPATH=scripts python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
-`tests/` deliberately sits *beside* `scripts/` rather than inside it: `scripts/` is the
-runtime payload — it ships with the plugin as-is and is the directory Claude invokes — so
-the suite has no business being in there. Tests import `engine.*` absolutely, which is what
+`tests/` deliberately sits *beside* `scripts/` rather than inside it: `scripts/` is the runtime
+payload — it ships with the plugin as-is and is the directory Claude invokes — so the suite has
+no business being in there. Tests import `engine.*` absolutely, which is what
 `PYTHONPATH=scripts` resolves. No live model or MCP calls; the suite runs offline.
