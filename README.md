@@ -26,22 +26,32 @@ that Claude had been silently ignoring, for example.
 
 ## Start here
 
-**Not a developer, or you'd rather not use a terminal?**
-→ [**Getting started, step by step**](./plugins/100xeval/GETTING-STARTED.md). No jargon, free
-path first, and you can do it all by talking to Claude.
+Two ways in. Both do the same work — pick whichever you would rather do.
 
-**Using the Claude desktop app?** Install a tool from inside the app, then just ask for what
-you want in plain words:
+### Ask Claude to do it
+
+Install once, then say what you want in plain words. Nothing to clone, no commands to learn.
+This works the same in **Claude Code and the Claude desktop app**; both support plugins.
 
 ```
 /plugin marketplace add 100xopensource/100xtools
 /plugin install 100xeval@100xtools
+/plugin install 100xdrift-check@100xtools
 ```
+
+If you are told to run `/reload-plugins`, do that. Then open the folder your plugin is in
+and ask:
 
 > *"static-check my plugin"* · *"why did it score 0.77?"* · *"what should I fix first?"*
 
-**Comfortable in a terminal?** Clone the repo and run the free check directly — nothing to
-install first:
+**Want that spelled out step by step, with nothing assumed?**
+→ [**Getting started**](./plugins/100xeval/GETTING-STARTED.md) — the same path, slower, with
+a troubleshooting table.
+
+### Run it yourself
+
+Clone the repo and run the free check directly. No `pip install` and no setup step — Python
+by itself is enough:
 
 ```bash
 git clone https://github.com/100xopensource/100xtools.git
@@ -49,7 +59,7 @@ cd 100xtools
 python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --target <your-plugin-folder>
 ```
 
-To try a tool without installing it, point Claude Code at a folder for one session:
+From that clone you can also try either tool for a single session, without installing it:
 
 ```bash
 claude --plugin-dir plugins/100xeval            # then: "run the evals for <skill>"
