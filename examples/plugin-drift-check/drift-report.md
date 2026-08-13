@@ -4,12 +4,13 @@ _Scope: this repository — 2 plugins searched._
 
 ### plugins/acme-north/skills/weekly-report/SKILL.md
 
-The window moved from a rolling 7 days to the ISO week, and the report is now labelled with
-an ISO week number.
+The window moved from a rolling 7 days to the ISO week, labelled with an ISO week number.
 
 | sibling plugin | sibling file | verdict | why (one line) |
 | --- | --- | --- | --- |
 | acme-south | skills/weekly-report/SKILL.md | likely-applies | Carries the same rolling-7-day window and the same double-count on the run day |
+
+Port into `plugins/acme-south/skills/weekly-report/SKILL.md`, under `## Window`:
 
 ```
 - Sum every order from **the last 7 days ending today**, inclusive.
@@ -25,8 +26,8 @@ The reconciler now joins on the ISO week number instead of the report's end date
 | --- | --- | --- | --- |
 | acme-south | agents/reconciler.md | conflicts | South keys ledger rows `<store>-<end-date>` and rejects colliding keys — ISO week numbers repeat across years |
 
-Porting this would break South's loader. The two regions need different join keys, and the
-North change is only safe because North's ledger does not have that constraint.
+Porting this would break South's loader; North's change is only safe because North's ledger
+has no such constraint.
 
 ### plugins/acme-north/commands/export-csv.md
 

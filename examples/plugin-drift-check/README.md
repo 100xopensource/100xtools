@@ -64,7 +64,7 @@ judgment the tool exists to make, and the reason it never edits anything itself.
 Because one verdict is `conflicts`, the whole report is 🔴 Critical. That is a prompt to
 look, not a merge blocker.
 
-[`expected-report.md`](./expected-report.md) shows the shape of a good answer. It is
+[`drift-report.md`](./drift-report.md) shows the shape of a good answer. It is
 illustrative, not asserted — the model's wording varies between runs, the three calls
 should not.
 
