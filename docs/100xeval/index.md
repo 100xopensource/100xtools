@@ -25,12 +25,17 @@ Behavioral and static evaluation for Claude Code plugins. Start with the
 
 * [Run folder](run-folder.md) - What an invocation writes, and where to look when it fails
 
-## How to actually run it
+## Troubleshooting and internals
 
-This bundle is conceptual. For installing, running, and writing cases, see the tool's own
-documentation, which ships with the plugin:
+* [Troubleshooting](troubleshooting.md) - what each failure means, including two that look like success
+* [Internals](internals.md) - directory layout, and the engine's own test suite
 
-* [Plugin README](../../plugins/100xeval/README.md) - install, first run, auth, flags
+## Installing and first run
+
+Install steps and the ask-Claude walkthrough are in the tool's own README, which ships with
+the plugin:
+
+* [Plugin README](../../plugins/100xeval/README.md) - install, what you need, get started
 * [Case schema](../../plugins/100xeval/skills/100xeval/references/case-schema.md) - every
   `case.yaml` field and grader parameter
 * [Managing testcases](../../plugins/100xeval/skills/100xeval/references/managing-testcases.md) -

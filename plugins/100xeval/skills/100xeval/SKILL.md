@@ -1,6 +1,6 @@
 ---
 name: 100xeval
-description: Run behavioral and static evals for a Claude Code plugin or skill, and interpret the scorecard. Use when someone says "run the evals for [skill]", "eval this plugin", "check [skill] before merge", "did my change regress", or wants a pass/fail scorecard on a plugin's real answers. Do NOT use for authoring or fixing skills.
+description: Run behavioral and static evals for a Claude Code plugin or skill, write and maintain the testcases they run on, and interpret the scorecard. Use when someone says "run the evals for [skill]", "eval this plugin", "add a testcase for [skill]", "turn this bug report into a testcase", "what should I be testing", "static-check my plugin", "check [skill] before merge", "did my change regress", "why did it score [n]", or wants a pass/fail scorecard on a plugin's real answers. Do NOT use for authoring or fixing the plugin under test.
 ---
 
 # 100xeval — run plugin evals
