@@ -63,19 +63,27 @@ deliberate: a testing tool that needs its own installation is one more thing tha
 **The easiest way is to let Claude do it.** You install the tool once, then ask for things in
 plain words. You never type a command.
 
-**Step 1. Install the tool.** In Claude Code or the Claude desktop app, type:
+**Step 1. Get the code.** In a terminal:
+
+```bash
+git clone https://github.com/100xopensource/100xtools.git
+cd 100xtools
+```
+
+> **If this fails with "repository not found":** the repo is private until 14 Aug. You need
+> to be added to the `100xopensource` GitHub organisation. Ask Thuan.
+
+**Step 2. Install the tool.** Start Claude Code in that folder, then type these two lines.
+The first tells Claude where to find the tools; the second installs the one you want.
 
 ```
-/plugin marketplace add 100xopensource/100xtools
+/plugin marketplace add .
 /plugin install 100xeval@100xtools
 ```
 
 If Claude tells you to run `/reload-plugins`, do that.
 
-> **If this fails with "repository not found":** the repo is private until 14 Aug. You need
-> to be added to the `100xopensource` GitHub organisation. Ask Thuan.
-
-**Step 2. Ask for a check.** Point Claude at the folder your plugin is in, and say:
+**Step 3. Ask for a check.** Point Claude at the folder your plugin is in, and say:
 
 > *"static-check my plugin"*
 
@@ -145,17 +153,10 @@ comparable.
 
 ## Part 3 — If you would rather type the command yourself
 
-You do not need this section. It is here for people who prefer seeing the command, or who
-want to run the check without installing anything.
+You do not need this section. It is here for people who prefer seeing the command run.
 
-**Step 1. Get the code.**
-
-```bash
-git clone https://github.com/100xopensource/100xtools.git
-cd 100xtools
-```
-
-**Step 2. Run the check.** Replace `<your-plugin-folder>` with the folder you want checked:
+From the folder you cloned in Part 1, replace `<your-plugin-folder>` with the folder you
+want checked:
 
 ```bash
 python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --target <your-plugin-folder>

@@ -62,12 +62,21 @@ terminal. You never have to edit a file by hand.
 
 ### Step 1 — install the plugin
 
-Open Claude Code in the repository you want checked, and type:
+Clone this repo somewhere alongside your own:
+
+```bash
+git clone https://github.com/100xopensource/100xtools.git
+```
+
+Then open Claude Code **in the repository you want checked**, and point it at that clone:
 
 ```
-/plugin marketplace add 100xopensource/100xtools
+/plugin marketplace add ../100xtools
 /plugin install 100xdrift-check@100xtools
 ```
+
+Adjust `../100xtools` if you cloned it elsewhere — any folder holding
+`.claude-plugin/marketplace.json` works as a marketplace.
 
 If Claude Code says `Run /reload-plugins to activate.`, type `/reload-plugins`.
 
@@ -77,11 +86,10 @@ If Claude Code says `Run /reload-plugins to activate.`, type `/reload-plugins`.
 <details>
 <summary>Other ways to install</summary>
 
-Already cloned this repository next to yours? Point at the folder instead — any folder
-holding `.claude-plugin/marketplace.json` works as a marketplace:
+Once this repo is public you can skip the clone and add it straight from GitHub:
 
 ```
-/plugin marketplace add ../100xtools
+/plugin marketplace add 100xopensource/100xtools
 /plugin install 100xdrift-check@100xtools
 ```
 

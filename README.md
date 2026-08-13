@@ -26,44 +26,47 @@ that Claude had been silently ignoring, for example.
 
 ## Start here
 
-Two ways in. Both do the same work — pick whichever you would rather do.
+Three steps. After them you can just ask Claude for what you want.
 
-### Ask Claude to do it
-
-Install once, then say what you want in plain words. Nothing to clone, no commands to learn.
-This works the same in **Claude Code and the Claude desktop app**; both support plugins.
-
-```
-/plugin marketplace add 100xopensource/100xtools
-/plugin install 100xeval@100xtools
-/plugin install 100xdrift-check@100xtools
-```
-
-If you are told to run `/reload-plugins`, do that. Then open the folder your plugin is in
-and ask:
-
-> *"static-check my plugin"* · *"why did it score 0.77?"* · *"what should I fix first?"*
-
-**Want that spelled out step by step, with nothing assumed?**
-→ [**Getting started**](./plugins/100xeval/GETTING-STARTED.md) — the same path, slower, with
-a troubleshooting table.
-
-### Run it yourself
-
-Clone the repo and run the free check directly. No `pip install` and no setup step — Python
-by itself is enough:
+**1. Clone this repo.** In your terminal:
 
 ```bash
 git clone https://github.com/100xopensource/100xtools.git
 cd 100xtools
-python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --target <your-plugin-folder>
 ```
 
-From that clone you can also try either tool for a single session, without installing it:
+**2. Add it as a marketplace.** Start Claude Code in that folder, then type:
+
+```
+/plugin marketplace add .
+```
+
+A *marketplace* is just a folder that lists plugins — here, the one you cloned. Any path
+works, so you can also add it from another project with
+`/plugin marketplace add ../100xtools`.
+
+**3. Install the tool you need:**
+
+```
+/plugin install 100xeval@100xtools
+/plugin install 100xdrift-check@100xtools
+```
+
+If you are told to run `/reload-plugins`, do that.
+
+**Then just ask.** Open the folder your plugin is in and say what you want in plain words:
+
+> *"static-check my plugin"* · *"why did it score 0.77?"* · *"what should I fix first?"*
+
+**Want this spelled out more slowly, with nothing assumed?**
+→ [**Getting started**](./plugins/100xeval/GETTING-STARTED.md), which adds a troubleshooting
+table.
+
+**Prefer to run the check yourself?** From the clone, no install needed — Python by itself is
+enough, with no `pip install` and no setup step:
 
 ```bash
-claude --plugin-dir plugins/100xeval            # then: "run the evals for <skill>"
-claude --plugin-dir plugins/100xdrift-check     # then: /100xdrift-check:install-skill
+python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --target <your-plugin-folder>
 ```
 
 Each tool's own README has the full setup:
