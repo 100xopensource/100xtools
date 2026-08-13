@@ -52,6 +52,30 @@ Reports break out run cost against judge cost. Judges can be several extra model
 case, so a case at `runs: 3` can spend more on grading than on the thing being graded. If a
 suite feels expensive, that split usually says why.
 
+## Check the price before you spend
+
+A test run costs roughly **$1–2 per run**, and the default `runs: 3` lands around **$3–5 for
+a single case**. There is no free tier and no undo.
+
+`--dry-run` lists exactly what would execute and the rough spend, without spending it:
+
+```bash
+RUN=plugins/100xeval/skills/100xeval/scripts/run.py
+
+python3 "$RUN" eval --case '<case-name>' --dry-run    # what would run, and cost
+python3 "$RUN" eval --case '<case-name>' --runs 1     # one case, for real
+python3 "$RUN" eval --tag <suite>                     # a whole suite
+```
+
+Exit codes: `0` all pass · `1` a case below `--threshold` · `2` usage or engine error — which
+is what makes `eval` usable directly as a CI gate.
+
+## Preflight before a large suite
+
+A blocked endpoint otherwise burns a whole suite scoring zero. The runner checks
+`claude mcp list` and aborts with guidance rather than producing a misleading dataless run.
+If your MCP sits behind an IP allowlist, confirm your egress is allowed before starting.
+
 ## See also
 
 * [Scoring](scoring.md) - how the numbers in the scorecard are derived

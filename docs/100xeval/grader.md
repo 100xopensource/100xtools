@@ -52,6 +52,15 @@ A criterion the user never requested fails correct answers. If you add a stricte
 your own, say so in a comment in the case, so the next person knows the failure is a policy
 choice rather than a defect.
 
+## Absence assertions fail open
+
+`min: 0, max: 0` passes when nothing matched — and a mistyped tool name also matches nothing,
+so a typo silently produces a grader that *cannot* fail. It is the most convincing green in
+the suite and it checks nothing.
+
+Before trusting one, confirm the same pattern can pass with `min: 1` on a run where the tool
+really was used.
+
 ## See also
 
 * [Scoring](scoring.md) - how grader results become a case verdict

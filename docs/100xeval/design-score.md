@@ -65,6 +65,50 @@ Nothing on its own. `0.89` is not a grade — it is a prompt to read the finding
 the specific files and rules. A score with no findings behind it tells you nothing about
 what to fix.
 
+## Running it
+
+Free, no model call, no network:
+
+```bash
+python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --target <plugin-dir>
+```
+
+```
+# 100xeval — static design quality  (scoring v1)
+
+## demo-plugin — design_score 0.77
+- frontmatter_quality: 0.50
+- progressive_disclosure: 1.00
+- reference_hygiene: 1.00
+- structural_completeness: 0.75
+- token_efficiency: 1.00
+- ecosystem_coherence: 1.00
+- security: 1.00
+
+### findings (3)
+- demo-plugin: [ST1] plugin has no README.md at its root
+- skills/report/SKILL.md: [FM3] skill has no description — the model cannot decide when to load it
+- skills/report/SKILL.md: [FM4] unrecognized frontmatter key 'descriptionn' (did you mean 'description'?)
+```
+
+**Read the findings, not the number.** The number only summarises; the findings say what to
+do. Here they earn their keep — someone typed `descriptionn` with two n's, and Claude was
+silently ignoring the description. Below about `0.85`, read every line.
+
+A `--target` that is not a plugin is an error (exit `2`), not a score. It will not quietly
+hand back a passing number for a folder that isn't there.
+
+## Where it is wrong
+
+* **It is heuristics over prose, and has been wrong repeatedly.** Run against Anthropic's own
+  published plugins it produced five classes of false positive in one pass. If more than
+  about one finding in five is noise for you, it is costing attention rather than saving it.
+* **`token_efficiency` never emits a finding.** It is measured, not detected, so a low score
+  there beside an empty findings list is normal rather than a display bug.
+* **A score only compares within its scoring version**, printed on every report and carried
+  in the JSON as `scoringVersion`. If you gate CI on a threshold, pin the version you tuned
+  it against — see [CHANGELOG.md](../../CHANGELOG.md).
+
 ## See also
 
 * [Check IDs](check-ids.md) - every check, and the sub-score it feeds
