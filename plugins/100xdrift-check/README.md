@@ -21,18 +21,30 @@ agent.
 **It reports. It never edits, never enforces parity, never blocks a merge.** Divergence
 between siblings is usually deliberate — the point is to surface the cases where it isn't.
 
-```
+````
 🟡 Skill drift check — Warning
 Non-blocking. Nothing is broken, but findings below need a human decision.
 
-_Scope: this repository._
+_Scope: this repository — 3 plugins searched._
 
-### plugins/team-a/skills/report-run
-| sibling plugin | sibling skill | verdict | why |
-| --- | --- | --- | --- |
-| plugins/team-b | report-run | likely-applies | same off-by-one in the week boundary |
-| plugins/team-c | report-run | sibling-specific | team-c reports on fiscal weeks by design |
+---
+
+### Changed in team-a: plugins/team-a/skills/report-run/SKILL.md
+
+**The change** — under `## Window`:
+
+```diff
+- Sum every order from **the last 7 days ending today**, inclusive.
++ Sum every order in the **ISO week, Monday to Sunday**, inclusive.
 ```
+
+| sibling plugin | sibling file | matched on | verdict | why (one line) |
+| --- | --- | --- | --- | --- |
+| team-b | `skills/report-run/SKILL.md` | Same skill name and path | likely-applies | Same off-by-one in the week boundary |
+| team-c | `skills/report-run/SKILL.md` | Same skill name and path | different on purpose | team-c reports on fiscal weeks by design |
+
+**To copy it across:** make the same edit in team-b's file, under its own `## Window`.
+````
 
 ---
 

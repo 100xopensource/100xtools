@@ -18,7 +18,7 @@ which may disagree with each other — that is normal and useful.
 | Verdict | Means | What a reviewer does |
 | --- | --- | --- |
 | `likely-applies` | The same defect or improvement exists there | Consider porting the change |
-| `sibling-specific` | Legitimate variation for that plugin's context | Ignore, deliberately |
+| `different on purpose` | Legitimate variation for that plugin's context | Ignore, deliberately |
 | `conflicts` | The change contradicts a rule the sibling relies on | Look before merging either |
 | `unclear` | Not enough signal to call it | Read the two files yourself |
 
@@ -34,7 +34,7 @@ The report's first line is a marker the workflow turns into the comment's headli
 | --- | --- | --- |
 | `critical` | Any verdict is `conflicts` — **or the check itself broke** | 🔴 |
 | `warning` | No conflicts, but something is `likely-applies` or `unclear` | 🟡 |
-| `good` | Every sibling is `sibling-specific`, or there were no siblings | 🟢 |
+| `good` | Every sibling is `different on purpose`, or there were no siblings | 🟢 |
 
 Critical covering both "found a conflict" and "the check is broken" is deliberate. A
 silently broken advisory reads as a clean bill of health, which is worse than having no

@@ -55,7 +55,7 @@ follow from that one decision, and each lands differently against South's copy:
 | --- | --- | --- | --- |
 | `skills/weekly-report/SKILL.md` | The same rolling-7-day window | `likely-applies` | Same bug, same fix |
 | `agents/reconciler.md` | Keys ledger rows on the end date, and says so | `conflicts` | ISO week numbers repeat across years and would collide |
-| `commands/export-csv.md` | Names files by fiscal period, one per store | `sibling-specific` | Finance ingests it that way — deliberate |
+| `commands/export-csv.md` | Names files by fiscal period, one per store | `different on purpose` | Finance ingests it that way — deliberate |
 
 Two plugins, three verdicts. That spread is the point: the same change is worth porting in
 one place, dangerous in another, and irrelevant in a third. Telling those apart is the

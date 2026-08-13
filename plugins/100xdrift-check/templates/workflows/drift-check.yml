@@ -253,7 +253,7 @@ jobs:
             const marker = '<!-- drift-check-report -->';
             // Status category. The skill writes a drift-status marker as the report's
             // first line (critical = conflicts verdict, warning = likely-applies/unclear,
-            // good = sibling-specific only). Workflow-generated skip/fallback notes have
+            // good = "different on purpose" only). Workflow-generated skip/fallback notes have
             // no marker — classify them here: a broken check is critical, everything else
             // (token missing, opt-out, bulk cap) is a warning. Unknown → warning.
             let status = 'warning';
