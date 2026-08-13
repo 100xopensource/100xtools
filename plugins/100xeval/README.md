@@ -108,18 +108,17 @@ You never have to learn a command or a flag.
 
 ## Documentation
 
-Concepts and how-to live in the [`docs/100xeval`](https://github.com/100xopensource/100xtools/blob/main/docs/100xeval/index.md) bundle. They are **not**
-copied by a marketplace install, so these are links rather than files beside you:
+Concepts and how-to live in the [`docs/100xeval`](../../docs/100xeval/index.md) bundle:
 
 | | |
 | --- | --- |
-| [Eval case](https://github.com/100xopensource/100xtools/blob/main/docs/100xeval/eval-case.md) | What a case is, what one looks like, and how to create one |
-| [Grader](https://github.com/100xopensource/100xtools/blob/main/docs/100xeval/grader.md) | The four types, one claim each, and the assertion that cannot fail |
-| [Run folder](https://github.com/100xopensource/100xtools/blob/main/docs/100xeval/run-folder.md) | Cost, `--dry-run`, exit codes, and the evidence a run writes |
-| [MCP auth](https://github.com/100xopensource/100xtools/blob/main/docs/100xeval/mcp-auth.md) | Two auth paths, and the failure that looks like nothing |
-| [Design score](https://github.com/100xopensource/100xtools/blob/main/docs/100xeval/design-score.md) | Running the static check, reading it, and where it is wrong |
-| [Troubleshooting](https://github.com/100xopensource/100xtools/blob/main/docs/100xeval/troubleshooting.md) | What each failure means |
-| [Internals](https://github.com/100xopensource/100xtools/blob/main/docs/100xeval/internals.md) | Layout, and the engine's own test suite |
+| [Eval case](../../docs/100xeval/eval-case.md) | What a case is, what one looks like, and how to create one |
+| [Grader](../../docs/100xeval/grader.md) | The four types, one claim each, and the assertion that cannot fail |
+| [Run folder](../../docs/100xeval/run-folder.md) | Cost, `--dry-run`, exit codes, and the evidence a run writes |
+| [MCP auth](../../docs/100xeval/mcp-auth.md) | Two auth paths, and the failure that looks like nothing |
+| [Design score](../../docs/100xeval/design-score.md) | Running the static check, reading it, and where it is wrong |
+| [Troubleshooting](../../docs/100xeval/troubleshooting.md) | What each failure means |
+| [Internals](../../docs/100xeval/internals.md) | Layout, and the engine's own test suite |
 
 Shipped inside the plugin, for writing cases in depth:
 [`case-schema.md`](./skills/100xeval/references/case-schema.md) ·
