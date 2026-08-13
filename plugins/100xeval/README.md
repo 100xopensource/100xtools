@@ -225,6 +225,21 @@ allowed network destinations with `EVAL_LINT_ALLOWED_DOMAINS=internal.corp,cdn.e
 
 ---
 
+## Known traps
+
+Two ways this tool can report success without having checked anything. Both have bitten us.
+
+**Absence assertions fail open.** `min: 0, max: 0` passes when nothing matched — and a
+mistyped pattern also matches nothing, so a typo silently gives you a grader that *cannot*
+fail. Before trusting one, confirm the same pattern can pass with `min: 1` on a run where the
+tool really was used.
+
+**`design_score` is only comparable within a scoring version.** The version is printed on
+every report and carried in the JSON as `scoringVersion`. It is bumped whenever a change
+would move an unchanged plugin's score, so a number from one version means nothing against
+another. If you gate CI on a threshold, pin the version you tuned it against — see
+[CHANGELOG.md](../../CHANGELOG.md).
+
 ## Layout
 
 ```
