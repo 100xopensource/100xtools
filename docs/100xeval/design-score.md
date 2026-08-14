@@ -1,7 +1,7 @@
 ---
 type: concept
 title: Design score
-description: The static layer's 0-1 verdict on plugin design, folded from weighted sub-scores and a flag penalty.
+description: The static layer's 0-1 verdict on plugin design — how it is folded from sub-scores, how to run it, and where it is wrong.
 resource: ../../plugins/100xeval/skills/100xeval/scripts/engine/static.py
 tags: [100xeval, static, scoring]
 generated:
@@ -64,6 +64,49 @@ alongside any threshold you gate CI on — see the repo's CHANGELOG.
 Nothing on its own. `0.89` is not a grade — it is a prompt to read the findings, which name
 the specific files and rules. A score with no findings behind it tells you nothing about
 what to fix.
+
+## Running it
+
+Free, no model call, no network:
+
+```bash
+python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --target <plugin-dir>
+```
+
+```
+# 100xeval — static design quality  (scoring v1)
+
+## demo-plugin — design_score 0.77
+- frontmatter_quality: 0.50
+- progressive_disclosure: 1.00
+- reference_hygiene: 1.00
+- structural_completeness: 0.75
+- token_efficiency: 1.00
+- ecosystem_coherence: 1.00
+- security: 1.00
+
+### findings (3)
+- demo-plugin: [ST1] plugin has no README.md at its root
+- skills/report/SKILL.md: [FM3] skill has no description — the model cannot decide when to load it
+- skills/report/SKILL.md: [FM4] unrecognized frontmatter key 'descriptionn' (did you mean 'description'?)
+```
+
+The findings are the output that matters — here one earns its keep: someone typed
+`descriptionn` with two n's, so Claude was silently ignoring the description. Below about
+`0.85`, read every line.
+
+A `--target` that is not a plugin is an error (exit `2`), not a score. It will not quietly
+hand back a passing number for a folder that isn't there.
+
+## It is heuristics, and it has been wrong
+
+The layer reads prose and guesses. Run against Anthropic's own published plugins it produced
+five classes of false positive in one pass — flagging licence files, a plugin's own vendor
+documentation, and a `password:` line lifted from a code sample. Each is fixed and tested,
+but the same *class* of bug recurs: a rule that reads documentation as instruction.
+
+If more than about one finding in five is noise for your plugins, it is costing attention
+rather than saving it. That is worth reporting as a bug in the check.
 
 ## See also
 

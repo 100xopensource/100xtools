@@ -1,28 +1,43 @@
-# 100xdrift-check — keep sibling plugin files from silently diverging
+# 100xdrift-check — stop fixes from landing in only one copy
 
-**For a repo that holds several plugins.** If two of them carry copies of the same skill,
-command or agent — one per team, per tenant, per product line — a bug fixed in one copy
-stays broken in the others, and nobody notices until a user hits it.
+**For a repo that holds several plugins.** Teams usually end up with near-identical copies
+of the same skill, command or agent — one per team, per customer, per product line. Those
+copies are *siblings*. Fix a bug in one sibling, forget the other four, and the bug lives on
+where nobody is looking.
 
-100xdrift-check is the reviewer that notices. When a pull request edits one of those files,
-Claude reads the change, finds the matching copies **elsewhere in the same repo**, and posts
-a comment saying which copies the change probably applies to and which are different for
-good reasons.
+100xdrift-check is the reviewer that notices. When a pull request edits a file it watches,
+Claude reads the change, finds the sibling copies **elsewhere in the same repo**, and leaves
+a comment saying which ones probably need the same fix — and which are different on purpose.
+
+> **Wrong tool?** If you have one plugin and want to know whether it is any good, you want
+> [100xeval](../100xeval/README.md) instead. This one only helps when copies exist to compare.
+
+> **Draft.** Usable, and it does what this page describes — but it has not yet been run
+> against a large multi-plugin repo under load. Treat early reports as advice to check, not
+> as a verdict.
 
 **It reports, and only reports.** Never edits a file, never enforces sameness, never blocks
 a merge.
 
 ## Setup
 
-Type these **inside Claude Code**, in the repository you want checked. Steps 1–2 are enough
-to run reviews yourself; 3–4 add the automatic check on every pull request.
+Work in the repository you want checked. `bash` blocks go in your terminal; everything else
+is typed **inside Claude Code**. Steps 1–2 are enough to run reviews yourself; 3–4 add the
+automatic check on every pull request.
 
 **1. Install the plugin**
 
+Clone this repo somewhere alongside your own, then point at that clone:
+
+```bash
+git clone https://github.com/100xopensource/100xtools.git
+claude plugin marketplace add ../100xtools
+claude plugin install 100xdrift-check@100xtools
 ```
-/plugin marketplace add 100xopensource/100xtools
-/plugin install 100xdrift-check@100xtools
-```
+
+Adjust `../100xtools` if you cloned it elsewhere — any folder holding
+`.claude-plugin/marketplace.json` works as a marketplace. Once this repo is public you can
+skip the clone and use `claude plugin marketplace add 100xopensource/100xtools` instead.
 
 If it says `Run /reload-plugins to activate.`, type `/reload-plugins`. Type `/` — you should
 now see `100xdrift-check:install-skill` in the list.

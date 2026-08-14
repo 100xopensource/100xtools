@@ -1,7 +1,7 @@
 ---
 type: concept
 title: Eval case
-description: The unit of work — one scenario, one folder, one case.yaml declaring the plugin, the prompt, and the graders.
+description: The unit of work — one scenario, one folder, one case.yaml declaring the plugin, the prompt, and the graders, and how to write one.
 resource: ../../plugins/100xeval/skills/100xeval/scripts/engine/loader.py
 tags: [100xeval, evals, cases]
 generated:
@@ -26,11 +26,59 @@ means adding a folder.
 * **The graders**, one claim each.
 * **`runs`**, defaulting to 3.
 
+## What one looks like
+
+```yaml
+name: asksales-slowest-hours
+description: >-
+  What this case proves. Source: who asked for it (issue id).
+plugins: ["../../plugins/acme-analytics"]   # relative to THIS file
+tags: [acme, asksales]                      # select with --tag
+runs: 3
+execution:
+  prompt: "What were the slowest hours at the Northgate store last week?"
+  model: claude-sonnet-5
+  harness: claude_code        # the RUNTIME that executes the turn
+  entrypoint: none            # the SURFACE emulated; `none` = the harness's own prompt
+  allowed_tools: [Read, Glob, Grep, Skill, mcp__Acme__run_query]
+  mcp_config: ../mcp-config.json
+graders:
+  - {type: tool_used, name: filtered-to-store, tool: mcp__Acme__run_query, input_match: "Northgate", min: 1}
+  - {type: llm, name: presentation, focus: last_message, criteria: "cites source; clear table; disclaimer"}
+```
+
+`harness` and `entrypoint` are independent axes and the easiest thing here to confuse — see
+[harness](harness.md) and [entrypoint](entrypoint.md).
+
+## Creating one
+
+Ask Claude *"add a testcase for &lt;skill&gt;"*, or scaffold the stub yourself:
+
+```bash
+RUN=plugins/100xeval/skills/100xeval/scripts/run.py
+python3 "$RUN" init <name> --plugin plugins/<p> --tag <skill> --prompt "<question>"
+```
+
+Two worked cases ship in
+[`examples/plugin-eval/`](../../examples/plugin-eval/README.md), running against real
+third-party plugins vendored into the repo. Read them before writing your first.
+
 ## Why `runs: 3` is the default
 
 Skills are non-deterministic. One case in our own corpus answered `0.148×` (correct) and
 `0.24×` (62% off) to the same prompt on different runs. A single run reports a coin flip as
 a fact. Three runs turn a pass into a rate you can reason about — see [scoring](scoring.md).
+
+## Cover more than the happy path
+
+A suite of well-formed, in-scope questions tests very little. Include a case the plugin
+should **refuse** (assert `tool_used` with `min: 0, max: 0`), one that a sibling skill owns,
+and one exercising a documented business rule.
+
+## No secrets in a case, ever
+
+`mcp_config` holds a *path*. The config it points at uses `Bearer ${EVAL_MCP_BEARER}`,
+expanded from the environment at run time — see [MCP auth](mcp-auth.md).
 
 ## Park, don't delete
 

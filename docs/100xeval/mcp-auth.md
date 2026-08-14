@@ -1,7 +1,7 @@
 ---
 type: concept
 title: MCP auth
-description: Two authentication paths that produce two different tool-name schemes, and the failure that looks like nothing.
+description: Two authentication paths that produce two different tool-name schemes, how to set the token, and the failure that looks like nothing.
 resource: ../../plugins/100xeval/skills/100xeval/scripts/engine/harnesses/claude_code.py
 tags: [100xeval, mcp, auth]
 generated:
@@ -54,6 +54,19 @@ preflight cannot see through a token that is present and wrong.
 A blocked endpoint burns an entire suite scoring zero. If the MCP sits behind an IP
 allowlist, confirm the egress is allowed before starting a long run — the cost of checking
 is one request, and the cost of not checking is the whole suite.
+
+## Setting it up
+
+If the plugin declares an MCP server, either authenticate the connector interactively
+(`claude` → `/mcp`) or inject a bearer token for headless runs:
+
+```bash
+export EVAL_MCP_BEARER='<service-token>'      # applied to every declared server
+python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --tag <suite>
+```
+
+The token is read from the environment only — never committed, never written into any
+`.mcp.json`.
 
 ## See also
 
