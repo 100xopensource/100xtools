@@ -24,6 +24,21 @@
       ]
     },
     {
+      "name": "100xcontinuity",
+      "source": "./plugins/100xcontinuity",
+      "description": "Session continuity for Claude Code: save artifacts and conversation records from a session into a durable store, and load them back by name in a later session. Local directory (including one a sync client watches) or an S3-compatible bucket.",
+      "version": "0.1.0",
+      "license": "Apache-2.0",
+      "keywords": [
+        "continuity",
+        "sessions",
+        "artifacts",
+        "storage",
+        "s3",
+        "sync"
+      ]
+    },
+    {
       "name": "100xdrift-check",
       "source": "./plugins/100xdrift-check",
       "description": "Drift review for a repo holding several plugins: when a PR edits a watched plugin file, find the sibling copies in the repo's other plugins and report which siblings the change likely applies to. Non-blocking, report-only.",

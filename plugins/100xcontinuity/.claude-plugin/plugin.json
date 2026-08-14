@@ -1,0 +1,12 @@
+{
+  "name": "100xcontinuity",
+  "description": "Session continuity for Claude Code: save artifacts and conversation records from a session into a durable store, and load them back by name in a later session. The store is a plain directory — typically one a sync client already watches, which is how it reaches the cloud — or an S3-compatible bucket. Content-addressed blobs and an append-only log, so two machines can write to one session inside a synced folder without conflict copies.",
+  "version": "0.1.0",
+  "author": {
+    "name": "100x",
+    "url": "https://github.com/100xopensource/100xtools"
+  },
+  "homepage": "https://github.com/100xopensource/100xtools/tree/main/plugins/100xcontinuity",
+  "license": "Apache-2.0",
+  "keywords": ["continuity", "sessions", "artifacts", "storage", "s3", "sync"]
+}

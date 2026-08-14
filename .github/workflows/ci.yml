@@ -22,6 +22,11 @@ jobs:
         # 3.11 is the floor we claim in the README; test the ends of the supported range so
         # a version-specific stdlib change can't break a user we told it would work for.
         python-version: ["3.11", "3.13"]
+        # One entry per plugin that ships a suite. A plugin with no tests is simply absent
+        # here rather than carrying an empty tests/ to keep a wildcard happy.
+        suite:
+          - plugins/100xeval/skills/100xeval
+          - plugins/100xcontinuity/skills/100xcontinuity
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -33,7 +38,7 @@ jobs:
       # PYTHONPATH puts the engine on the path without the tests having to know where
       # they live.
       - name: Engine unit tests
-        working-directory: plugins/100xeval/skills/100xeval
+        working-directory: ${{ matrix.suite }}
         env:
           PYTHONPATH: scripts
         run: python3 -m unittest discover -s tests -p 'test_*.py' -v

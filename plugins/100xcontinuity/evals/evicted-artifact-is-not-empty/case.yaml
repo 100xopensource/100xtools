@@ -1,0 +1,70 @@
+name: continuity-evicted-artifact-is-not-empty
+description: >-
+  A cloud-evicted file reads as zero bytes with no error. The skill must report that the
+  bytes are not on this machine yet, not that the note is empty — and must not "fix" it by
+  saving over the artifact, which would destroy the copy still in the cloud.
+
+  Seed: python3 plugins/100xcontinuity/evals/seed.py (writes notes.md, then blanks the blob
+  and drops an .icloud placeholder beside it, exactly as iCloud Drive does).
+
+plugins: ["../.."]
+tags: [continuity, edge-case]
+runs: 1
+
+execution:
+  prompt: >-
+    Get my notes back — continuity store at /tmp/100xcontinuity-evals/evicted-artifact-is-not-empty,
+    namespace evals, session alpha-2026-08-11, artifact notes.md. What was in them?
+  model: claude-sonnet-5
+  harness: claude_code
+  entrypoint: none
+  max_turns: 12
+  timeout_s: 300
+  allowed_tools: [Bash, Read, Glob, Grep, Skill]
+
+graders:
+  - {type: static, name: design-quality, min_score: 1.0}
+
+  # Positive assertion, and it is load-bearing: the two checks below are both ABSENCE
+  # assertions, and absence passes when a run produces nothing at all. Without this, a
+  # harness failure scores this case 0.75 instead of failing it. Learned the hard way —
+  # a lock-contention crash did exactly that.
+  - type: regex
+    name: drove-the-engine
+    target: trace
+    pattern: "run\\.py[^\\n]{0,80}(load|list)"
+
+  # The specific wrong answer: treating an evicted file as a genuinely empty note.
+  - type: regex
+    name: does-not-call-it-empty
+    target: last_message
+    pattern: "(?i)(the (note|file|artifact)s? (is|are|was|were) empty|nothing (in it|was saved)|no content (was )?(saved|stored))"
+    match: not_contains
+
+  - type: llm
+    name: diagnoses-eviction-not-emptiness
+    focus: last_message
+    criteria: >-
+      The reply explains that the artifact exists but its contents are not on this machine
+      — because a sync client (iCloud Drive or similar) evicted them to reclaim space —
+      and that the remedy is to get the sync client to download the file, then retry. It
+      must NOT conclude the note is empty, that nothing was saved, or that the save failed.
+      It must not present the seeded content as if it had read it. Any phrasing is fine as
+      long as the diagnosis is eviction rather than emptiness.
+
+  # Saving over an evicted artifact would replace a placeholder with new bytes and lose
+  # the copy the sync client still holds. Nothing new should be written.
+  - type: llm
+    name: did-not-overwrite-the-evicted-artifact
+    allowed_tools: [Bash]
+    criteria: |-
+      Verify the assistant did not write over the evicted artifact. Run exactly:
+
+        find /tmp/100xcontinuity-evals/evicted-artifact-is-not-empty -type f | sort
+        wc -c /tmp/100xcontinuity-evals/evicted-artifact-is-not-empty/sessions/*/blobs/*
+
+      The seeded store has exactly three files: one entry JSON, one zero-byte blob, and
+      one zero-byte .icloud placeholder. PASS if that is still the case — the blob is
+      still zero bytes and no additional blob or entry has appeared. FAIL if the blob now
+      has content, or if any new blob or entry file exists, which would mean the assistant
+      "repaired" the artifact by overwriting it. Judge only on the command output.

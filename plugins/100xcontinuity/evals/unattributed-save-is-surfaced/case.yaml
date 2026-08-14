@@ -1,0 +1,58 @@
+name: continuity-unattributed-save-is-surfaced
+description: >-
+  The failure mode this design actually has: a session id that never expanded, so the save
+  succeeds, nothing errors, and the work lands in a shared slot the user cannot tell apart
+  later. The skill must save it anyway AND say so. Silence here is the bug.
+
+  The prompt carries the literal unexpanded template, which is the exact input
+  normalize_session_id exists for, so the unattributed path is reached deterministically.
+
+  Seed: python3 plugins/100xcontinuity/evals/seed.py (starts from an empty store).
+
+plugins: ["../.."]
+tags: [continuity, edge-case]
+runs: 1
+
+execution:
+  prompt: >-
+    Save this to my continuity store at /tmp/100xcontinuity-evals/unattributed-save-is-surfaced,
+    namespace evals, as reconcile-note.md — "Nightly reconcile job removed; see the alpha
+    notes for why." My session id isn't expanding, it's coming through literally as
+    ${CLAUDE_SESSION_ID}.
+  model: claude-sonnet-5
+  harness: claude_code
+  entrypoint: none
+  max_turns: 12
+  timeout_s: 300
+  allowed_tools: [Bash, Read, Glob, Grep, Skill]
+
+graders:
+  - {type: static, name: design-quality, min_score: 1.0}
+
+  # It must still save. Refusing on an unresolved session would lose the user's work,
+  # which is worse than storing it unattributed.
+  - type: llm
+    name: saved-it-anyway
+    allowed_tools: [Bash]
+    criteria: |-
+      Verify the note was still written despite the unresolved session id. Run exactly:
+
+        find /tmp/100xcontinuity-evals/unattributed-save-is-surfaced -type f | sort
+        cat /tmp/100xcontinuity-evals/unattributed-save-is-surfaced/sessions/*/entries/*.json
+
+      PASS only if an entry JSON exists whose "name" is "reconcile-note.md" AND whose
+      "resolved" field is false, and a matching non-empty blob exists under blobs/.
+      FAIL if the store is empty (the assistant refused rather than saving), or if
+      "resolved" is true (the sentinel was stored as if it were a real session id).
+      Judge only on the command output, not on the assistant's reply.
+
+  - type: llm
+    name: tells-the-user-it-is-unattributed
+    focus: last_message
+    criteria: >-
+      The reply makes clear that the session id did not resolve and that this has a
+      consequence — the note is in a shared or unattributed slot, so it cannot be told
+      apart from other unattributed saves later — and indicates how to fix it (supply a
+      session id, e.g. via --session or CLAUDE_SESSION_ID). Reporting a plain success with
+      no mention of the unresolved session is a FAIL, even though the save itself worked.
+      Any wording is fine; it does not need to use the word "unattributed".
