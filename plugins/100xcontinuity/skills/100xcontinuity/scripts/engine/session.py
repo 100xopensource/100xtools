@@ -22,7 +22,7 @@ import json
 from typing import Any
 
 from engine import keys
-from engine.store import ObjectNotFound, ObjectStore
+from engine.store import ObjectNotFound, ObjectNotMaterialized, ObjectStore
 
 
 # Entry records are small by contract: they name bytes, they never carry them.
@@ -105,18 +105,27 @@ def read_session(
     entry_prefix = f"{keys.session_prefix(digest)}entries/"
 
     history: list[dict[str, Any]] = []
+    sound_keys: list[str] = []
     damaged: list[str] = []
     for key in store.list(entry_prefix):
         try:
-            history.append(json.loads(store.get(key).decode("utf-8")))
+            record = json.loads(store.get(key).decode("utf-8"))
         except (json.JSONDecodeError, UnicodeDecodeError, ObjectNotFound):
             damaged.append(key)
+            continue
+        history.append(record)
+        sound_keys.append(key)
 
+    # An entry that parses as JSON but does not describe an artifact is damaged
+    # too. Counting only unparseable ones let a record with no `sha256` through
+    # as a healthy artifact, and the failure surfaced later as a crash on read
+    # rather than here, where the caller is already being told what is wrong.
     artifacts: dict[str, dict[str, Any]] = {}
-    for entry in history:
-        name = entry.get("name")
-        if isinstance(name, str) and name:
-            artifacts[name] = entry
+    for entry, key in zip(history, sound_keys):
+        if _describes_an_artifact(entry):
+            artifacts[entry["name"]] = entry
+        else:
+            damaged.append(key)
 
     return {
         "session_digest": digest,
@@ -131,12 +140,65 @@ def read_session(
 def load_artifact(
     store: ObjectStore, *, namespace: str | None, session_id: str | None, name: str
 ) -> bytes:
-    """Return the current bytes of one named artifact in a session."""
+    """Return the current bytes of one named artifact, verified against its digest.
+
+    The verification is the real eviction guarantee. A sync client that reclaims
+    disk leaves a file readable but short or empty, and only iCloud leaves a
+    marker a store could spot — Dropbox and Google Drive do not. Here the
+    expected digest is known, so bytes that do not hash to it are rejected
+    whichever client did it, and truncation is caught for free.
+
+    Empty or short bytes read as an eviction (`ObjectNotMaterialized`: wait for
+    the sync client). A full-length mismatch is corruption, which is a different
+    problem with a different remedy, so it does not borrow that name.
+    """
     state = read_session(store, namespace=namespace, session_id=session_id)
     entry = state["artifacts"].get(name)
     if entry is None:
         raise SessionError(f"no artifact named {name!r} in this session")
-    return store.get(keys.blob_key(state["session_digest"], entry["sha256"]))
+
+    expected = entry.get("sha256")
+    if not isinstance(expected, str):
+        raise SessionError(
+            f"the entry for {name!r} names no sha256, so its bytes cannot be located "
+            "or verified — the entry is damaged"
+        )
+    try:
+        blob_key = keys.blob_key(state["session_digest"], expected)
+    except ValueError as exc:
+        raise SessionError(f"the entry for {name!r} is damaged: {exc}") from exc
+
+    data = store.get(blob_key)
+    actual = keys.content_digest(data)
+    if actual == expected:
+        return data
+    if len(data) < entry.get("size", len(data) + 1):
+        raise ObjectNotMaterialized(
+            f"{name!r} is in the cloud but not fully on this machine yet — "
+            f"got {len(data)} of {entry.get('size')} bytes. Ask the sync client to "
+            "download it and retry; do not re-save, which would overwrite the copy "
+            "the client still holds"
+        )
+    raise SessionError(
+        f"{name!r} is corrupt: its bytes hash to {actual[:12]}… but the entry names "
+        f"{expected[:12]}…. The stored object no longer matches what was saved"
+    )
+
+
+def _describes_an_artifact(entry: Any) -> bool:
+    """Whether a parsed entry carries the two fields a read actually needs.
+
+    A name to look it up by, and a digest to locate and verify its bytes with.
+    Anything missing either is a record that cannot be honoured, and saying so
+    at fold time is what keeps `load_artifact` from failing on a `KeyError`.
+    """
+    return (
+        isinstance(entry, dict)
+        and isinstance(entry.get("name"), str)
+        and bool(entry.get("name"))
+        and isinstance(entry.get("sha256"), str)
+        and bool(entry.get("sha256"))
+    )
 
 
 def _encode_entry(entry: dict[str, Any]) -> bytes:

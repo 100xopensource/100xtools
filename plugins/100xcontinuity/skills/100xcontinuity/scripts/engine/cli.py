@@ -160,6 +160,12 @@ def _cmd_list(args: argparse.Namespace) -> dict[str, Any]:
 
 def _cmd_where(args: argparse.Namespace) -> dict[str, Any]:
     cfg = _settings(args)
+    # Validate the backend before reporting paths. Skipping this made the one
+    # diagnostic command endorse the misconfiguration it exists to catch: an
+    # unusable backend still exited 0, next to a local path that would never be
+    # written. `check_backend` rather than `get_store` because a command that
+    # answers "where is my store" must not create it while answering.
+    store_mod.check_backend(cfg["backend"])
     root = pathlib.Path(cfg["root"]).expanduser()
     digest = keys.session_digest(cfg["namespace"], cfg["session"])
     resolved = keys.normalize_session_id(cfg["session"]) is not None

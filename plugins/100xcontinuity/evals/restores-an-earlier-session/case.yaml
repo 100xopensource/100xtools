@@ -35,14 +35,15 @@ graders:
   - type: regex
     name: recovered-the-seeded-content
     target: last_message
-    pattern: "(?i)vega"
+    pattern: "(?i)widget importer"
 
   - type: llm
     name: reports-decisions-and-the-blocker
     focus: last_message
     criteria: >-
-      The reply reports what was saved in that earlier session: that the Vega migration
-      went behind a flag defaulting to off, that the nightly reconcile job was dropped,
-      and that the work was blocked on finance sign-off for the Q3 true-up. All three must
-      be present in substance; exact wording, ordering and formatting do not matter. It
-      must not invent additional decisions that were not in the stored note.
+      The reply reports what was saved in that earlier session: that the Acme widget
+      importer went behind a flag defaulting to off, that the nightly stock-count job was
+      dropped, and that the work was blocked on the Acme platform team raising the request
+      quota. All three must be present in substance; exact wording, ordering and
+      formatting do not matter. It must not invent additional decisions that were not in
+      the stored note.

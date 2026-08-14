@@ -32,15 +32,17 @@ from engine import keys, session, store  # noqa: E402
 
 NAMESPACE = "evals"
 
-# What the restore case must find. Distinctive enough that a model cannot produce
-# it by guessing, so the grader is really checking a read of the store.
+# What the restore case must find. Invented Acme material, per the repo's fixture
+# convention — it must not read as anyone's real internal notes. Still distinctive
+# enough that a model cannot produce it by guessing, so a passing grader means the
+# store was genuinely read rather than plausibly imagined.
 EARLIER_SESSION = "alpha-2026-08-11"
 EARLIER_NOTES = b"""# Session alpha
 
 Decisions:
-- Ship the Vega migration behind a flag, default off.
-- Drop the nightly reconcile job; it has not caught anything in 90 days.
-- Blocked on: finance sign-off for the Q3 true-up.
+- Ship the Acme widget importer behind a flag, default off.
+- Drop the nightly stock-count job; it has not flagged anything in 90 days.
+- Blocked on: the Acme platform team raising the request quota.
 """
 
 

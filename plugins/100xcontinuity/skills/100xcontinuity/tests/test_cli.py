@@ -161,6 +161,24 @@ class WhereTests(_CliFixture):
         self.json_cli("where", *self.base)
         self.assertFalse(pathlib.Path(self.root).exists())
 
+    def test_where_refuses_a_backend_it_cannot_use(self) -> None:
+        # The diagnostic must catch the misconfiguration it exists to catch.
+        # It used to exit 0 and print a local path next to "backend": "s3".
+        code, text = self.run_cli("where", "--backend", "s3", "--root", self.root)
+        self.assertEqual(code, 1)
+        payload = json.loads(text)
+        self.assertFalse(payload["ok"])
+        self.assertIn("s3", payload["hint"].lower())
+
+    def test_unusable_backend_stays_within_the_json_contract(self) -> None:
+        # Every command prints JSON and nothing else — including this failure,
+        # which previously escaped as a traceback on stderr.
+        for cmd in (("where",), ("list",)):
+            with self.subTest(cmd=cmd):
+                code, text = self.run_cli(*cmd, "--backend", "s3", "--root", self.root)
+                self.assertEqual(code, 1)
+                self.assertFalse(json.loads(text)["ok"])
+
     def test_where_reports_whether_the_root_exists(self) -> None:
         self.assertFalse(self.json_cli("where", *self.base)["root_exists"])
         self.json_cli("save", *self.base, "--name", "a.txt", stdin=b"x")

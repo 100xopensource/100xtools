@@ -7,7 +7,7 @@ import pathlib
 import tempfile
 import unittest
 
-from engine import keys, session, store
+from engine import keys, session, store  # noqa: F401 - store used by subclasses
 
 
 class _Fixture(unittest.TestCase):
@@ -161,6 +161,88 @@ class DamagedEntryTests(_Fixture):
         bad = keys.entry_key(digest, "2026-08-13T10-00-00-000000Z", "c" * 64)
         self.store.put(bad, b"\xff\xfe not utf-8")
         self.assertEqual(self.read()["damaged"], [bad])
+
+
+class VerifiesBytesOnReadTests(_Fixture):
+    """Reads verify against the digest the key already carries.
+
+    This is the real eviction guarantee. Only iCloud leaves a marker a store can
+    spot; Dropbox and Google Drive evict silently, so a store-level check cannot
+    cover them and a digest check can.
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.save("a.txt", b"hello world", stamp="2026-08-13T09-00-00-000000Z")
+        digest = keys.session_digest(self.ns, self.sid)
+        self.blob = self.root / keys.blob_key(digest, keys.content_digest(b"hello world"))
+
+    def load(self) -> bytes:
+        return session.load_artifact(
+            self.store, namespace=self.ns, session_id=self.sid, name="a.txt"
+        )
+
+    def test_healthy_bytes_still_load(self) -> None:
+        self.assertEqual(self.load(), b"hello world")
+
+    def test_eviction_without_a_marker_is_caught(self) -> None:
+        # Dropbox and Google Drive leave no .icloud sibling. Before the digest
+        # check this returned b"" as a successful empty artifact.
+        self.blob.write_bytes(b"")
+        with self.assertRaises(store.ObjectNotMaterialized):
+            self.load()
+
+    def test_partial_materialization_is_caught(self) -> None:
+        # A file part-way through downloading is readable and wrong.
+        self.blob.write_bytes(b"hel")
+        with self.assertRaises(store.ObjectNotMaterialized):
+            self.load()
+
+    def test_full_length_mismatch_is_corruption_not_eviction(self) -> None:
+        # Same length, different bytes: waiting for a sync client will not fix
+        # this, so it must not borrow the eviction error or its advice.
+        self.blob.write_bytes(b"HELLO WORLD")
+        with self.assertRaises(session.SessionError) as caught:
+            self.load()
+        self.assertNotIsInstance(caught.exception, store.ObjectNotMaterialized)
+        self.assertIn("corrupt", str(caught.exception))
+
+
+class DamagedEntryShapeTests(_Fixture):
+    """An entry that parses but cannot be honoured is damaged, not healthy."""
+
+    def _write_entry(self, payload: bytes) -> str:
+        digest = keys.session_digest(self.ns, self.sid)
+        key = keys.entry_key(digest, "2026-08-13T09-00-00-000000Z", "c" * 64)
+        self.store.put(key, payload)
+        return key
+
+    def test_entry_without_a_digest_is_damaged(self) -> None:
+        # It used to fold in as a healthy artifact and crash on read instead.
+        key = self._write_entry(b'{"name":"a.txt"}')
+        state = self.read()
+        self.assertEqual(state["damaged"], [key])
+        self.assertEqual(state["artifacts"], {})
+
+    def test_entry_without_a_name_is_damaged(self) -> None:
+        key = self._write_entry(b'{"sha256":"' + b"a" * 64 + b'"}')
+        self.assertEqual(self.read()["damaged"], [key])
+
+    def test_loading_a_damaged_entry_raises_session_error_not_keyerror(self) -> None:
+        # The CLI only models StoreError/SessionError/ValueError/OSError, so a
+        # KeyError here escaped as a traceback and broke the JSON contract.
+        self._write_entry(b'{"name":"a.txt"}')
+        with self.assertRaises(session.SessionError):
+            session.load_artifact(
+                self.store, namespace=self.ns, session_id=self.sid, name="a.txt"
+            )
+
+    def test_a_damaged_entry_does_not_sink_its_healthy_siblings(self) -> None:
+        self.save("good.txt", b"intact", stamp="2026-08-13T08-00-00-000000Z")
+        self._write_entry(b'{"name":"bad.txt"}')
+        state = self.read()
+        self.assertIn("good.txt", state["artifacts"])
+        self.assertEqual(len(state["damaged"]), 1)
 
 
 class UnresolvedSessionTests(_Fixture):

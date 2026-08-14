@@ -115,23 +115,22 @@ or Dropbox, and lets that client do the uploading. The plugin never syncs anythi
 which means **a successful save proves the bytes reached local disk, not the cloud.** Say
 so if a user asks whether their work is backed up; there is no completion signal to check.
 
-Two failures are worth recognising by name:
+Three failures are worth recognising by name:
 
-- **`ObjectNotMaterialized`** — the artifact exists but its bytes are not on this machine
-  (typically iCloud evicted them to reclaim space). The remedy is to let the sync client
-  download the file, not to save it again. Never treat this as an empty artifact.
+- **`ObjectNotMaterialized`** — the artifact exists but its bytes are not on this machine,
+  because a sync client evicted them to reclaim space. Every read is verified against the
+  digest the key carries, so this is caught whichever client did it and whether the file
+  came back empty or part-way. The remedy is to let the sync client finish downloading,
+  then retry. **Never treat it as an empty artifact, and never re-save over it** — that
+  replaces a placeholder with new bytes and loses the copy still in the cloud.
+- **"is corrupt: its bytes hash to … but the entry names …"** — same length, wrong content.
+  Waiting will not fix this one; the stored object no longer matches what was saved.
 - **Nothing found in a session you know you saved to** — usually the session id did not
   resolve on one of the two runs. Compare `session_digest` from `where` across both.
+
+A `list` reporting entries under `damaged` means those records cannot be honoured. The rest
+of the session is unaffected, so report them rather than treating the session as lost.
 
 Read `references/synced-folders.md` before advising anyone on which folder to use, and
 `references/storage-layout.md` before interpreting what is on disk or debugging a store by
 hand.
-
-## Running the tests
-
-Offline, no model and no network:
-
-```bash
-cd plugins/100xcontinuity/skills/100xcontinuity
-PYTHONPATH=scripts python3 -m unittest discover -s tests -p 'test_*.py'
-```

@@ -16,10 +16,18 @@ code:
 - **Nothing is ever rewritten.** Blobs are content-addressed and the entry log is
   append-only, so two machines editing one session cannot produce the diverging
   versions a sync client resolves by forking a conflict copy.
-- **Evicted files are detected, not misread.** iCloud Drive replaces a synced
-  file's contents with a placeholder to reclaim disk. Reading one returns short
-  or empty bytes with no error, so `LocalStore.get` verifies what it read and
-  raises `ObjectNotMaterialized` rather than handing back a truncated artifact.
+- **Evicted files are detected, not misread.** A sync client reclaiming disk
+  replaces a file's contents while leaving its name in place, and reading one
+  returns short or empty bytes with no error.
+
+Eviction is caught in two places, and the split matters. This module only
+recognises the *iCloud* form of it — a `.<name>.icloud` placeholder sibling —
+because that is all a store can see when it has nothing to compare the bytes
+against. Dropbox and Google Drive evict without leaving any such marker, so the
+guarantee cannot live here. It lives in `session.load_artifact`, which knows the
+digest the bytes are supposed to have and verifies it; that catches eviction by
+any client, and truncation too. The check here is a fast path with a better
+message, not the guarantee.
 
 Reference: `references/synced-folders.md`.
 """
@@ -55,6 +63,16 @@ class ObjectNotMaterialized(StoreError):
     Raised for a cloud-evicted placeholder. Distinct from `ObjectNotFound`
     because the remedy is different: wait for the sync client, or ask it to
     download the file — not re-save it.
+    """
+
+
+class BackendNotAvailable(StoreError):
+    """A known backend that this build cannot use yet.
+
+    A `StoreError` rather than `NotImplementedError` so it travels the same path
+    as every other storage failure and reaches the caller as a modelled result.
+    Raised as a bare `NotImplementedError` it escaped the CLI's error handling
+    and printed a traceback, breaking the JSON-only contract on stdout.
     """
 
 
@@ -168,6 +186,22 @@ class LocalStore:
         )
 
 
+def check_backend(backend: str) -> None:
+    """Raise unless `backend` names something this build can actually use.
+
+    Separate from `get_store` so a diagnostic can validate configuration without
+    the side effect of creating a store root — `where` reports what is
+    configured and must not bring it into existence while doing so.
+    """
+    if backend == "local":
+        return
+    if backend == "s3":
+        raise BackendNotAvailable(
+            "the S3-compatible backend is not wired up yet; use backend='local'"
+        )
+    raise ValueError(f"unknown backend {backend!r} (expected 'local' or 's3')")
+
+
 def get_store(backend: str, *, root: str | None = None) -> ObjectStore:
     """Build the configured backend.
 
@@ -175,12 +209,7 @@ def get_store(backend: str, *, root: str | None = None) -> ObjectStore:
     S3-compatible backend is selected by name here so callers never branch on it
     themselves; it lands in `s3.py`.
     """
-    if backend == "local":
-        if not root:
-            raise ValueError("the local backend needs a root directory")
-        return LocalStore(root)
-    if backend == "s3":
-        raise NotImplementedError(
-            "the S3-compatible backend is not wired up yet; use backend='local'"
-        )
-    raise ValueError(f"unknown backend {backend!r} (expected 'local' or 's3')")
+    check_backend(backend)
+    if not root:
+        raise ValueError("the local backend needs a root directory")
+    return LocalStore(root)

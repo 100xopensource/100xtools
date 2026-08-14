@@ -1,8 +1,13 @@
 # Behavioral eval cases for 100xcontinuity
 
 Four cases that drive the skill end to end against a real store on disk. They exist to test
-the **skill's judgement**, not the engine — the engine has 87 unit tests beside `scripts/`,
-and a behavioral case that only re-checks the plumbing is a model call you paid for twice.
+the **skill's judgement**, not the engine — the engine has unit tests beside `scripts/`, and
+a behavioral case that only re-checks the plumbing is a model call you paid for twice.
+
+**These are for working on the plugin in this repo, not for using it.** Running them needs
+the sibling `100xeval` plugin, which a marketplace install of `100xcontinuity` does not
+bring with it. Nothing under `evals/` is on the path that operates the tool — the plugin
+stays self-contained without it.
 
 ## The rule these cases follow
 

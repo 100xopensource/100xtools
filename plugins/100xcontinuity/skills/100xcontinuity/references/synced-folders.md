@@ -31,9 +31,14 @@ re-made on every machine.
 
 **1. Files get evicted.** iCloud Drive, Dropbox Smart Sync, and Google Drive streaming all
 reclaim disk by dropping a file's contents while leaving its name in place. Reading one
-returns empty bytes and *no error*. The store detects this and raises
-`ObjectNotMaterialized` instead of handing back a truncated artifact — but the remedy is to
-let the client download the file, not to save it again.
+returns empty or partial bytes and *no error*.
+
+Only iCloud leaves a marker behind (a `.<name>.icloud` sibling), so marker-spotting alone
+would catch one client of three. Instead every artifact read is verified against the digest
+its key already carries: bytes that do not hash to it raise `ObjectNotMaterialized`
+whichever client evicted them, and a half-downloaded file is caught the same way. The
+remedy is to let the client finish, then retry — **not** to save it again, which would
+overwrite the placeholder and lose the copy the client still holds.
 
 **2. Sync is not instant and gives no completion signal.** A save that returns `ok: true`
 means the bytes are on local disk. Whether they have left the machine is between the user

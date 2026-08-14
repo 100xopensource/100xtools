@@ -172,8 +172,36 @@ class SelectorTests(unittest.TestCase):
         self.assertIn("gdrive", str(caught.exception))
 
     def test_s3_backend_is_declared_but_not_yet_wired(self) -> None:
-        with self.assertRaises(NotImplementedError):
+        with self.assertRaises(store.BackendNotAvailable):
             store.get_store("s3")
+
+    def test_unavailable_backend_is_a_store_error(self) -> None:
+        # It must travel the same path as every other storage failure. As a bare
+        # NotImplementedError it escaped the CLI's handler and printed a
+        # traceback, breaking the JSON-only contract on stdout.
+        self.assertTrue(issubclass(store.BackendNotAvailable, store.StoreError))
+
+
+class CheckBackendTests(unittest.TestCase):
+    """Validating configuration must not bring a store into existence."""
+
+    def test_local_passes(self) -> None:
+        self.assertIsNone(store.check_backend("local"))
+
+    def test_unavailable_backend_raises(self) -> None:
+        with self.assertRaises(store.BackendNotAvailable):
+            store.check_backend("s3")
+
+    def test_unknown_backend_raises_by_name(self) -> None:
+        with self.assertRaises(ValueError) as caught:
+            store.check_backend("gdrive")
+        self.assertIn("gdrive", str(caught.exception))
+
+    def test_checking_creates_nothing(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp) / "never-created"
+            store.check_backend("local")
+            self.assertFalse(root.exists())
 
 
 if __name__ == "__main__":

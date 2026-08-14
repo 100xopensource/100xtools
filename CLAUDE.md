@@ -103,14 +103,20 @@ for f in static.analyze('plugins/100xeval')['findings']: print(f)"
 ```
 
 ```bash
-# 100xeval engine tests — offline; no model, MCP, or network calls
-cd plugins/100xeval/skills/100xeval
+# Engine tests — offline; no model, MCP, or network calls. Two plugins ship a suite, and
+# CI's `test` job matrixes over both, so a new suite means a new row in that matrix.
+cd plugins/100xeval/skills/100xeval          # or plugins/100xcontinuity/skills/100xcontinuity
 PYTHONPATH=scripts python3 -m unittest discover -s tests -p 'test_*.py'
 
 # One module / class / test
 PYTHONPATH=scripts python3 -m unittest tests.test_lint
 PYTHONPATH=scripts python3 -m unittest tests.test_lint.TestSecurityChecks.test_path_traversal_flagged
 ```
+
+**The repo's Python floor is 3.11**, which is above the macOS system `python3` (3.9). The
+suites use `contextlib.chdir` and `X | None` annotations at runtime, so on a stock Mac they
+fail for reasons that have nothing to do with the change under test. `uv run --python 3.11
+--no-project python -m unittest …` runs them on the real floor.
 
 **`tests/` sits beside `scripts/`, not inside it** — `scripts/` is the runtime payload that
 ships and that Claude invokes, so the suite stays out of it. Both the `cd` and
@@ -236,6 +242,47 @@ The workflow is not active in this repo — it is a template for repos that inst
 **No `disable-model-invocation` on these skills**, though all three want it: three SKILL.md
 files carrying that one line read as duplication to `token_efficiency`, which counts
 frontmatter. Re-add it together with a fix excluding frontmatter from that metric.
+
+### 100xcontinuity — session continuity
+
+Saves artifacts and conversation records into a durable store and loads them back in a
+later session. **Plugin-only: there is no server**, so it writes to the user's own storage
+directly and never needs a presigned URL.
+
+**"Local" means a folder someone's sync client already watches** — iCloud Drive, OneDrive,
+a synced SharePoint library, Google Drive, Dropbox. That client does the uploading; the
+plugin syncs nothing. So a successful save proves bytes reached local disk, *never* that
+they reached the cloud, and there is no completion signal to wait on. Say so rather than
+describing a save as backed up.
+
+That one choice explains the whole storage design, and each piece looks arbitrary without
+it:
+
+- **Blobs are content-addressed** by their own sha256, so two machines writing identical
+  bytes produce one file.
+- **The entry log is append-only.** Nothing is ever rewritten, so a sync client never has
+  two versions to reconcile — conflict copies are structurally impossible rather than
+  resolved after the fact. The cost is that history grows monotonically.
+- **Reads verify bytes against the digest in the key.** An evicted file reads as short or
+  empty with *no error*, and only iCloud leaves a marker a store could spot — Dropbox and
+  Google Drive do not. The digest check is therefore the real guarantee and lives in
+  `session.load_artifact`; `store.py`'s `.icloud` check is a fast path with a better
+  message. Short bytes are `ObjectNotMaterialized` (wait for the client); full-length
+  mismatch is corruption, a different problem with a different remedy.
+
+`normalize_session_id` maps unresolved sentinels — `unknown`, `unknown-session`, an
+unexpanded `${CLAUDE_SESSION_ID}` — to a single `unattributed` slot. An unresolved save
+still **succeeds**; losing the artifact would be worse. The CLI says so in the result, and
+that hint is load-bearing: without it a store quietly fills with work nobody can find.
+
+`evals/` holds behavioral cases that need the sibling 100xeval plugin, so they are
+repo-only and not part of what a marketplace install operates. They cost money and are not
+in CI. Their graders read the **store**, not the transcript — and any case built mainly
+from absence assertions needs one positive assertion too, or a run that never happened
+scores well.
+
+The S3-compatible backend and the MCP surface are declared in the seam and not yet built;
+`--backend s3` fails with a modelled error rather than writing nowhere.
 
 ## Adding a plugin
 

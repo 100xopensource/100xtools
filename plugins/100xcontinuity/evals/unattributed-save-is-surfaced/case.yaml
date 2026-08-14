@@ -16,8 +16,8 @@ runs: 1
 execution:
   prompt: >-
     Save this to my continuity store at /tmp/100xcontinuity-evals/unattributed-save-is-surfaced,
-    namespace evals, as reconcile-note.md — "Nightly reconcile job removed; see the alpha
-    notes for why." My session id isn't expanding, it's coming through literally as
+    namespace evals, as stock-count-note.md — "Nightly stock-count job removed; see the
+    alpha notes for why." My session id isn't expanding, it's coming through literally as
     ${CLAUDE_SESSION_ID}.
   model: claude-sonnet-5
   harness: claude_code
@@ -40,7 +40,7 @@ graders:
         find /tmp/100xcontinuity-evals/unattributed-save-is-surfaced -type f | sort
         cat /tmp/100xcontinuity-evals/unattributed-save-is-surfaced/sessions/*/entries/*.json
 
-      PASS only if an entry JSON exists whose "name" is "reconcile-note.md" AND whose
+      PASS only if an entry JSON exists whose "name" is "stock-count-note.md" AND whose
       "resolved" field is false, and a matching non-empty blob exists under blobs/.
       FAIL if the store is empty (the assistant refused rather than saving), or if
       "resolved" is true (the sentinel was stored as if it were a real session id).

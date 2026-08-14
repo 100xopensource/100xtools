@@ -21,8 +21,8 @@ execution:
     /tmp/100xcontinuity-evals/saves-a-summary, namespace evals, session beta-2026-08-13.
     Call it handover.md.
 
-    We moved the Vega migration behind a flag (default off), dropped the nightly
-    reconcile job, and we're blocked on finance sign-off for the Q3 true-up.
+    We moved the Acme widget importer behind a flag (default off), dropped the nightly
+    stock-count job, and we're waiting on the Acme platform team for a quota increase.
   model: claude-sonnet-5
   harness: claude_code
   entrypoint: none
@@ -58,7 +58,7 @@ graders:
         3. Some entry JSON has "name" exactly "handover.md".
         4. That entry's "resolved" field is true (the session id was attributed).
         5. The blob whose filename equals that entry's "sha256" exists and is non-empty,
-           and its text mentions the Vega migration.
+           and its text mentions the Acme widget importer.
 
       FAIL if the store is empty, if no entry names handover.md, or if an entry names a
       sha256 with no matching blob file. Do not read the assistant's reply — a claim of

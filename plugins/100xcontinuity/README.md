@@ -104,9 +104,13 @@ PYTHONPATH=scripts python3 -m unittest discover -s tests -p 'test_*.py'
 | | Status |
 | --- | --- |
 | Local backend, save / load / list / where | Done |
-| S3-compatible backend | Next — the seam is in place, the backend is not |
-| MCP surface for fetching sessions | Next |
-| Using an existing Google Drive or SharePoint MCP to read the store | Documented setup, pending verification |
+| S3-compatible backend | Not started — the seam is in place, the backend is not. Selecting `--backend s3` fails with a clear message rather than writing nowhere |
+| Custom MCP surface for fetching sessions | Not started |
+| Using an existing Google Drive or SharePoint MCP to read the store | Not started — no setup steps are written yet |
+
+Until the S3 backend lands there is nothing to switch *to*: `--backend` accepts `local`
+alone, and no bucket, endpoint, or credential setting exists. The documentation for
+switching arrives with the backend.
 
 ## Licence
 
