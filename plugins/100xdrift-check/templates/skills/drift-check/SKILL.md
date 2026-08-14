@@ -96,11 +96,42 @@ Write your report to `./drift-report.md` (markdown — CI posts it as a PR comme
 
 - Directly under the marker, one line naming what was searched, so nobody mistakes it for
   a wider check than it is: `_Scope: this repository — N plugins searched._`
-- Then one section per changed file, each opened by a `---` rule and headed
-  `### Changed in <plugin>: <path to the changed file>`. The rule separates the sections
-  visibly in a long PR comment; naming the plugin the change landed in makes the direction
-  of the review obvious at a glance, which matters once several plugins have changed in one
-  pull request. Each section in this order:
+- Then one section per changed file, each opened by a `---` rule. **The whole section is a
+  GitHub alert** — it renders as one coloured band a reviewer can skim past or stop at.
+  Prefix EVERY line of the section with `> `, including blank lines (`>` alone), the diff
+  fences, and the table rows. One missed prefix ends the block early and the rest of the
+  section falls out of the band. Exactly two types, and the choice says what the section
+  ASKS OF A READER:
+  - `> [!CAUTION]` (red) — **a pull request is owed.** Any sibling is **likely-applies**:
+    there is a change to port, so somebody has to open a PR on that sibling.
+  - `> [!WARNING]` (yellow) — **everything else.** No sibling is likely-applies, so nothing
+    is waiting to be ported — whether the siblings **conflict**, are **unclear**, are
+    **different on purpose**, or the file has none at all.
+
+  Red means a PR is owed, not that the section is the scariest. A **conflicts** section is
+  `[!WARNING]` because nothing should be copied across — it is still often the most
+  important section in the report, and the `critical` status marker at the top of the file
+  is what carries that. The colour will not say it for you, so the verdict line must.
+
+  The alert's own label is fixed by GitHub (`Caution` / `Warning`) and cannot be renamed,
+  so the section's title is the first line INSIDE it, in bold, followed by a `>` spacer
+  line:
+  `> **Changed in <plugin>: <path to the changed file>**`. Naming the plugin the change
+  landed in makes the direction of the review obvious at a glance, which matters once
+  several plugins have changed in one pull request. It is bold text rather than a `###`
+  heading because a heading cannot live inside an alert without breaking the band; the cost
+  is that sections no longer appear in a rendered file's outline.
+
+  Then the verdict line. `[!CAUTION]` takes one form; `[!WARNING]` covers a wide range, so
+  its line is what separates "read this before merging" from "nothing here" — never let it
+  be generic:
+  - `[!CAUTION]` → `> **Action required** — port this to <sibling>; it needs its own pull
+    request.`
+  - `[!WARNING]`, sibling **conflicts** or **unclear** → `> **Alert** — <what to read and
+    why>. Nothing to port.`
+  - `[!WARNING]`, **different on purpose** or no siblings → `> **No action** — <why>.`
+
+  After it, the rest of the section in this order, all still `> `-prefixed:
   1. **The change** — a fenced ` ```diff ` block quoting the diff, trimmed to the lines
      that carry the decision. Name the location in the label when it helps, as in
      `**The change** — under ## Window:`. Evidence, not a proposal: quote, never paraphrase.
@@ -121,7 +152,9 @@ Write your report to `./drift-report.md` (markdown — CI posts it as a PR comme
      second diff says the same thing twice, so the action line pointing at the sibling's
      section replaces it.
   6. If the sibling carries a rule this change does not touch but a careless port would
-     break, quote that rule in a `>` blockquote so it survives the port.
+     break, quote that rule so it survives the port. Inside the alert that is a nested
+     blockquote — every line starts `> > ` — and never a second `[!…]`, which does not
+     nest.
 - **Quote the sibling's own words wherever they decide the verdict** — a rule the sibling
   states, or a line it shares with the pre-change original. A verdict a reviewer can trace
   back to the file beats one they have to take on faith.

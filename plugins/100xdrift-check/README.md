@@ -29,21 +29,24 @@ _Scope: this repository — 3 plugins searched._
 
 ---
 
-### Changed in team-a: plugins/team-a/skills/report-run/SKILL.md
-
-**The change** — under `## Window`:
-
-```diff
-- Sum every order from **the last 7 days ending today**, inclusive.
-+ Sum every order in the **ISO week, Monday to Sunday**, inclusive.
-```
-
-| sibling plugin | sibling file | matched on | verdict | why (one line) |
-| --- | --- | --- | --- | --- |
-| team-b | `skills/report-run/SKILL.md` | Same skill name and path | likely-applies | Same off-by-one in the week boundary |
-| team-c | `skills/report-run/SKILL.md` | Same skill name and path | different on purpose | team-c reports on fiscal weeks by design |
-
-**To copy it across:** make the same edit in team-b's file, under its own `## Window`.
+> [!CAUTION]
+> **Changed in team-a: `plugins/team-a/skills/report-run/SKILL.md`**
+>
+> **Action required** — port this to team-b; it needs its own pull request.
+>
+> **The change** — under `## Window`:
+>
+> ```diff
+> - Sum every order from **the last 7 days ending today**, inclusive.
+> + Sum every order in the **ISO week, Monday to Sunday**, inclusive.
+> ```
+>
+> | sibling plugin | sibling file | matched on | verdict | why (one line) |
+> | --- | --- | --- | --- | --- |
+> | team-b | `skills/report-run/SKILL.md` | Same skill name and path | likely-applies | Same off-by-one in the week boundary |
+> | team-c | `skills/report-run/SKILL.md` | Same skill name and path | different on purpose | team-c reports on fiscal weeks by design |
+>
+> **To copy it across:** make the same edit in team-b's file, under its own `## Window`.
 ````
 
 ---
@@ -276,6 +279,19 @@ an icon:
 
 Critical covering both "found a conflict" and "the check is broken" is deliberate: a
 silently broken advisory reads as a clean bill of health, which is worse than no check.
+
+**Section callouts.** Each changed file's whole section sits inside a GitHub alert, so it
+reads as one coloured band saying what the section asks of you:
+
+| | When | What it asks |
+| --- | --- | --- |
+| 🔴 `[!CAUTION]` | A sibling is `likely-applies` | Port it, in its own PR |
+| 🟡 `[!WARNING]` | Everything else — `conflicts`, `unclear`, `different on purpose`, or no siblings | Nothing to port; read the verdict line |
+
+Red means a PR is owed, not that the section is the scariest — a `conflicts` section is
+yellow because nothing should be copied across, and is still often the one to read first.
+Yellow covers a wide range, so its first line is what separates "read this before merging"
+from "nothing here". The status headline above is what carries urgency.
 
 **Opt out per PR** with the `skip-drift-check` label. Adding or removing it re-runs the job
 immediately and replaces the comment, so a stale advisory never sits on a PR that opted

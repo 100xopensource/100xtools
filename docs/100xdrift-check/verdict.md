@@ -26,6 +26,41 @@ which may disagree with each other — that is normal and useful.
 phrasing differences go in a collapsed FYI section rather than the table. A tool that
 nagged about prose would train people to close the comment unread.
 
+## Rolling up to a section callout
+
+Each changed file's section *is* a GitHub alert — title, diff, table, action line and all —
+so the whole section renders as one coloured band a reviewer can skim past or stop at:
+
+| Callout | When | What the section asks of a reader |
+| --- | --- | --- |
+| `[!CAUTION]` (red) | Any sibling is `likely-applies` | Port it, in its own pull request |
+| `[!WARNING]` (yellow) | Everything else — `conflicts`, `unclear`, `different on purpose`, or no siblings | Nothing to port |
+
+The callout is a call to action, not a severity, and it answers one question: *is a pull
+request owed?* That is why `conflicts` is yellow rather than red — nothing should be copied
+across. It is not a demotion: a conflict is usually the most important thing in the report,
+its verdict line says so, and the `critical` status marker below is what makes it loud.
+
+Two levels rather than one per verdict is deliberate. GitHub offers five alert types, and
+mapping each verdict to its own would render a long report as a wall of coloured bars —
+which destroys exactly the skimming the callouts exist for. The cost lands on yellow, which
+now spans "a sibling contradicts this, read it before merging" and "nothing to see here".
+Colour cannot separate those, so the band's first line has to: `**Alert** — …` against
+`**No action** — …`.
+
+GitHub's alert label (`Caution` / `Warning`) cannot be renamed, so the section title —
+`Changed in <plugin>: <path>` — is the first bold line inside the band rather than the
+alert's own heading. It is not a `###` heading either: a heading cannot sit inside an alert
+without ending it, so banding the section trades away the outline entries and heading
+anchors that headings would give a rendered report.
+
+The other cost is the prefix. Every line has to carry `> `, blank lines included, and one
+missed prefix ends the band early and drops the rest of the section out of it. The reviewer
+generates this markdown, so that is a real failure mode rather than a theoretical one. It
+degrades visibly — a half-banded section — rather than silently, which is why it is an
+acceptable trade for a formatting feature. The status marker the workflow parses is a plain
+HTML comment on line 1, outside every band, so no prefix slip can affect it.
+
 ## Rolling up to a status marker
 
 The report's first line is a marker the workflow turns into the comment's headline icon:
