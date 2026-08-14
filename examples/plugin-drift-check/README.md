@@ -72,7 +72,7 @@ should not.
 
 **All three prompt surfaces are watched**, not just skills: the change touches a `SKILL.md`,
 a `commands/` file and an `agents/` file, which is exactly what the shipped watch list
-covers. See [what gets reviewed](../../plugins/100xdrift-check/README.md#what-gets-reviewed).
+covers — the `paths:` list in `.github/workflows/drift-check.yml`.
 
 **Siblings come from the same repo.** Two plugins in one tree is the shape this tool is for.
 Nothing is cloned or fetched — see
