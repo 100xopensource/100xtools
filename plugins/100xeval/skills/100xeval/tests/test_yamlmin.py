@@ -14,10 +14,10 @@ execution:
   model: claude-sonnet-5
   entrypoint: cowork
   max_turns: 15
-  allowed_tools: [Read, Glob, Grep, Skill, mcp__claude_ai_Acme__run_query]
+  allowed_tools: [Read, Glob, Grep, Skill, mcp__Acme__run_query]
   append_system_prompt: null
 graders:
-  - {type: tool_used, name: filtered-to-store, tool: mcp__claude_ai_Acme__run_query, input_match: Eastern, min: 1}
+  - {type: tool_used, name: filtered-to-store, tool: mcp__Acme__run_query, input_match: Eastern, min: 1}
   - {type: llm, name: presentation, focus: last_message, criteria: "cites source; ranked hourly table; disclaimer"}
 """
 
@@ -34,7 +34,7 @@ class TestYamlmin(unittest.TestCase):
     def test_flow_lists(self):
         self.assertEqual(self.data["plugins"], ["../../plugins/acme-analytics"])
         self.assertEqual(self.data["tags"], ["asksales"])
-        self.assertIn("mcp__claude_ai_Acme__run_query", self.data["execution"]["allowed_tools"])
+        self.assertIn("mcp__Acme__run_query", self.data["execution"]["allowed_tools"])
         self.assertEqual(len(self.data["execution"]["allowed_tools"]), 5)
 
     def test_nested_mapping(self):

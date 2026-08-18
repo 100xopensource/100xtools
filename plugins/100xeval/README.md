@@ -277,10 +277,10 @@ works and saves doing this per repository.
 
 Two traps worth knowing before you spend anything:
 
-- **A `setup-token` token cannot carry your claude.ai connectors.** It can only make model
-  requests. If the plugin's data access comes from a connector you added in the claude.ai UI,
-  that works on your laptop and **cannot** work in CI — you need `MCP_<SERVER>_API_KEY` and the
-  plugin's own MCP config instead. See [MCP auth](../../docs/100xeval/mcp-auth.md).
+- **A `setup-token` token only makes model requests — it carries no MCP access.** MCP is a
+  separate credential per server, and a connector you added in the claude.ai UI is **not** a
+  supported path, locally or in CI: you need `MCP_<SERVER>_API_KEY` (or client credentials) and
+  the plugin's own MCP config. See [MCP auth](../../docs/100xeval/mcp-auth.md).
 - **The token belongs to whoever ran `claude setup-token`.** Mint it from a bot account with
   its own seat, or the check breaks the day that person rotates their credentials or leaves.
 
@@ -347,7 +347,7 @@ Concepts and how-to live in the [`docs/100xeval`](../../docs/100xeval/index.md) 
 | [Eval case](../../docs/100xeval/eval-case.md) | What a case is, what one looks like, and how to create one |
 | [Grader](../../docs/100xeval/grader.md) | The four types, one claim each, and the assertion that cannot fail |
 | [Run folder](../../docs/100xeval/run-folder.md) | Cost, `--dry-run`, exit codes, and the evidence a run writes |
-| [MCP auth](../../docs/100xeval/mcp-auth.md) | Two auth paths, and the failure that looks like nothing |
+| [MCP auth](../../docs/100xeval/mcp-auth.md) | The one auth path, its two credential shapes, and the failure that looks like nothing |
 | [Design score](../../docs/100xeval/design-score.md) | Running the static check, reading it, and where it is wrong |
 | [Troubleshooting](../../docs/100xeval/troubleshooting.md) | What each failure means |
 | [Internals](../../docs/100xeval/internals.md) | Layout, and the engine's own test suite |

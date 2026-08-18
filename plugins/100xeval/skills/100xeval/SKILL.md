@@ -41,7 +41,7 @@ python3 "$RUN" init <name> --plugin plugins/<p> --tag <skill> --prompt "<questio
 | `references/case-schema.md` | The template and every field/grader parameter, plus the YAML subset's limits. |
 | `references/managing-testcases.md` | Add / edit / delete workflow, best practice, the coverage dimensions, the ground-truth SQL pattern, and gotchas that have actually bitten. |
 | `references/ci-setup.md` | Wiring evals into GitHub Actions: the workflow, the secrets, and the four lines in it that are load-bearing. Read before writing any CI file. |
-| `references/mcp-auth.md` | Getting the plugin's MCP credential into a run: API key vs OAuth client credentials for headless, why a claude.ai connector cannot be, and the "called 0×" trap. |
+| `references/mcp-auth.md` | Getting the plugin's MCP credential into a run: API key vs OAuth client credentials, why the claude.ai account connector is not a supported path, and the "called 0×" trap. |
 
 The essentials:
 - **`execution.prompt`** — the user question, verbatim (don't tidy it — resolving a loose
@@ -51,7 +51,7 @@ The essentials:
   hard-coded figure), an `llm` (presentation); add an agentic `llm` with `allowed_tools`
   **and the exact query in its `criteria`** to verify numbers, or a `regex` for a phrase.
 - **Keep `runs: 3`.** Skills are non-deterministic; one run reports a coin flip as fact.
-- **Strict/CI mode** (optional): set `execution.mcp_config: mcp-config.json` and put the
+- **MCP auth is always strict mode.** Set `execution.mcp_config: mcp-config.json` and put the
   plugin's MCP servers there with `"Authorization": "Bearer ${MCP_<SERVER>_API_KEY}"` — one
   var per server (`Acme-Feedback` → `MCP_ACME_FEEDBACK_API_KEY`), no global fallback. Expanded
   from the environment at run time, never hardcoded. No secret ever belongs in a case file.
@@ -92,17 +92,19 @@ cases are in flight — grading doesn't hold a run slot, so a higher `M` overlap
 with runs. Report order always follows case order, whatever finishes first.
 
 **Behavioral runs need MCP auth** when the plugin declares one — `references/mcp-auth.md` has
-the full picture (API key or OAuth client credentials for headless; a connector for local only).
-The runner pre-flights `claude mcp list` and aborts with guidance if a declared server isn't
-connected. Fix and retry:
+the full picture. There is **one path**: the plugin's own servers via `--strict-mcp-config`,
+authenticated per server by `MCP_<SERVER>_API_KEY` or by `_CLIENT_ID`/`_CLIENT_SECRET` the
+runner exchanges for a short-lived token. The claude.ai account connector is **not** supported —
+it loads only under an interactive claude.ai login, so it could never be reproduced headlessly.
 
 ```bash
-claude mcp login <server-name>     # or run `claude` interactively and approve via /mcp
+export MCP_ACME_API_KEY='<key>'    # one var per declared server, no global fallback
 ```
 
-(A plugin with no `.mcp.json` runs directly. In strict `mcp_config` mode, auth is the
-per-server `${MCP_<SERVER>_API_KEY}` instead — a bad, expired, or *unset* key shows up as
-`tool_used` "called 0×", not as an auth error, so check the key before blaming the skill.)
+(A plugin with no `.mcp.json` runs directly. Nothing preflights the credential: a bad, expired,
+or *unset* key shows up as `tool_used` "called 0×", not as an auth error, so check the key
+before blaming the skill — and the server name's **case** second, since a grader written
+`mcp__acme__*` never matches a server declared `Acme` and fails identically.)
 
 **Read the scorecard:** a case runs on exactly **one harness + one model**
 (`execution.harness`, default `claude_code`, × `execution.model`) repeated `runs` times.

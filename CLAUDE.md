@@ -182,20 +182,25 @@ them (`security` ×2, `token_efficiency` ×0.5) and applies a flag-count penalty
 - `static.analyze()` only reads `.msg`, so any module exposing `lint_plugin(dir, root)` can
   replace `lint.py`.
 
-**MCP auth produces two different tool-name schemes:** ambient account connector gives
-`mcp__claude_ai_<Server>__<tool>`, strict plugin config (`--mcp-config … --strict-mcp-config`)
-gives `mcp__<Server>__<tool>`. `canonical_tool_name` / `expand_tool_aliases` normalize across
-both. Strict mode is preferred — auth comes from `MCP_<SERVER>_API_KEY` in the environment,
-or from `MCP_<SERVER>_CLIENT_ID`/`_CLIENT_SECRET` which `mcp_oauth.py` exchanges for a
-short-lived token (discovering the endpoint via RFC 9728 → RFC 8414, Basic auth and no scope by
-default because that is what real connectors accept), rather than from whichever account is logged in, so runs behave
-identically locally and in CI. A minted token is published to the **child process env** so the
-config on disk still holds only `${VAR}` — both spawn sites (harness and agentic judge) apply
+**MCP has exactly one path: strict plugin config** (`--mcp-config … --strict-mcp-config`), so
+tool names have exactly one scheme, `mcp__<Server>__<tool>`. The claude.ai account connector was
+supported and was **deliberately removed** — it loads only under an interactive claude.ai login,
+so a run that leaned on one could never be reproduced headlessly, and a pass could come from a
+server the plugin never declared. Nothing falls back to it: there is no `claude mcp list`
+preflight, no `canonical_tool_name`/`expand_tool_aliases` normalization, and
+`build_strict_mcp_config` returns None only when a plugin declares no server at all.
+
+Auth comes from `MCP_<SERVER>_API_KEY` in the environment, or from
+`MCP_<SERVER>_CLIENT_ID`/`_CLIENT_SECRET` which `mcp_oauth.py` exchanges for a short-lived token
+(discovering the endpoint via RFC 9728 → RFC 8414, Basic auth and no scope by default because
+that is what real connectors accept). A minted token is published to the **child process env** so
+the config on disk still holds only `${VAR}` — both spawn sites (harness and agentic judge) apply
 the overlay, and missing the judge would fail the grader that checks the numbers. The
 variable is **per server, with no global fallback**: a plugin can declare two vendors' servers,
-and one shared key would hand each vendor the other's credential. A server with no key set is
-still passed through to `--strict-mcp-config`, just without an `Authorization` header. **A bad or
-expired token surfaces as `tool_used` "called 0×", not as an auth error.** Check the token
+and one shared key would hand each vendor the other's credential. A server with no credential is
+still passed through to `--strict-mcp-config`, just without an `Authorization` header — hiding it
+would change what the plugin under test receives. **A bad, expired, or missing token surfaces as
+`tool_used` "called 0×", not as an auth error, and nothing preflights it.** Check the token
 before blaming the skill — and check the server-name *case* second. `_grade_tool_used` matches
 with `fnmatch.fnmatchcase`, so a grader written `mcp__acme__*` never matches a server declared
 `Acme`, and the failure looks identical to bad auth.
