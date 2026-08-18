@@ -5,7 +5,7 @@ them, and find out when an edit breaks one. That is how a plugin's quality survi
 changes and more than one person editing it.
 
 A plugin is a folder of written instructions. Nothing checks instructions — no compiler, no
-test that goes red. A reworded sentence that quietly stops the plugin filtering by store looks
+test that goes red. A reworded sentence that quietly stops the plugin filtering by team looks
 exactly like a change that broke nothing. Testcases are how you tell the difference.
 
 **The loop:**
@@ -91,14 +91,14 @@ nothing. Then, once you have a result:
 **Building up testcases** — the part that keeps the plugin working over time:
 
 > *"what should I be testing in this plugin?"*
-> *"add a testcase for askinventory"*
+> *"add a testcase for askusage"*
 > *"turn this bug report into a testcase: <paste the report>"*
 > *"show me the testcases we already have"*
 
 **Running them** — this is the part that costs money, so ask the price first:
 
 > *"how much would it cost to run these testcases?"*
-> *"run the evals for asksales, just once"*
+> *"run the evals for asktickets, just once"*
 > *"did my change break anything?"*
 > *"why did that case fail?"*
 

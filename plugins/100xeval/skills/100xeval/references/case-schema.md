@@ -19,16 +19,16 @@ best practice, gotchas).
 ## Template
 
 ```yaml
-name: askinventory-turn-full-score          # required, unique; also the run-folder name
+name: asktickets-first-response-full-score  # required, unique; also the run-folder name
 description: >-
   What this case proves, in one or two sentences.
 
   Source: who asked for it (issue / report id).
 plugins: ["../../plugins/acme-analytics"]   # path(s) RELATIVE TO THIS FILE
-tags: [acme, askinventory]        # select with --tag (ALL given tags must match)
+tags: [acme, asktickets]          # select with --tag (ALL given tags must match)
 runs: 3                                     # repetitions; passRate = passed / runs
 execution:
-  prompt: "What were the slowest hours at the Northgate store last week?"
+  prompt: "Which hours had the slowest first response for the Billing EU team last week?"
   model: claude-sonnet-5
   harness: claude_code                      # RUNTIME (see SKILL.md: harness vs entrypoint)
   entrypoint: none                          # SURFACE emulated; `none` = the harness's own prompt
@@ -37,7 +37,7 @@ execution:
   append_system_prompt: null                # extra text layered after the entrypoint
   mcp_config: ../mcp-config.json            # strict mode; omit to auto-build from the plugin
 graders:
-  - {type: tool_used, name: filtered-to-store, tool: mcp__Acme__run_query, input_match: "Northgate", min: 1}
+  - {type: tool_used, name: filtered-to-team, tool: mcp__Acme__run_query, input_match: "Billing", min: 1}
   - type: llm
     name: presentation
     focus: last_message
@@ -91,7 +91,7 @@ Asserts the **shape** of what was queried, never a figure, so it doesn't go stal
 | Param | Default | Meaning |
 | --- | --- | --- |
 | `tool` | **required** | Tool name, or a glob (`mcp__server__*`). Canonicalized, so account vs plugin-scoped spellings match. |
-| `input_match` | — | Substring that must appear in the call's input (e.g. a store name). |
+| `input_match` | — | Substring that must appear in the call's input (e.g. a team name). |
 | `min` | `1` | Minimum matching calls. |
 | `max` | — | Maximum matching calls. |
 

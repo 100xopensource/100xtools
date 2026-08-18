@@ -10,13 +10,13 @@ no virtualenv, no install step).
 python3 plugins/100xeval/skills/100xeval/scripts/run.py init <name> --plugin plugins/<p> --tag <skill> --prompt "…"
 
 # run static + behavioral (default)
-python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --tag asksales
+python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --tag asktickets
 
 # design quality only, no execution (free)
 python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --target plugins/acme-analytics
 
 # behavioral only
-python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --skip-static --case 'asksales-*'
+python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --skip-static --case 'asktickets-*'
 ```
 
 Exit codes: `0` all pass · `1` a case below `--threshold` (default 1.0) · `2` engine error.
@@ -37,7 +37,7 @@ the plugin's declared MCP as shipped rather than an account connector.
 ```bash
 export MCP_ACME_API_KEY='<acme-key>'                     # one var per declared server
 export MCP_ACME_FEEDBACK_API_KEY='<acme-feedback-key>'   # `Acme-Feedback` → ACME_FEEDBACK
-python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --tag asksales
+python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --tag asktickets
 ```
 
 The token is read from the environment only — **never committed, never written to any

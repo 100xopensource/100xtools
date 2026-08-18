@@ -25,8 +25,8 @@ python3 "$RUN" init <case-name> --plugin plugins/<plugin> --tag <skill> --prompt
 That writes `evals/<case-name>/case.yaml` with a `tool_used` + `llm` stub. Then:
 
 1. **Paste the prompt verbatim.** If it came from a user, keep their wording, including
-   the imprecise bits — resolving "SB Northgate" to the canonical
-   `SB - Northgate` is the skill's job, and a tidied prompt stops testing that.
+   the imprecise bits — resolving "Billing EU" to the canonical
+   `Billing - EU` is the skill's job, and a tidied prompt stops testing that.
 2. **Fix `plugins`** — relative to the case dir (`../../plugins/<name>`). The loader
    fails the case if the path doesn't resolve, so a typo surfaces immediately.
 3. **Tag it** with the skill under test plus a suite tag, so `--tag <suite>` runs the
@@ -108,7 +108,7 @@ truth. Drop to `--runs 1` only for debugging a case, not for judging a skill.
 
 **Write criteria as checkable sentences.** "Good analysis" is not gradeable. "Reports
 every figure the question asked for, names the period used, and says so plainly if the
-store is out of scope" is.
+team is out of scope" is.
 
 **Grade what the requester asked for.** If you add a stricter grader of your own, say so
 in a comment — a case that fails on a rule nobody agreed to wastes everyone's time.
@@ -145,13 +145,13 @@ moves, so a failure tells you nothing.
       Load the ground truth by running EXACTLY this SQL, unmodified, and use ONLY
       its result as the truth. Do not write your own query.
 
-      SELECT location, SUM(quantity) AS units
-      FROM acme.ai_semantic.unified_mart_transactions
+      SELECT queue, COUNT(*) AS tickets
+      FROM acme.ai_semantic.unified_mart_tickets
       WHERE company = 'Acme'
-        AND location = 'SB - Northgate'
-        AND CAST(transaction_timestamp AS DATE) >= DATE_TRUNC('week', CURRENT_DATE - INTERVAL '1 week')
-        AND CAST(transaction_timestamp AS DATE) <  DATE_TRUNC('week', CURRENT_DATE)
-      GROUP BY location
+        AND queue = 'Billing - EU'
+        AND CAST(created_at AS DATE) >= DATE_TRUNC('week', CURRENT_DATE - INTERVAL '1 week')
+        AND CAST(created_at AS DATE) <  DATE_TRUNC('week', CURRENT_DATE)
+      GROUP BY queue
 
       PASS only if the answer's figure matches within 5 percent.
 
@@ -171,7 +171,7 @@ Why each part:
 **Verify the SQL before trusting it.** Hand-written SQL is usually wrong the first time.
 The cheapest source of correct SQL is the skill's own successful run: run the case once,
 read `runs/<id>/<case>/run-1/result.json`, and lift the queries it actually executed. One
-hand-written query was wrong four ways at once — a store name missing its dash, a column
+hand-written query was wrong four ways at once — a team name missing its dash, a column
 that didn't exist, a table in the wrong catalog, and the current partial week instead of
 the completed one.
 
@@ -181,10 +181,10 @@ straight out of `askmarketing/SKILL.md` failed every vote with `TABLE_OR_VIEW_NO
 skill documentation is a hypothesis.
 
 **Make the judge infer as little as possible.** Every step you leave to it is a place two
-runs can diverge. One case asked the judge to match ~77 warehouse store names to a
-20-cluster map, filter to one state, sum each cluster, then compare 20 totals. It scored
+runs can diverge. One case asked the judge to match ~77 queue names to a
+20-team map, filter to one region, sum each group, then compare 20 totals. It scored
 0/3 with *contradictory* evidence: 0.09% agreement on a cluster in one run, +4.5% on the
-same cluster in another. Fixing it meant putting the store list literally in the SQL and
+same group in another. Fixing it meant putting the queue list literally in the SQL and
 checking **one** cluster end-to-end. One thing verified deterministically beats twenty
 verified by inference — coverage is a different grader's job.
 
@@ -283,8 +283,8 @@ uses the case's config. Naming the server `Acme` in the case's `mcp-config.json`
 one set of grader tool names work either way, even though the plugin ships it under a
 different key.
 
-**Store names and other identifiers have canonical spellings.** `SB Northgate` in
-the prompt, `SB - Northgate` in the warehouse. Use the user's spelling in the
+**Team names and other identifiers have canonical spellings.** `Billing EU` in
+the prompt, `Billing - EU` in the warehouse. Use the user's spelling in the
 prompt and the canonical one in ground-truth SQL — and say so in the criteria, so the
 judge doesn't "helpfully" fix your query.
 
