@@ -35,7 +35,7 @@ execution:
   max_turns: 20                             # agent tool-loop budget (--max-turns)
   allowed_tools: [Read, Glob, Grep, Skill, mcp__Acme__run_query]
   append_system_prompt: null                # extra text layered after the entrypoint
-  mcp_config: ../mcp-config.json            # strict mode; omit to auto-build from the plugin
+  mcp_config: ../mcp-config.json            # omit to auto-build from the plugin's .mcp.json
 graders:
   - {type: tool_used, name: filtered-to-team, tool: mcp__Acme__run_query, input_match: "Billing", min: 1}
   - type: llm
@@ -72,7 +72,7 @@ Scaffold a stub with `python3 "$RUN" init <name> --plugin plugins/<p> --tag <ski
 | `entrypoint` | str | `none` | The **surface** emulated: its real system prompt at `engine/entrypoints/<name>.md`. `none` passes no system prompt, so the harness's own applies. Any other name with no file **aborts in preflight** rather than emulating nothing. `cowork` ships; override per run with `--entrypoint`. See `engine/entrypoints/README.md`. |
 | `max_turns` | int | `15` | Agent tool-loop budget, passed to the CLI as `--max-turns`. Raise it for long multi-step work (a report build needs far more than a single question). |
 | `timeout_s` | int | `300` | Per-**run** wall clock, in seconds. A multi-step build is killed at the default; `--timeout` overrides it for a whole invocation. |
-| `allowed_tools` | list[str] | `[]` | Tools granted to the run. Both `mcp__X__t` and `mcp__claude_ai_X__t` spellings are expanded automatically, so either works. |
+| `allowed_tools` | list[str] | `[]` | Tools granted to the run. MCP tools are the strict-config scheme only, `mcp__<Server>__<tool>`, spelled exactly as the server declares itself — the name's case is significant. |
 | `append_system_prompt` | str | `null` | Case-specific text layered **after** the entrypoint prompt. |
 | `mcp_config` | str | `null` | Path (relative to the case dir) to an MCP config JSON → strict mode. Omit and, when a bearer is in the env, one is auto-built from the plugin's own `.mcp.json`. |
 

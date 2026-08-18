@@ -236,9 +236,9 @@ instead. Park the original with `skip:` rather than deleting it.
 ## Before you spend: preflight the endpoint
 
 Three separate sessions lost runs — and real money — to auth and network problems that
-looked like skill failures. The runner's built-in preflight only checks `claude mcp list`,
-which strict `mcp_config` mode deliberately skips, so a blocked endpoint isn't caught
-until every run has finished scoring zero.
+looked like skill failures. **Nothing preflights the MCP credential**: a key that is present
+and wrong is indistinguishable from a right one until the server answers, so a blocked
+endpoint isn't caught until every run has finished scoring zero.
 
 ```bash
 set -a && . ./.env && set +a
@@ -277,11 +277,11 @@ gets blocked, and the failure looks like a skill defect. If the plugin ships the
 MCP server, the case should generally grant its read tools — while leaving out anything
 that **writes**, which an eval has no business calling.
 
-**Name MCP servers so tool names match in both modes.** Local runs use the account
-connector (`mcp__claude_ai_Acme__…`, canonicalized to `mcp__Acme__…`); strict mode
-uses the case's config. Naming the server `Acme` in the case's `mcp-config.json` makes
-one set of grader tool names work either way, even though the plugin ships it under a
-different key.
+**The server name in `mcp-config.json` is the tool name, case included.** There is one
+naming scheme — `mcp__<Server>__<tool>` — and matching is case-sensitive, so a server declared
+`Acme` is *not* reached by a grader written `mcp__acme__*`. That mismatch fails exactly like a
+bad credential ("called 0×"), so pick the name once and spell graders and `allowed_tools` from
+it, even if the plugin ships the server under a different key.
 
 **Team names and other identifiers have canonical spellings.** `Billing EU` in
 the prompt, `Billing - EU` in the warehouse. Use the user's spelling in the

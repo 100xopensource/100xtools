@@ -76,11 +76,11 @@ class TestLlmGrader(unittest.TestCase):
             return "FAIL\nnumbers off"
 
         g = Grader("llm", "accuracy", params={
-            "criteria": "figures correct", "allowed_tools": ["mcp__claude_ai_Acme__run_query"],
+            "criteria": "figures correct", "allowed_tools": ["mcp__Acme__run_query"],
         })
         out = grade(g, rr(), {"judge_votes": 1, "judge_runner": run})
         self.assertFalse(out.passed)
-        self.assertEqual(seen["allowed"], ["mcp__claude_ai_Acme__run_query"])
+        self.assertEqual(seen["allowed"], ["mcp__Acme__run_query"])
 
     def test_missing_criteria(self):
         out = grade(Grader("llm", "x", params={}), rr(), {"judge_runner": lambda p, m, a: "PASS"})

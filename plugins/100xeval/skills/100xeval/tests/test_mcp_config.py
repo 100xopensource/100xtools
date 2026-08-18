@@ -11,49 +11,19 @@ SERVERS = {
 }
 
 
-class TestCanonicalNaming(unittest.TestCase):
-    def test_strips_account_prefix(self):
-        self.assertEqual(
-            claude_code.canonical_tool_name("mcp__claude_ai_Acme__run_query"),
-            "mcp__Acme__run_query",
-        )
-
-    def test_plugin_scoped_unchanged(self):
-        self.assertEqual(
-            claude_code.canonical_tool_name("mcp__Acme__run_query"),
-            "mcp__Acme__run_query",
-        )
-
-    def test_non_mcp_unchanged(self):
-        self.assertEqual(claude_code.canonical_tool_name("Read"), "Read")
-
-    def test_both_naming_schemes_match_after_canon(self):
-        a = claude_code.canonical_tool_name("mcp__claude_ai_Acme__run_query")
-        b = claude_code.canonical_tool_name("mcp__Acme__run_query")
-        self.assertEqual(a, b)
-
-
-class TestExpandAliases(unittest.TestCase):
-    def test_expands_both_directions(self):
-        out = claude_code.expand_tool_aliases(["mcp__claude_ai_Acme__q", "Read"])
-        self.assertIn("mcp__claude_ai_Acme__q", out)
-        self.assertIn("mcp__Acme__q", out)
-        self.assertIn("Read", out)
-
-    def test_plugin_scoped_gets_account_alias(self):
-        out = claude_code.expand_tool_aliases(["mcp__Acme__q"])
-        self.assertIn("mcp__Acme__q", out)
-        self.assertIn("mcp__claude_ai_Acme__q", out)
-
-    def test_dedupe(self):
-        out = claude_code.expand_tool_aliases(["Read", "Read"])
-        self.assertEqual(out.count("Read"), 1)
-
-
 class TestStrictConfig(unittest.TestCase):
-    def test_none_without_token(self):
+    def test_none_only_when_nothing_is_declared(self):
         with mock.patch.dict(os.environ, {}, clear=True):
-            self.assertIsNone(claude_code.build_strict_mcp_config(SERVERS))
+            self.assertIsNone(claude_code.build_strict_mcp_config({}))
+
+    def test_credential_less_server_is_still_declared(self):
+        """There is no unauthenticated fallback to drop back to, so the server is passed
+        through without an Authorization header rather than the config becoming None."""
+        with mock.patch.dict(os.environ, {}, clear=True):
+            cfg = claude_code.build_strict_mcp_config(SERVERS)
+        self.assertEqual(set(cfg["mcpServers"]), set(SERVERS))
+        for entry in cfg["mcpServers"].values():
+            self.assertNotIn("Authorization", entry.get("headers", {}))
 
     def test_each_server_gets_its_own_var(self):
         # Emits the ${VAR} reference (Claude expands it), never the key value. Each server
@@ -204,22 +174,6 @@ class TestChildEnvOverlay(unittest.TestCase):
     def test_overlay_empty_without_mcp(self):
         with mock.patch.dict(os.environ, {}, clear=True):
             self.assertEqual(claude_code.mcp_env_overlay(Case(name="c", prompt="p")), {})
-
-
-class TestPreflightSkipsInTokenMode(unittest.TestCase):
-    def test_token_mode_skips_account_check(self):
-        # A case whose plugin declares Acme; token present → preflight must NOT abort
-        # even though we pass an empty `claude mcp list` (which would otherwise abort).
-        import tempfile
-
-        with tempfile.TemporaryDirectory() as d:
-            plugdir = os.path.join(d, "p")
-            os.makedirs(plugdir)
-            with open(os.path.join(plugdir, ".mcp.json"), "w") as fh:
-                fh.write('{"mcpServers": {"Acme": {"type":"http","url":"https://x/mcp"}}}')
-            case = Case(name="c", prompt="p", path=d, plugins=["p"])
-            with mock.patch.dict(os.environ, {"MCP_ACME_API_KEY": "tok"}, clear=True):
-                claude_code.verify_mcp_auth(case, list_output="")  # no abort despite empty list
 
 
 if __name__ == "__main__":

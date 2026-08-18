@@ -8,8 +8,13 @@ when your users are on a different surface that runs on this same engine (see
 `engine/entrypoints/README.md`).
 
 Single-turn `claude -p --output-format json` (never --resume/stream-json — they drop
-MCP connectors). Tool calls come from the session transcript, not the JSON result
+MCP servers). Tool calls come from the session transcript, not the JSON result
 (which omits them), so `tool_used` reads `~/.claude/projects/**/<session_id>.jsonl`.
+
+MCP is always driven through `--mcp-config … --strict-mcp-config`, so a declared server
+resolves the same way locally and in CI. claude.ai account connectors are deliberately
+NOT a supported path — they load only under an interactive claude.ai login, so a run that
+depended on one could never be reproduced headlessly.
 
 The two parse functions are pure and unit-tested against fixtures (no live call).
 """
@@ -19,7 +24,6 @@ from __future__ import annotations
 import glob
 import json
 import os
-import re
 import shutil
 import subprocess
 import tempfile
@@ -29,15 +33,6 @@ from ..models import Case, RunResult, ToolCall
 from .base import Abort, register_harness
 
 TIMEOUT_S = 300      # default only; a case may raise it via `execution.timeout_s`
-MCP_LIST_TIMEOUT_S = 60
-
-# `claude mcp list` line: "<scope> <name>: <url> [(TRANSPORT)] - <status>"
-# The spaced hyphen and the explicit `(HTTP)` group both matter: `\s*-\s*` backtracks into
-# hyphens inside the URL, silently truncating it so it no longer matches the declared server.
-_MCP_LINE = re.compile(
-    r"^(?P<label>.+?):\s*(?P<url>https?://\S+?)"
-    r"(?:\s+\([A-Za-z]+\))?"          # optional transport annotation, e.g. " (HTTP)"
-    r"\s+-\s+(?P<status>.+?)\s*$")
 
 
 class ClaudeCodeHarness:
@@ -51,7 +46,6 @@ class ClaudeCodeHarness:
         if shutil.which("claude") is None:
             raise Abort("`claude` CLI not found on PATH — install Claude Code to run behavioral evals")
         verify_entrypoint(case)
-        verify_mcp_auth(case)
 
     def run(self, case: Case, model: str | None, workspace: str | None = None) -> RunResult:
         # Persistent workspace (under .runs/<run_id>/…) when given, else ephemeral temp.
@@ -81,8 +75,8 @@ class ClaudeCodeHarness:
             if case.max_turns:
                 cmd += ["--max-turns", str(case.max_turns)]
 
-            # Strict mode: the case's `mcp_config`, or one auto-built from the plugin's
-            # .mcp.json when a bearer is in the env. Neither → ambient/account MCP.
+            # The case's `mcp_config`, else one auto-built from the plugin's .mcp.json.
+            # None only when nothing declares a server; there is no ambient fallback.
             strict_cfg = resolve_strict_mcp_config(case)
             if strict_cfg is not None:
                 cfg_path = os.path.join(tmp, "mcp-config.json")
@@ -91,10 +85,10 @@ class ClaudeCodeHarness:
                 cmd += ["--mcp-config", cfg_path, "--strict-mcp-config"]
 
             if case.allowed_tools:
-                # Allow both naming schemes so a case works whether it runs on the
-                # account connector (mcp__claude_ai_X__t) or a strict plugin config
-                # (mcp__X__t). Passing tools that don't exist in a given mode is harmless.
-                cmd += ["--allowedTools", ",".join(expand_tool_aliases(case.allowed_tools))]
+                # Strict config gives exactly one MCP naming scheme, `mcp__<Server>__<tool>`,
+                # so a granted tool is spelled the way the server declares it. Note the
+                # server-name CASE is significant here and in `tool_used` graders.
+                cmd += ["--allowedTools", ",".join(case.allowed_tools)]
             # REPLACES the prompt (not --append-*): we want the surface's, not Claude Code's
             # plus it. Empty with `entrypoint: none`. Not ARG_MAX-bound — no shell involved.
             if entry:
@@ -132,9 +126,6 @@ class ClaudeCodeHarness:
             if transcript_path:
                 with open(transcript_path, encoding="utf-8") as fh:
                     tool_calls = parse_transcript_tool_calls(fh.read())
-            # Canonicalize so graders match regardless of naming scheme.
-            for c in tool_calls:
-                c.name = canonical_tool_name(c.name)
             return RunResult(
                 final_text=final_text, tool_calls=tool_calls, cost_usd=cost, tokens=usage,
                 duration_ms=duration, session_id=session_id, transcript_path=transcript_path,
@@ -320,17 +311,20 @@ def plugin_mcp_server_configs(case: Case) -> dict:
     return {name: cfg for name, cfg in servers.items() if isinstance(cfg, dict) and cfg.get("url")}
 
 
-def plugin_mcp_servers(case: Case) -> dict:
-    """{name: url} for HTTP MCP servers the case's first plugin declares, or {}."""
-    return {name: cfg.get("url", "") for name, cfg in plugin_mcp_server_configs(case).items()}
-
-
 def _env_key(server_name: str) -> str:
     return "".join(ch if ch.isalnum() else "_" for ch in server_name).upper()
 
 
 def _bearer_var_name(server_name: str) -> str:
-    """The env-var name holding this server's key: `MCP_<SERVER>_API_KEY`."""
+    """The env-var name holding this server's key: `MCP_<SERVER>_API_KEY`.
+
+    Per-server by design: there is deliberately no key that applies to every declared
+    server. A plugin can declare servers from two different vendors, and one shared
+    variable would hand each vendor the other's credential.
+
+    Never read from disk / .mcp.json — no secret belongs in the repo. CI injects these
+    env vars from its secret store.
+    """
     return f"MCP_{_env_key(server_name)}_API_KEY"
 
 
@@ -350,29 +344,6 @@ def _strict_servers(case: Case) -> dict:
     cfg = load_case_mcp_config(case) if case.mcp_config else None
     source = cfg.get("mcpServers", {}) if cfg else plugin_mcp_server_configs(case)
     return {name: (entry or {}).get("url", "") for name, entry in source.items()}
-
-
-def mcp_token_for(server_name: str) -> str | None:
-    """API key for one server, from `MCP_<SERVER>_API_KEY`.
-
-    Per-server by design: there is deliberately no key that applies to every declared
-    server. A plugin can declare servers from two different vendors, and one shared
-    variable would hand each vendor the other's credential.
-
-    Never read from disk / .mcp.json — no secret belongs in the repo. CI injects
-    these env vars from its secret store.
-    """
-    return os.environ.get(_bearer_var_name(server_name))
-
-
-def token_injection_active(servers: dict) -> bool:
-    """True when any declared server has a credential we can use.
-
-    Counts a mintable OAuth server as well as a static key: without that, strict mode never
-    engages for the OAuth path and preflight aborts complaining the account connector is not
-    connected — which is both wrong and unfixable by the user.
-    """
-    return any(mcp_token_for(name) or mcp_oauth.mintable(name) for name in servers)
 
 
 def _bearer_var_for(server_name: str) -> str | None:
@@ -411,11 +382,15 @@ def _inject_bearer(server_configs: dict) -> dict:
 def build_strict_mcp_config(server_configs: dict):
     """Auto-build a `--mcp-config` dict from the plugin's servers + injected bearer headers.
 
-    Returns None when no token is configured (→ caller uses the ambient/account MCP).
-    When active, EVERY declared server is included so `--strict-mcp-config` doesn't hide
-    a server the case needs; servers with a token get the Authorization header.
+    Returns None only when the plugin declares no server at all — there is no unauthenticated
+    fallback to reach for, so a credential-less server is passed through and simply goes
+    without an `Authorization` header. EVERY declared server is included: hiding one would
+    change what the plugin under test receives, and `--strict-mcp-config` shows nothing else.
+
+    A server left credential-less answers 401, which the graders report as `tool_used`
+    "called 0x" — same symptom as a wrong key, so check the credential before the skill.
     """
-    if not server_configs or not token_injection_active(server_configs):
+    if not server_configs:
         return None
     return {"mcpServers": _inject_bearer(server_configs)}
 
@@ -441,114 +416,6 @@ def resolve_strict_mcp_config(case: Case):
     if case.mcp_config:
         return load_case_mcp_config(case)
     return build_strict_mcp_config(plugin_mcp_server_configs(case))
-
-
-_CLAUDE_AI_PREFIX = re.compile(r"^mcp__claude_ai_")
-
-
-def canonical_tool_name(name: str) -> str:
-    """Normalize account-connector names to plugin-scoped form.
-
-    `mcp__claude_ai_Acme__run_query` → `mcp__Acme__run_query`,
-    so a case's grader matches whether it ran on the account connector or a strict
-    plugin config. Non-MCP tool names pass through unchanged.
-    """
-    return _CLAUDE_AI_PREFIX.sub("mcp__", name)
-
-
-def expand_tool_aliases(tools: list[str]) -> list[str]:
-    """For each MCP tool, include both `mcp__claude_ai_X__t` and `mcp__X__t` variants."""
-    out = []
-    for t in tools:
-        out.append(t)
-        canon = canonical_tool_name(t)
-        if canon != t:
-            out.append(canon)
-        elif t.startswith("mcp__"):
-            account = "mcp__claude_ai_" + t[len("mcp__"):]
-            out.append(account)
-    # dedupe, preserve order
-    seen = set()
-    return [x for x in out if not (x in seen or seen.add(x))]
-
-
-def parse_mcp_list(text: str) -> list[dict]:
-    """Pure: parse `claude mcp list` output into [{label, url, status, connected}].
-
-    Auth is per-registration, so the same URL can appear both connected (account
-    connector) and not (a plugin-scoped copy) — callers get every entry.
-    """
-    entries = []
-    for line in text.splitlines():
-        m = _MCP_LINE.match(line.strip())
-        if not m:
-            continue
-        status = m.group("status")
-        entries.append({
-            "label": m.group("label").strip(),
-            "url": m.group("url").strip(),
-            "status": status,
-            "connected": "connected" in status.lower() and "not connected" not in status.lower(),
-        })
-    return entries
-
-
-def verify_mcp_auth(case: Case, list_output: str | None = None) -> None:
-    """Abort (with guidance) unless every MCP the plugin declares is connected.
-
-    Plugin with no `.mcp.json` → nothing to verify. We match declared
-    server URLs against `claude mcp list`; a URL that is connected under ANY
-    registration is treated as authenticated-and-reachable. Not connected, or
-    absent entirely, aborts before a misleading dataless run.
-    """
-    declared = plugin_mcp_servers(case)
-    if not declared:
-        return
-    # A case that grants no MCP tools cannot use MCP, so requiring the servers is
-    # meaningless. Many plugins declare optional connectors — Anthropic's own describe them
-    # as "SUPERCHARGED when you connect your tools" over a standalone core — and treating
-    # every declared server as required made those plugins unevaluable, aborting before a
-    # run that needed nothing from them.
-    if case.allowed_tools and not any(t.startswith("mcp__") for t in case.allowed_tools):
-        return
-    if case.mcp_config or token_injection_active(declared):
-        # Strict-config mode: the plugin's MCP authenticates via the case's mcp_config
-        # and/or an injected bearer, not the account connector, so `claude mcp list` is
-        # irrelevant. A bad token surfaces at run time as tool_used 'called 0x'.
-        return
-
-    if list_output is None:
-        try:
-            proc = subprocess.run(
-                ["claude", "mcp", "list"], capture_output=True, text=True, timeout=MCP_LIST_TIMEOUT_S,
-            )
-        except (subprocess.TimeoutExpired, OSError) as exc:
-            raise Abort(f"could not verify MCP status (`claude mcp list` failed: {exc}); "
-                        "authenticate the plugin's connectors and retry") from exc
-        list_output = proc.stdout + "\n" + proc.stderr
-
-    entries = parse_mcp_list(list_output)
-    connected_urls = {e["url"] for e in entries if e["connected"]}
-    known_urls = {e["url"] for e in entries}
-
-    unauthenticated = []
-    missing = []
-    for name, url in declared.items():
-        if url in connected_urls:
-            continue
-        (unauthenticated if url in known_urls else missing).append(f"{name} ({url})")
-
-    if not unauthenticated and not missing:
-        return
-
-    lines = [f"plugin MCP not ready for case {case.name!r}:"]
-    for item in unauthenticated:
-        lines.append(f"  • needs authentication: {item}")
-    for item in missing:
-        lines.append(f"  • not registered / not approved: {item}")
-    lines.append("Fix: authenticate each server, e.g. `claude mcp login <name>` (or run "
-                 "`claude` interactively and approve via /mcp), then re-run the eval.")
-    raise Abort("\n".join(lines))
 
 
 register_harness(ClaudeCodeHarness())

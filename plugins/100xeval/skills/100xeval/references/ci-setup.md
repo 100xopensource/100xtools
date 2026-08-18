@@ -6,8 +6,8 @@ what to do when *you* are wiring it up.
 
 **Getting the plugin's MCP credential is a separate question — see `mcp-auth.md`.** This page
 assumes you know which `MCP_<SERVER>_API_KEY` values the run needs; that one covers where they
-come from, the API-key and OAuth-client-credentials options, and why a claude.ai connector
-cannot be used here.
+come from, the API-key and OAuth-client-credentials options, and why the claude.ai account
+connector is not a supported path anywhere.
 
 **Two jobs, because the layers cost differently.** The static check is free, needs no
 credentials, and can run on every pull request including forks. Behavioral cases cost roughly
@@ -145,10 +145,9 @@ name spelled exactly as above.
 environment at run time. If a user pastes a token into the conversation, use it for that run
 only and tell them to add it as a secret instead.
 
-**A `setup-token` token cannot reach claude.ai connectors** — it can only make model requests,
-and no headless credential can. If the plugin's data access comes from a connector the user
-added in the claude.ai UI, that path cannot work in CI at all; settle the MCP credential with
-`mcp-auth.md` before promising a CI run will work.
+**A `setup-token` token only makes model requests — it carries no MCP access.** MCP is a
+separate credential per server, and the claude.ai account connector is not a path here or
+locally. Settle the MCP credential with `mcp-auth.md` before promising a CI run will work.
 
 **If the server issues short-lived tokens** rather than static keys, set `_CLIENT_ID` and
 `_CLIENT_SECRET` instead of the API key. The workflow needs no mint step and no `::add-mask::`

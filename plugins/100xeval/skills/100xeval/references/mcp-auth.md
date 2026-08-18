@@ -4,11 +4,12 @@ A plugin that declares an MCP server needs that server connected, or the run ans
 nothing and every `tool_used` grader reports "called 0×". This page is how to get it connected.
 `ci-setup.md` covers the CI wiring; the concepts live in `docs/100xeval/mcp-auth.md`.
 
-## Two recommended methods for headless runs
+## Two supported methods
 
-Headless means anything with no human at a browser: CI, a cron job, `claude -p` in a script.
-Both methods end the same way — a bearer credential in an `Authorization` header, injected from
-the environment and never written to disk.
+There is no third. Both end the same way — a bearer credential in an `Authorization` header,
+injected from the environment and never written to disk — and both behave identically on your
+machine and in CI, which is why the interactive claude.ai account connector is **not** a
+supported path (see the end of this page).
 
 | Method | Use when | Credential lifetime |
 | --- | --- | --- |
@@ -106,17 +107,26 @@ credentials" path (`oauth.clientId`, `--client-secret`, `callbackPort`). That ne
 browser. This method works because 100xeval performs the grant and hands the result over as a
 bearer credential — not because Claude Code gained a headless OAuth mode.
 
-## Interactive runs — the account connector
+## The claude.ai account connector is not supported
 
-On your own machine there is a third option that needs no variable at all: connect the server
-once in the claude.ai UI, log in with `claude`, and the run picks it up. Convenient, and fine
-for local work.
+Connecting a server in the claude.ai UI and logging in with `claude` used to be a third path
+on your own machine. It was removed, deliberately, and nothing falls back to it: MCP always
+goes through `--strict-mcp-config`, which ignores account connectors entirely.
 
-**It cannot be carried into a headless run.** claude.ai connectors load only when the active
-credential is an interactive claude.ai login — not under `CLAUDE_CODE_OAUTH_TOKEN`,
-`ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `apiKeyHelper`, a cloud provider, or an Anthropic
-profile. Every credential a runner can hold is on that exclusion list. Do not promise a CI run
-will work through a connector; move that server to method 1 or 2 first.
+Two reasons it had to go:
+
+- **It could never be carried into a headless run.** claude.ai connectors load only when the
+  active credential is an interactive claude.ai login — not under `CLAUDE_CODE_OAUTH_TOKEN`,
+  `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`, `apiKeyHelper`, a cloud provider, or an Anthropic
+  profile. Every credential a runner can hold is on that exclusion list, so a green local run
+  meant nothing about CI.
+- **It tested the wrong thing.** The connector is a server *you* registered, not the server the
+  plugin ships in its `.mcp.json`. A pass could come from a registration the plugin never
+  declared.
+
+So: set method 1 or method 2 for every server you want reached. There is no interactive
+shortcut left to reach for, and no `claude mcp list` preflight — the run no longer inspects
+your registrations at all.
 
 ## What the engine actually does with the credential
 
@@ -131,11 +141,12 @@ Consequences that follow from that, and surprise people:
 
 - A config that already sets an `Authorization` header is passed through untouched. Your own
   `${VAR}` wins.
-- A declared server with no key set is still included in the strict config — hiding it would
-  change what the plugin under test receives — but goes without an `Authorization` header.
-- Setting any server's key switches the whole run into strict mode, which ignores account
-  connectors entirely. A half-configured run is therefore worse than none: the keyed server
-  works, the unkeyed one silently stops resolving.
+- A declared server with no credential is still included in the strict config — hiding it would
+  change what the plugin under test receives — but goes without an `Authorization` header, so it
+  answers 401.
+- **Tool names have exactly one form**, `mcp__<Server>__<tool>`, spelled as the server declares
+  itself. Matching is case-sensitive: a grader written `mcp__acme__*` never matches a server
+  declared `Acme`, and that failure is indistinguishable from bad auth. Check the case second.
 
 ## When it goes wrong
 
@@ -144,9 +155,9 @@ auth error.** The run completes, the model answers from nothing, and every insti
 skill. Check the credential first. With per-server names, a name that does not match the server
 is the most common version of this.
 
-Preflight catches the connector case but not this one: the runner checks `claude mcp list` and
-aborts when a declared server is not connected, but it cannot see through a key that is present
-and wrong. Verify a suspect endpoint directly before spending a suite:
+Nothing preflights this. The runner cannot see through a credential that is present and wrong,
+and a missing one is indistinguishable from a wrong one at run time. Verify a suspect endpoint
+directly before spending a suite:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' -X POST \
