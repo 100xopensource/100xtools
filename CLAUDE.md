@@ -196,7 +196,29 @@ variable is **per server, with no global fallback**: a plugin can declare two ve
 and one shared key would hand each vendor the other's credential. A server with no key set is
 still passed through to `--strict-mcp-config`, just without an `Authorization` header. **A bad or
 expired token surfaces as `tool_used` "called 0×", not as an auth error.** Check the token
-before blaming the skill.
+before blaming the skill — and check the server-name *case* second. `_grade_tool_used` matches
+with `fnmatch.fnmatchcase`, so a grader written `mcp__acme__*` never matches a server declared
+`Acme`, and the failure looks identical to bad auth.
+
+`MCP_<SERVER>_API_KEY` is sent verbatim as `Authorization: Bearer`, and nothing probes the
+server to find out what it wants. That is why it works for vendors whose "API key" is
+bearer-acceptable and fails for anything else: a vendor wanting `X-Api-Key`, or a bearer-only
+OAuth endpoint, needs its own `headers` block in the case's `mcp_config` — `_inject_bearer`
+skips any server that already sets `Authorization`. Which of the two paths runs is decided
+purely by **which env vars exist**, never by asking the server: a static key present makes
+`mintable()` false, so it always wins and no network call happens. Worth knowing before
+reaching for the OAuth path: `client_credentials` is not universal, and a vendor whose
+authorization server omits that grant cannot be minted for at all.
+
+**A behavioral run is NOT isolated from the operator's own Claude Code config.** `--plugin-dir`
+adds the plugin under test; it does not subtract anything. User-level plugins and skills in
+`~/.claude` load as well, so a case can be satisfied by tooling that is not in the plugin under
+test — verified, not theorised: a case written against a vendored plugin's MCP server was
+scored 1.00 by a run that invoked a *user-installed* plugin's skill to do the work. The plugin
+under test contributed nothing. The score was real; the attribution was wrong. Read a local
+green as "the assertion held on this machine", and expect a clean-home CI run to reach it by a
+different route or not at all. When a behavioral score matters, check the transcript's
+`tool_use` names against what the plugin actually ships.
 
 ### 100xdrift-check — cross-plugin drift review
 
