@@ -12,7 +12,7 @@ to break. If you genuinely need a library, open an issue explaining why the stdl
 it before writing the PR.
 
 **No secrets, ever.** Not in a case file, not in a fixture, not in a test. Tokens come from
-the environment (`EVAL_MCP_BEARER`) and configs reference them as `${VAR}`. The linter's SEC1
+the environment (`MCP_<SERVER>_API_KEY`) and configs reference them as `${VAR}`. The linter's SEC1
 check will catch the obvious cases; it will not catch a clever one.
 
 **No internal, customer, or tenant data.** Fixtures use `example.com` / `Acme`. If you are

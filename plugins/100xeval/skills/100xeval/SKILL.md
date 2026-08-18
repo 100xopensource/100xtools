@@ -40,6 +40,8 @@ python3 "$RUN" init <name> --plugin plugins/<p> --tag <skill> --prompt "<questio
 | --- | --- |
 | `references/case-schema.md` | The template and every field/grader parameter, plus the YAML subset's limits. |
 | `references/managing-testcases.md` | Add / edit / delete workflow, best practice, the coverage dimensions, the ground-truth SQL pattern, and gotchas that have actually bitten. |
+| `references/ci-setup.md` | Wiring evals into GitHub Actions: the workflow, the secrets, and the four lines in it that are load-bearing. Read before writing any CI file. |
+| `references/mcp-auth.md` | Getting the plugin's MCP credential into a run: API key vs OAuth client credentials for headless, why a claude.ai connector cannot be, and the "called 0×" trap. |
 
 The essentials:
 - **`execution.prompt`** — the user question, verbatim (don't tidy it — resolving a loose
@@ -50,9 +52,11 @@ The essentials:
   **and the exact query in its `criteria`** to verify numbers, or a `regex` for a phrase.
 - **Keep `runs: 3`.** Skills are non-deterministic; one run reports a coin flip as fact.
 - **Strict/CI mode** (optional): set `execution.mcp_config: mcp-config.json` and put the
-  plugin's MCP servers there with `"Authorization": "Bearer ${EVAL_MCP_BEARER}"` — the token
-  is expanded from the environment at run time, never hardcoded. No secret ever belongs in
-  a case file.
+  plugin's MCP servers there with `"Authorization": "Bearer ${MCP_<SERVER>_API_KEY}"` — one
+  var per server (`Acme-Feedback` → `MCP_ACME_FEEDBACK_API_KEY`), no global fallback. Expanded
+  from the environment at run time, never hardcoded. No secret ever belongs in a case file.
+  For a server behind an IdP, set `MCP_<SERVER>_CLIENT_ID` / `_CLIENT_SECRET` instead and the
+  runner mints the token itself, discovering the endpoint — `references/mcp-auth.md`.
 - **Validate it loads before spending a run**, and expect the first run to debug the
   *case* (ungranted tool, wrong column) before it tests the skill.
 
@@ -87,17 +91,18 @@ you want when debugging a single case. `--case-concurrency M` (default = `N`) ca
 cases are in flight — grading doesn't hold a run slot, so a higher `M` overlaps judging
 with runs. Report order always follows case order, whatever finishes first.
 
-**Behavioral runs need MCP auth** when the plugin declares one. The runner pre-flights
-`claude mcp list` and aborts with guidance if a declared server isn't connected. Fix and
-retry:
+**Behavioral runs need MCP auth** when the plugin declares one — `references/mcp-auth.md` has
+the full picture (API key or OAuth client credentials for headless; a connector for local only).
+The runner pre-flights `claude mcp list` and aborts with guidance if a declared server isn't
+connected. Fix and retry:
 
 ```bash
 claude mcp login <server-name>     # or run `claude` interactively and approve via /mcp
 ```
 
 (A plugin with no `.mcp.json` runs directly. In strict `mcp_config` mode, auth is the
-`${EVAL_MCP_BEARER}` token instead — a bad or expired token shows up as `tool_used`
-"called 0×", not as an auth error, so check the token before blaming the skill.)
+per-server `${MCP_<SERVER>_API_KEY}` instead — a bad, expired, or *unset* key shows up as
+`tool_used` "called 0×", not as an auth error, so check the key before blaming the skill.)
 
 **Read the scorecard:** a case runs on exactly **one harness + one model**
 (`execution.harness`, default `claude_code`, × `execution.model`) repeated `runs` times.
@@ -112,6 +117,17 @@ prompt. The default is `entrypoint: none` — the run uses Claude Code's own pro
 right when Claude Code is the surface you care about. To emulate a different surface,
 supply its prompt yourself (`scripts/engine/entrypoints/README.md`). A new surface is a new
 entrypoint, never a new harness.
+
+## 3) Wire it into CI
+
+Asked to gate a merge, run evals on every pull request, or "set it up in CI":
+**read `references/ci-setup.md` first**, then write the workflow. Never hand-roll one — four
+lines in it are load-bearing, and the failure they prevent is a green build that evaluated
+nothing.
+
+The shape: a free `--static-only` job on every PR, plus a guarded behavioral job with
+`CLAUDE_CODE_OAUTH_TOKEN` for the model and one `MCP_<SERVER>_API_KEY` per declared MCP
+server. No secret value is ever written into a file.
 
 ## Report back
 

@@ -19,7 +19,7 @@ means adding a folder.
 ## What a case declares
 
 * **The prompt**, verbatim as a user would type it. Resist tidying it: resolving a loose
-  store name or an ambiguous date range is the skill's job, and cleaning the question up
+  team name or an ambiguous date range is the skill's job, and cleaning the question up
   removes the thing being tested.
 * **The plugin**, as a path relative to *the case file* rather than the repo root — a case
   in `evals/<name>/` points at `../../plugins/<p>`.
@@ -29,21 +29,21 @@ means adding a folder.
 ## What one looks like
 
 ```yaml
-name: asksales-slowest-hours
+name: asktickets-slowest-first-response
 description: >-
   What this case proves. Source: who asked for it (issue id).
 plugins: ["../../plugins/acme-analytics"]   # relative to THIS file
-tags: [acme, asksales]                      # select with --tag
+tags: [acme, asktickets]                    # select with --tag
 runs: 3
 execution:
-  prompt: "What were the slowest hours at the Northgate store last week?"
+  prompt: "Which hours had the slowest first response for the Billing EU team last week?"
   model: claude-sonnet-5
   harness: claude_code        # the RUNTIME that executes the turn
   entrypoint: none            # the SURFACE emulated; `none` = the harness's own prompt
   allowed_tools: [Read, Glob, Grep, Skill, mcp__Acme__run_query]
   mcp_config: ../mcp-config.json
 graders:
-  - {type: tool_used, name: filtered-to-store, tool: mcp__Acme__run_query, input_match: "Northgate", min: 1}
+  - {type: tool_used, name: filtered-to-team, tool: mcp__Acme__run_query, input_match: "Billing", min: 1}
   - {type: llm, name: presentation, focus: last_message, criteria: "cites source; clear table; disclaimer"}
 ```
 
@@ -77,7 +77,7 @@ and one exercising a documented business rule.
 
 ## No secrets in a case, ever
 
-`mcp_config` holds a *path*. The config it points at uses `Bearer ${EVAL_MCP_BEARER}`,
+`mcp_config` holds a *path*. The config it points at uses `Bearer ${MCP_<SERVER>_API_KEY}`,
 expanded from the environment at run time — see [MCP auth](mcp-auth.md).
 
 ## Park, don't delete

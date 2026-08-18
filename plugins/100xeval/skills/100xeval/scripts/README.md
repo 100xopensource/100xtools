@@ -10,13 +10,13 @@ no virtualenv, no install step).
 python3 plugins/100xeval/skills/100xeval/scripts/run.py init <name> --plugin plugins/<p> --tag <skill> --prompt "…"
 
 # run static + behavioral (default)
-python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --tag asksales
+python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --tag asktickets
 
 # design quality only, no execution (free)
 python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --target plugins/acme-analytics
 
 # behavioral only
-python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --skip-static --case 'asksales-*'
+python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --skip-static --case 'asktickets-*'
 ```
 
 Exit codes: `0` all pass · `1` a case below `--threshold` (default 1.0) · `2` engine error.
@@ -35,9 +35,15 @@ ambient/account MCP). This is what makes CI work without interactive OAuth, and 
 the plugin's declared MCP as shipped rather than an account connector.
 
 ```bash
-export EVAL_MCP_BEARER='<service-token>'                 # applied to every declared server
-export EVAL_MCP_BEARER_ACME='<acme-only-token>'          # optional per-server override
-python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --tag asksales
+export MCP_ACME_API_KEY='<acme-key>'                     # one var per declared server
+export MCP_ACME_FEEDBACK_API_KEY='<acme-feedback-key>'   # `Acme-Feedback` → ACME_FEEDBACK
+
+# …or let the runner mint a short-lived token instead of holding a static key.
+# Two vars: the token endpoint is discovered from the MCP URL (RFC 9728 -> RFC 8414).
+export MCP_ACME_CLIENT_ID='<client-id>'
+export MCP_ACME_CLIENT_SECRET='<client-secret>'
+# optional: _TOKEN_URL to skip discovery, _AUTH_STYLE=post, _SCOPE (usually omit)
+python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --tag asktickets
 ```
 
 The token is read from the environment only — **never committed, never written to any

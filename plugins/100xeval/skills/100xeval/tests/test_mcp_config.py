@@ -55,32 +55,60 @@ class TestStrictConfig(unittest.TestCase):
         with mock.patch.dict(os.environ, {}, clear=True):
             self.assertIsNone(claude_code.build_strict_mcp_config(SERVERS))
 
-    def test_default_token_applied_to_all(self):
-        # Emits the ${VAR} reference (Claude expands it), never the token value.
-        with mock.patch.dict(os.environ, {"EVAL_MCP_BEARER": "tok123"}, clear=True):
-            cfg = claude_code.build_strict_mcp_config(SERVERS)
-        self.assertIsNotNone(cfg)
-        for name in SERVERS:
-            hdr = cfg["mcpServers"][name]["headers"]["Authorization"]
-            self.assertEqual(hdr, "Bearer ${EVAL_MCP_BEARER}")
-
-    def test_per_server_token_overrides(self):
-        env = {"EVAL_MCP_BEARER": "default", "EVAL_MCP_BEARER_ACME": "special"}
+    def test_each_server_gets_its_own_var(self):
+        # Emits the ${VAR} reference (Claude expands it), never the key value. Each server
+        # names its own variable — there is no shared key that reaches every server.
+        env = {"MCP_ACME_API_KEY": "a", "MCP_ACME_FEEDBACK_API_KEY": "b"}
         with mock.patch.dict(os.environ, env, clear=True):
             cfg = claude_code.build_strict_mcp_config(SERVERS)
-        self.assertEqual(cfg["mcpServers"]["Acme"]["headers"]["Authorization"], "Bearer ${EVAL_MCP_BEARER_ACME}")
-        self.assertEqual(cfg["mcpServers"]["Acme-Feedback"]["headers"]["Authorization"], "Bearer ${EVAL_MCP_BEARER}")
+        self.assertIsNotNone(cfg)
+        self.assertEqual(cfg["mcpServers"]["Acme"]["headers"]["Authorization"],
+                         "Bearer ${MCP_ACME_API_KEY}")
+        self.assertEqual(cfg["mcpServers"]["Acme-Feedback"]["headers"]["Authorization"],
+                         "Bearer ${MCP_ACME_FEEDBACK_API_KEY}")
+
+    def test_unset_server_gets_no_auth_header(self):
+        # One server keyed, the other not. The unkeyed one is still included (strict mode
+        # must not hide a declared server) but carries no Authorization header — one
+        # vendor's key is never handed to another vendor's server.
+        with mock.patch.dict(os.environ, {"MCP_ACME_API_KEY": "a"}, clear=True):
+            cfg = claude_code.build_strict_mcp_config(SERVERS)
+        self.assertIn("Acme-Feedback", cfg["mcpServers"])
+        self.assertNotIn("Authorization",
+                         cfg["mcpServers"]["Acme-Feedback"].get("headers", {}))
 
     def test_no_token_value_ever_written(self):
-        with mock.patch.dict(os.environ, {"EVAL_MCP_BEARER": "SECRET_TOKEN_VALUE"}, clear=True):
+        with mock.patch.dict(os.environ, {"MCP_ACME_API_KEY": "SECRET_TOKEN_VALUE"}, clear=True):
             cfg = claude_code.build_strict_mcp_config(SERVERS)
         self.assertNotIn("SECRET_TOKEN_VALUE", str(cfg))  # only the ${VAR} ref is emitted
 
     def test_url_and_type_preserved(self):
-        with mock.patch.dict(os.environ, {"EVAL_MCP_BEARER": "t"}, clear=True):
+        with mock.patch.dict(os.environ, {"MCP_ACME_API_KEY": "t"}, clear=True):
             cfg = claude_code.build_strict_mcp_config(SERVERS)
         self.assertEqual(cfg["mcpServers"]["Acme"]["url"], SERVERS["Acme"]["url"])
         self.assertEqual(cfg["mcpServers"]["Acme"]["type"], "http")
+
+    def test_oauth_server_emits_var_ref_with_no_value(self):
+        # The variable is not in os.environ yet — it is added to the child's environment at
+        # spawn time — but the config must still name it, or the OAuth path writes a server
+        # with no Authorization header at all.
+        env = {
+            "MCP_ACME_CLIENT_ID": "cid",
+            "MCP_ACME_CLIENT_SECRET": "csecret",
+            "MCP_ACME_TOKEN_URL": "https://idp.example.com/token",
+        }
+        with mock.patch.dict(os.environ, env, clear=True):
+            cfg = claude_code.build_strict_mcp_config(SERVERS)
+        self.assertEqual(cfg["mcpServers"]["Acme"]["headers"]["Authorization"],
+                         "Bearer ${MCP_ACME_API_KEY}")
+        self.assertNotIn("csecret", str(cfg))  # the secret never reaches the config
+
+    def test_server_name_normalized_into_var_name(self):
+        # Non-alphanumerics become underscores and the name uppercases, so `Acme-Feedback`
+        # reads MCP_ACME_FEEDBACK_API_KEY. Asserted directly: a silent change here would
+        # look like a missing key rather than a renamed variable.
+        self.assertEqual(claude_code._bearer_var_name("Acme-Feedback"),
+                         "MCP_ACME_FEEDBACK_API_KEY")
 
 
 class TestCaseMcpConfig(unittest.TestCase):
@@ -96,16 +124,16 @@ class TestCaseMcpConfig(unittest.TestCase):
         cfg_text = '{"mcpServers": {"Acme": {"type":"http","url":"https://x/mcp"}}}'
         with tempfile.TemporaryDirectory() as d:
             case = self._case_with_config(d, cfg_text)
-            with mock.patch.dict(os.environ, {"EVAL_MCP_BEARER": "T"}, clear=True):
+            with mock.patch.dict(os.environ, {"MCP_ACME_API_KEY": "T"}, clear=True):
                 cfg = claude_code.load_case_mcp_config(case)
-            self.assertEqual(cfg["mcpServers"]["Acme"]["headers"]["Authorization"], "Bearer ${EVAL_MCP_BEARER}")
+            self.assertEqual(cfg["mcpServers"]["Acme"]["headers"]["Authorization"], "Bearer ${MCP_ACME_API_KEY}")
 
     def test_preexisting_auth_header_not_overwritten(self):
         import tempfile
         cfg_text = '{"mcpServers": {"S": {"type":"http","url":"https://x/mcp","headers":{"Authorization":"Bearer ${MY_VAR}"}}}}'
         with tempfile.TemporaryDirectory() as d:
             case = self._case_with_config(d, cfg_text)
-            with mock.patch.dict(os.environ, {"EVAL_MCP_BEARER": "ENV"}, clear=True):
+            with mock.patch.dict(os.environ, {"MCP_S_API_KEY": "ENV"}, clear=True):
                 cfg = claude_code.load_case_mcp_config(case)
             self.assertEqual(cfg["mcpServers"]["S"]["headers"]["Authorization"], "Bearer ${MY_VAR}")
 
@@ -123,6 +151,61 @@ class TestCaseMcpConfig(unittest.TestCase):
             self.assertIsNone(claude_code.resolve_strict_mcp_config(Case(name="c", prompt="p")))
 
 
+class TestChildEnvOverlay(unittest.TestCase):
+    """The minted token reaches the child process, and nothing else is lost doing it."""
+
+    def setUp(self):
+        from engine import mcp_oauth
+        mcp_oauth.reset_cache()
+
+    def _case_with_plugin_mcp(self, d, servers='{"Acme": {"type":"http","url":"https://x/mcp"}}'):
+        plugdir = os.path.join(d, "p")
+        os.makedirs(plugdir, exist_ok=True)
+        with open(os.path.join(plugdir, ".mcp.json"), "w") as fh:
+            fh.write('{"mcpServers": %s}' % servers)
+        return Case(name="c", prompt="p", path=d, plugins=["p"])
+
+    def test_overlay_carries_minted_token(self):
+        import io
+        import json as _json
+        import tempfile
+        from unittest.mock import MagicMock
+
+        body = io.BytesIO(_json.dumps({"access_token": "tok-xyz"}).encode())
+        cm = MagicMock()
+        cm.__enter__.return_value = body
+        cm.__exit__.return_value = False
+        env = {
+            "MCP_ACME_CLIENT_ID": "cid",
+            "MCP_ACME_CLIENT_SECRET": "csecret",
+            "MCP_ACME_TOKEN_URL": "https://idp.example.com/token",
+            "PATH": "/usr/bin",
+        }
+        with tempfile.TemporaryDirectory() as d:
+            case = self._case_with_plugin_mcp(d)
+            with mock.patch.dict(os.environ, env, clear=True):
+                with mock.patch("urllib.request.urlopen", return_value=cm):
+                    overlay = claude_code.mcp_env_overlay(case)
+                    child = {**os.environ, **overlay}
+        self.assertEqual(overlay, {"MCP_ACME_API_KEY": "tok-xyz"})
+        # env= replaces the child's whole environment, so the overlay must extend os.environ
+        # rather than stand in for it — without PATH the `claude` binary is not found.
+        self.assertEqual(child["PATH"], "/usr/bin")
+
+    def test_overlay_empty_for_static_key(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            case = self._case_with_plugin_mcp(d)
+            with mock.patch.dict(os.environ, {"MCP_ACME_API_KEY": "static"}, clear=True):
+                with mock.patch("urllib.request.urlopen") as urlopen:
+                    self.assertEqual(claude_code.mcp_env_overlay(case), {})
+                urlopen.assert_not_called()
+
+    def test_overlay_empty_without_mcp(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(claude_code.mcp_env_overlay(Case(name="c", prompt="p")), {})
+
+
 class TestPreflightSkipsInTokenMode(unittest.TestCase):
     def test_token_mode_skips_account_check(self):
         # A case whose plugin declares Acme; token present → preflight must NOT abort
@@ -135,7 +218,7 @@ class TestPreflightSkipsInTokenMode(unittest.TestCase):
             with open(os.path.join(plugdir, ".mcp.json"), "w") as fh:
                 fh.write('{"mcpServers": {"Acme": {"type":"http","url":"https://x/mcp"}}}')
             case = Case(name="c", prompt="p", path=d, plugins=["p"])
-            with mock.patch.dict(os.environ, {"EVAL_MCP_BEARER": "tok"}, clear=True):
+            with mock.patch.dict(os.environ, {"MCP_ACME_API_KEY": "tok"}, clear=True):
                 claude_code.verify_mcp_auth(case, list_output="")  # no abort despite empty list
 
 

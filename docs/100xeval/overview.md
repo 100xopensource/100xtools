@@ -14,7 +14,7 @@ generated:
 100xeval answers one question: **did this plugin actually give the right answer?**
 
 Prompt changes have no compiler. A reworded instruction that quietly stops a skill from
-filtering by store looks exactly like a change that broke nothing — until a user finds it.
+filtering by team looks exactly like a change that broke nothing — until a user finds it.
 100xeval is the thing that notices, by running the plugin for real and grading what came
 back.
 
