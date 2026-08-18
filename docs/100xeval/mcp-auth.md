@@ -17,11 +17,30 @@ are two ways to get there, and **they produce different tool names**.
 | Path | Auth comes from | Tools are named |
 | --- | --- | --- |
 | Ambient account connector | Whichever account is logged in on this machine | `mcp__claude_ai_<Server>__<tool>` |
-| Strict plugin config | `EVAL_MCP_BEARER` in the environment | `mcp__<Server>__<tool>` |
+| Strict plugin config | `MCP_<SERVER>_API_KEY` in the environment | `mcp__<Server>__<tool>` |
 
 The engine canonicalizes across both, so one set of grader tool names works either way.
 Without that, a case written locally would silently stop matching in CI — the tools would be
 called, the names would not match, and `tool_used` would report zero.
+
+## Two credentials that work headless
+
+Strict mode accepts any bearer credential, which leaves two shapes worth recommending for a run
+with no human at a browser:
+
+* **An API key** — a long-lived key the server issues, valid until someone rotates it.
+* **An OAuth client-credentials token** — minted per run from an IdP and expiring on its own.
+  Claude Code cannot perform this grant itself (its OAuth support is authorization-code with a
+  browser callback), so the exchange happens before the run and the resulting access token is
+  passed in as the same variable.
+
+Prefer the second where the server supports it: the credential's lifetime is the whole
+difference, and a token that expires by itself is one nobody has to remember to rotate. The
+engine treats them identically.
+
+The how-to for both is
+[`references/mcp-auth.md`](../../plugins/100xeval/skills/100xeval/references/mcp-auth.md),
+which ships inside the plugin.
 
 ## Prefer strict mode
 
@@ -33,9 +52,42 @@ connectors entirely. Two reasons it is the better path:
 * **It tests what ships.** The plugin's declared MCP is what a user gets; an account
   connector is what *you* happen to have.
 
-The token is read from the environment only. It is never committed and never written into
+The key is read from the environment only. It is never committed and never written into
 any `.mcp.json` — a case file holds a *path* to a config, and that config references
-`${EVAL_MCP_BEARER}`, expanded at run time.
+`${MCP_<SERVER>_API_KEY}`, expanded at run time.
+
+## One variable per server, and no global
+
+The variable name is built from the server's own name: non-alphanumerics become underscores
+and the whole thing uppercases, so a server called `Acme-Feedback` reads
+`MCP_ACME_FEEDBACK_API_KEY`.
+
+**There is deliberately no key that applies to every declared server.** A plugin can declare
+servers from two different vendors, and a single shared variable would hand each vendor the
+other's credential. The cost of that safety is one variable per server, which is also one CI
+secret per server.
+
+A declared server with no key set is still passed to `--strict-mcp-config` — hiding it would
+change what the plugin under test actually gets — but it goes without an `Authorization`
+header. If that server is the one the case needs, the symptom is the "called 0×" failure
+below, so set the key before blaming the skill.
+
+## The account connector cannot work headless
+
+The ambient path is the easier one to set up — connect once in the claude.ai UI, log in with
+`claude`, nothing else to configure — and it works for local runs, including `claude -p`. It
+**cannot** be carried into CI, and this is a documented property of Claude Code rather than a
+limitation here.
+
+claude.ai connectors are fetched only when the active credential is an interactive claude.ai
+subscription login. They are not loaded when `ANTHROPIC_API_KEY`, `ANTHROPIC_AUTH_TOKEN`,
+`apiKeyHelper`, a cloud provider, an Anthropic profile, or `CLAUDE_CODE_OAUTH_TOKEN` supplies
+it — a `claude setup-token` token can only make model requests. Every credential a headless
+runner can hold is on that list, so there is no supported way to reach a connector from CI.
+
+What survives under a `CLAUDE_CODE_OAUTH_TOKEN` run is an MCP server the run configures
+itself, which is exactly strict mode. So a CI job needs two credentials doing two jobs:
+`CLAUDE_CODE_OAUTH_TOKEN` for the model, `MCP_<SERVER>_API_KEY` for each MCP server.
 
 ## The failure that looks like nothing
 
@@ -61,7 +113,7 @@ If the plugin declares an MCP server, either authenticate the connector interact
 (`claude` → `/mcp`) or inject a bearer token for headless runs:
 
 ```bash
-export EVAL_MCP_BEARER='<service-token>'      # applied to every declared server
+export MCP_ACME_API_KEY='<acme-key>'          # one per server the plugin declares
 python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --tag <suite>
 ```
 

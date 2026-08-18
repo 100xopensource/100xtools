@@ -77,7 +77,7 @@ and one exercising a documented business rule.
 
 ## No secrets in a case, ever
 
-`mcp_config` holds a *path*. The config it points at uses `Bearer ${EVAL_MCP_BEARER}`,
+`mcp_config` holds a *path*. The config it points at uses `Bearer ${MCP_<SERVER>_API_KEY}`,
 expanded from the environment at run time — see [MCP auth](mcp-auth.md).
 
 ## Park, don't delete

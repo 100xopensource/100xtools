@@ -185,8 +185,11 @@ them (`security` ×2, `token_efficiency` ×0.5) and applies a flag-count penalty
 **MCP auth produces two different tool-name schemes:** ambient account connector gives
 `mcp__claude_ai_<Server>__<tool>`, strict plugin config (`--mcp-config … --strict-mcp-config`)
 gives `mcp__<Server>__<tool>`. `canonical_tool_name` / `expand_tool_aliases` normalize across
-both. Strict mode is preferred — auth comes from `EVAL_MCP_BEARER` in the environment rather
-than whichever account is logged in, so runs behave identically locally and in CI. **A bad or
+both. Strict mode is preferred — auth comes from `MCP_<SERVER>_API_KEY` in the environment
+rather than whichever account is logged in, so runs behave identically locally and in CI. The
+variable is **per server, with no global fallback**: a plugin can declare two vendors' servers,
+and one shared key would hand each vendor the other's credential. A server with no key set is
+still passed through to `--strict-mcp-config`, just without an `Authorization` header. **A bad or
 expired token surfaces as `tool_used` "called 0×", not as an auth error.** Check the token
 before blaming the skill.
 

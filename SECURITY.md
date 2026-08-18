@@ -17,7 +17,7 @@ safety:
 
 - A path that lets skill content (contributor-authored, therefore untrusted) escalate
   beyond the read-only tool allowlist in `drift-check.yml`.
-- A path that causes a token — `EVAL_MCP_BEARER`, `ANTHROPIC_API_KEY`,
+- A path that causes a token — `MCP_<SERVER>_API_KEY`, `ANTHROPIC_API_KEY`,
   `CLAUDE_CODE_OAUTH_TOKEN` — to be written to disk, into a report, into an artifact, or
   into a PR comment.
 - A path that lets a case file or plugin under evaluation execute code outside the run's

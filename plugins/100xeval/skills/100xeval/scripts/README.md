@@ -35,8 +35,8 @@ ambient/account MCP). This is what makes CI work without interactive OAuth, and 
 the plugin's declared MCP as shipped rather than an account connector.
 
 ```bash
-export EVAL_MCP_BEARER='<service-token>'                 # applied to every declared server
-export EVAL_MCP_BEARER_ACME='<acme-only-token>'          # optional per-server override
+export MCP_ACME_API_KEY='<acme-key>'                     # one var per declared server
+export MCP_ACME_FEEDBACK_API_KEY='<acme-feedback-key>'   # `Acme-Feedback` → ACME_FEEDBACK
 python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --tag asksales
 ```
 

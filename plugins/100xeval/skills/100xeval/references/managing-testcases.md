@@ -243,7 +243,7 @@ until every run has finished scoring zero.
 ```bash
 set -a && . ./.env && set +a
 curl -s -o /dev/null -w '%{http_code}\n' -X POST \
-  -H "Authorization: Bearer $EVAL_MCP_BEARER" -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer $MCP_ACME_API_KEY" -H 'Content-Type: application/json' \
   -H 'Accept: application/json, text/event-stream' \
   -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"preflight","version":"1"}}}' \
   <the plugin's MCP url>
@@ -292,5 +292,7 @@ judge doesn't "helpfully" fix your query.
 two lines breaks the parser for every case in the directory at once.
 
 **Secrets never go in a case.** `mcp_config` stores a **path**, and the config it points
-at uses `Bearer ${EVAL_MCP_BEARER}` — the literal placeholder, expanded from the
-environment at run time by the CLI, never written to disk expanded.
+at uses `Bearer ${MCP_<SERVER>_API_KEY}` — the literal placeholder, expanded from the
+environment at run time by the CLI, never written to disk expanded. One variable per
+server, named after the server (`Acme-Feedback` → `MCP_ACME_FEEDBACK_API_KEY`); there is
+no key that covers every server.

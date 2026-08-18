@@ -322,28 +322,33 @@ def _env_key(server_name: str) -> str:
     return "".join(ch if ch.isalnum() else "_" for ch in server_name).upper()
 
 
+def _bearer_var_name(server_name: str) -> str:
+    """The env-var name holding this server's key: `MCP_<SERVER>_API_KEY`."""
+    return f"MCP_{_env_key(server_name)}_API_KEY"
+
+
 def mcp_token_for(server_name: str) -> str | None:
-    """Bearer token for a server: per-server EVAL_MCP_BEARER_<KEY>, else EVAL_MCP_BEARER.
+    """API key for one server, from `MCP_<SERVER>_API_KEY`.
+
+    Per-server by design: there is deliberately no key that applies to every declared
+    server. A plugin can declare servers from two different vendors, and one shared
+    variable would hand each vendor the other's credential.
 
     Never read from disk / .mcp.json — no secret belongs in the repo. CI injects
     these env vars from its secret store.
     """
-    return os.environ.get(f"EVAL_MCP_BEARER_{_env_key(server_name)}") or os.environ.get("EVAL_MCP_BEARER")
+    return os.environ.get(_bearer_var_name(server_name))
 
 
 def token_injection_active(servers: dict) -> bool:
-    """True when any declared server has a bearer token available in the environment."""
+    """True when any declared server has an API key available in the environment."""
     return any(mcp_token_for(name) for name in servers)
 
 
 def _bearer_var_for(server_name: str) -> str | None:
-    """Which env-var NAME holds this server's token: per-server, else the shared one."""
-    per_server = f"EVAL_MCP_BEARER_{_env_key(server_name)}"
-    if os.environ.get(per_server):
-        return per_server
-    if os.environ.get("EVAL_MCP_BEARER"):
-        return "EVAL_MCP_BEARER"
-    return None
+    """Which env-var NAME holds this server's key, or None when it is unset."""
+    var = _bearer_var_name(server_name)
+    return var if os.environ.get(var) else None
 
 
 def _inject_bearer(server_configs: dict) -> dict:
