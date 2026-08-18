@@ -13,12 +13,12 @@ the environment and never written to disk.
 | Method | Use when | Credential lifetime |
 | --- | --- | --- |
 | **API key** | The server issues long-lived keys, or you are getting started | Until rotated by hand |
-| **OAuth client credentials** | The server sits behind an IdP that issues machine tokens | Minutes to hours; re-minted per run |
+| **OAuth client credentials** | The server sits behind an IdP that issues machine tokens | Minutes to hours; minted per run by the runner |
 
 **Prefer client credentials where the server supports it.** A static key in a CI secret is valid
 until someone remembers to rotate it; a client-credentials token is minted per run and expires
-on its own. The engine handles both identically, so this is a choice about the credential's
-lifetime, not about how the eval works.
+on its own. Both are the same amount of setup — four variables instead of one — and the run
+behaves identically either way.
 
 ### Method 1 — API key
 
@@ -38,37 +38,53 @@ from two vendors, and one shared key would hand each vendor the other's credenti
 
 ### Method 2 — OAuth client credentials
 
-**Claude Code cannot perform this grant itself.** Its OAuth support is the authorization-code
-flow with a browser callback — even the "pre-configured OAuth credentials" path
-(`oauth.clientId`, `--client-secret`, `callbackPort`) ends at a browser login, which a headless
-runner has no way to complete. So the exchange happens *before* the run: mint an access token
-from the IdP, then hand it to the eval as the same `MCP_<SERVER>_API_KEY` variable.
+**The runner mints the token itself.** Declare the credentials and it performs the exchange
+before the run — no pre-step, no minting shell in your workflow, nothing to keep in sync:
 
 ```bash
-# 1. Mint a short-lived token (client_id + client_secret → access token)
-ACCESS_TOKEN=$(curl -sS -X POST "$TOKEN_ENDPOINT" \
-  -d grant_type=client_credentials \
-  -d client_id="$CLIENT_ID" \
-  -d client_secret="$CLIENT_SECRET" \
-  -d scope="$SCOPE" \
-  | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
-
-# 2. Hand it to the run under the server's variable name
-export MCP_ACME_API_KEY="$ACCESS_TOKEN"
+export MCP_ACME_CLIENT_ID='<client-id>'
+export MCP_ACME_CLIENT_SECRET='<client-secret>'
+export MCP_ACME_TOKEN_URL='https://idp.example.com/oauth2/token'
+export MCP_ACME_SCOPE='mcp:read'          # optional; omitted if unset
 python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --tag <suite>
 ```
 
-Three things to get right:
+Same `MCP_<SERVER>_…` naming as the static key, so `Acme-Feedback` reads
+`MCP_ACME_FEEDBACK_CLIENT_ID` and so on. In CI these are four repository secrets and no extra
+workflow steps.
 
-- **Mask the token if you are in CI.** Echoing it into `$GITHUB_ENV` without
-  `echo "::add-mask::$ACCESS_TOKEN"` first puts it one careless `set -x` away from the build
-  log. The client secret stays a repository secret; only the minted token moves.
-- **Mint inside the job, never ahead of it.** A token minted at workflow-authoring time is a
-  static key with extra steps.
-- **Check the expiry against the run length.** A suite of 20 cases at `runs: 3` can outlive a
-  5-minute token, and the failure arrives mid-run as "called 0×" on the later cases only — which
-  reads exactly like a flaky skill. If the token is short-lived, narrow the suite or mint one
-  per case batch.
+What the runner does with them:
+
+- **One exchange per process**, cached and shared. A suite at `runs: 3` with three graders hits
+  the token endpoint once, not once per subprocess.
+- **The token goes into the child process's environment**, never into the MCP config on disk.
+  The config still holds `"Authorization": "Bearer ${MCP_ACME_API_KEY}"`, and Claude Code
+  expands it there. Neither the client secret nor the minted token reaches any file the run
+  writes, including the run folder you upload as a CI artifact.
+- **The agentic judge gets the same token.** A ground-truth grader queries the MCP itself, so
+  authenticating the run and not the judge would fail exactly the grader that checks the
+  numbers.
+
+**`MCP_<SERVER>_API_KEY` wins if both are set.** An explicitly supplied key is deterministic
+and needs no network call, so it is not second-guessed — unset it to use the OAuth path.
+
+Failures stop the run rather than degrading it, because an unauthenticated run reports
+"called 0×" and reads as a broken skill:
+
+| What you did | What you get |
+| --- | --- |
+| Set `CLIENT_ID` but not `CLIENT_SECRET` | Abort naming every missing variable |
+| An `http://` token URL | Abort — a client secret in cleartext is a disclosed secret |
+| Wrong credentials | Abort with the HTTP status. **The response body is withheld** — an error body can contain a token |
+| Endpoint unreachable | Abort naming the error class, so you can tell DNS from a firewall |
+| A response with no `access_token` | Abort listing the keys that did come back |
+| A token expiring in under 5 minutes | A warning, not an abort. Recovering mid-suite is out of scope, so this is the one chance to notice before the later cases fail as "called 0×" |
+
+**What Claude Code still cannot do**, so you don't go looking for it: its own OAuth support is
+the authorization-code flow with a browser callback, including the "pre-configured OAuth
+credentials" path (`oauth.clientId`, `--client-secret`, `callbackPort`). That needs a human at a
+browser. This method works because 100xeval performs the grant and hands the result over as a
+bearer credential — not because Claude Code gained a headless OAuth mode.
 
 ## Interactive runs — the account connector
 

@@ -24,6 +24,7 @@ import shutil
 import subprocess
 import tempfile
 
+from .. import mcp_oauth
 from ..models import Case, RunResult, ToolCall
 from .base import Abort, register_harness
 
@@ -105,10 +106,16 @@ class ClaudeCodeHarness:
             debug_log = os.path.join(tmp, "claude-debug.log")
             cmd += ["--debug-file", debug_log]
             redacted = _redact_cmd(cmd)  # for logs: no 257KB prompt, no token
+            # A minted OAuth token travels here and nowhere else — the config on disk holds
+            # only `${VAR}`, and Claude Code expands it from this environment. Overlay onto
+            # os.environ rather than replacing it: the child needs PATH and the caller's own
+            # auth as much as it needs this.
+            child_env = {**os.environ, **mcp_env_overlay(case)}
             try:
                 proc = subprocess.run(
                     cmd, capture_output=True, text=True, timeout=timeout_s,
                     cwd=tmp,  # neutral cwd so nothing else loads
+                    env=child_env,
                 )
             except subprocess.TimeoutExpired:
                 return RunResult(error=f"timeout after {timeout_s}s", command=redacted, debug_log=debug_log)
@@ -327,6 +334,24 @@ def _bearer_var_name(server_name: str) -> str:
     return f"MCP_{_env_key(server_name)}_API_KEY"
 
 
+def mcp_env_overlay(case: Case) -> dict:
+    """Env additions for this case's child processes: minted OAuth tokens, if any.
+
+    Empty for the static-key path and for a case with no MCP, so the common case pays
+    nothing and behaves exactly as before.
+    """
+    servers = _strict_server_names(case)
+    return mcp_oauth.env_for_servers(servers) if servers else {}
+
+
+def _strict_server_names(case: Case) -> list:
+    """Server names this case will authenticate: its own mcp_config's, else the plugin's."""
+    cfg = load_case_mcp_config(case) if case.mcp_config else None
+    if cfg:
+        return list(cfg.get("mcpServers", {}))
+    return list(plugin_mcp_server_configs(case))
+
+
 def mcp_token_for(server_name: str) -> str | None:
     """API key for one server, from `MCP_<SERVER>_API_KEY`.
 
@@ -341,14 +366,26 @@ def mcp_token_for(server_name: str) -> str | None:
 
 
 def token_injection_active(servers: dict) -> bool:
-    """True when any declared server has an API key available in the environment."""
-    return any(mcp_token_for(name) for name in servers)
+    """True when any declared server has a credential we can use.
+
+    Counts a mintable OAuth server as well as a static key: without that, strict mode never
+    engages for the OAuth path and preflight aborts complaining the account connector is not
+    connected — which is both wrong and unfixable by the user.
+    """
+    return any(mcp_token_for(name) or mcp_oauth.mintable(name) for name in servers)
 
 
 def _bearer_var_for(server_name: str) -> str | None:
-    """Which env-var NAME holds this server's key, or None when it is unset."""
+    """Which env-var NAME holds this server's key, or None when it has no credential.
+
+    A mintable server counts: the variable is absent from `os.environ` at config-build time
+    and is added to the child's environment just before spawn, so the emitted `${VAR}`
+    reference resolves there. The config still never carries a value.
+    """
     var = _bearer_var_name(server_name)
-    return var if os.environ.get(var) else None
+    if os.environ.get(var):
+        return var
+    return var if mcp_oauth.mintable(server_name) else None
 
 
 def _inject_bearer(server_configs: dict) -> dict:

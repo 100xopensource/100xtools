@@ -20,6 +20,7 @@ import tempfile
 
 # Reuse the harness's result parser + tool-name alias expansion so the judge names
 # tools exactly the way the run under test did.
+from . import mcp_oauth
 from .harnesses.claude_code import add_tokens, expand_tool_aliases, parse_cli_json, parse_usage
 
 DEFAULT_JUDGE_MODEL = "claude-haiku-4-5-20251001"
@@ -124,8 +125,14 @@ def _claude_runner(prompt: str, model: str, allowed_tools: list[str] | None,
             cmd += ["--mcp-config", cfg_path, "--strict-mcp-config"]
         if allowed_tools:
             cmd += ["--allowedTools", ",".join(expand_tool_aliases(allowed_tools))]
+        # Same reason the config is passed at all: an agentic judge reaching an MCP server
+        # authenticated by a minted OAuth token needs that token in its own environment.
+        # Authenticating the run but not the judge fails exactly the grader that checks the
+        # numbers, and blames the answer for it.
+        child_env = {**os.environ, **mcp_oauth.env_for_servers((mcp_config or {}).get("mcpServers", {}))}
         try:
-            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=JUDGE_TIMEOUT_S)
+            proc = subprocess.run(cmd, capture_output=True, text=True, timeout=JUDGE_TIMEOUT_S,
+                                  env=child_env)
         except subprocess.TimeoutExpired:
             return f"FAIL\njudge timed out after {JUDGE_TIMEOUT_S}s"
         if proc.returncode != 0:

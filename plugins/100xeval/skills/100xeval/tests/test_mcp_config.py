@@ -88,6 +88,21 @@ class TestStrictConfig(unittest.TestCase):
         self.assertEqual(cfg["mcpServers"]["Acme"]["url"], SERVERS["Acme"]["url"])
         self.assertEqual(cfg["mcpServers"]["Acme"]["type"], "http")
 
+    def test_oauth_server_emits_var_ref_with_no_value(self):
+        # The variable is not in os.environ yet — it is added to the child's environment at
+        # spawn time — but the config must still name it, or the OAuth path writes a server
+        # with no Authorization header at all.
+        env = {
+            "MCP_ACME_CLIENT_ID": "cid",
+            "MCP_ACME_CLIENT_SECRET": "csecret",
+            "MCP_ACME_TOKEN_URL": "https://idp.example.com/token",
+        }
+        with mock.patch.dict(os.environ, env, clear=True):
+            cfg = claude_code.build_strict_mcp_config(SERVERS)
+        self.assertEqual(cfg["mcpServers"]["Acme"]["headers"]["Authorization"],
+                         "Bearer ${MCP_ACME_API_KEY}")
+        self.assertNotIn("csecret", str(cfg))  # the secret never reaches the config
+
     def test_server_name_normalized_into_var_name(self):
         # Non-alphanumerics become underscores and the name uppercases, so `Acme-Feedback`
         # reads MCP_ACME_FEEDBACK_API_KEY. Asserted directly: a silent change here would
@@ -134,6 +149,61 @@ class TestCaseMcpConfig(unittest.TestCase):
     def test_no_config_no_token_is_none(self):
         with mock.patch.dict(os.environ, {}, clear=True):
             self.assertIsNone(claude_code.resolve_strict_mcp_config(Case(name="c", prompt="p")))
+
+
+class TestChildEnvOverlay(unittest.TestCase):
+    """The minted token reaches the child process, and nothing else is lost doing it."""
+
+    def setUp(self):
+        from engine import mcp_oauth
+        mcp_oauth.reset_cache()
+
+    def _case_with_plugin_mcp(self, d, servers='{"Acme": {"type":"http","url":"https://x/mcp"}}'):
+        plugdir = os.path.join(d, "p")
+        os.makedirs(plugdir, exist_ok=True)
+        with open(os.path.join(plugdir, ".mcp.json"), "w") as fh:
+            fh.write('{"mcpServers": %s}' % servers)
+        return Case(name="c", prompt="p", path=d, plugins=["p"])
+
+    def test_overlay_carries_minted_token(self):
+        import io
+        import json as _json
+        import tempfile
+        from unittest.mock import MagicMock
+
+        body = io.BytesIO(_json.dumps({"access_token": "tok-xyz"}).encode())
+        cm = MagicMock()
+        cm.__enter__.return_value = body
+        cm.__exit__.return_value = False
+        env = {
+            "MCP_ACME_CLIENT_ID": "cid",
+            "MCP_ACME_CLIENT_SECRET": "csecret",
+            "MCP_ACME_TOKEN_URL": "https://idp.example.com/token",
+            "PATH": "/usr/bin",
+        }
+        with tempfile.TemporaryDirectory() as d:
+            case = self._case_with_plugin_mcp(d)
+            with mock.patch.dict(os.environ, env, clear=True):
+                with mock.patch("urllib.request.urlopen", return_value=cm):
+                    overlay = claude_code.mcp_env_overlay(case)
+                    child = {**os.environ, **overlay}
+        self.assertEqual(overlay, {"MCP_ACME_API_KEY": "tok-xyz"})
+        # env= replaces the child's whole environment, so the overlay must extend os.environ
+        # rather than stand in for it — without PATH the `claude` binary is not found.
+        self.assertEqual(child["PATH"], "/usr/bin")
+
+    def test_overlay_empty_for_static_key(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            case = self._case_with_plugin_mcp(d)
+            with mock.patch.dict(os.environ, {"MCP_ACME_API_KEY": "static"}, clear=True):
+                with mock.patch("urllib.request.urlopen") as urlopen:
+                    self.assertEqual(claude_code.mcp_env_overlay(case), {})
+                urlopen.assert_not_called()
+
+    def test_overlay_empty_without_mcp(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            self.assertEqual(claude_code.mcp_env_overlay(Case(name="c", prompt="p")), {})
 
 
 class TestPreflightSkipsInTokenMode(unittest.TestCase):

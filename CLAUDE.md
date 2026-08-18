@@ -185,8 +185,12 @@ them (`security` ×2, `token_efficiency` ×0.5) and applies a flag-count penalty
 **MCP auth produces two different tool-name schemes:** ambient account connector gives
 `mcp__claude_ai_<Server>__<tool>`, strict plugin config (`--mcp-config … --strict-mcp-config`)
 gives `mcp__<Server>__<tool>`. `canonical_tool_name` / `expand_tool_aliases` normalize across
-both. Strict mode is preferred — auth comes from `MCP_<SERVER>_API_KEY` in the environment
-rather than whichever account is logged in, so runs behave identically locally and in CI. The
+both. Strict mode is preferred — auth comes from `MCP_<SERVER>_API_KEY` in the environment,
+or from `MCP_<SERVER>_CLIENT_ID`/`_CLIENT_SECRET`/`_TOKEN_URL` which `mcp_oauth.py` exchanges
+for a short-lived token, rather than from whichever account is logged in, so runs behave
+identically locally and in CI. A minted token is published to the **child process env** so the
+config on disk still holds only `${VAR}` — both spawn sites (harness and agentic judge) apply
+the overlay, and missing the judge would fail the grader that checks the numbers. The
 variable is **per server, with no global fallback**: a plugin can declare two vendors' servers,
 and one shared key would hand each vendor the other's credential. A server with no key set is
 still passed through to `--strict-mcp-config`, just without an `Authorization` header. **A bad or

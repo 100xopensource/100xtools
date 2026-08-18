@@ -55,6 +55,8 @@ The essentials:
   plugin's MCP servers there with `"Authorization": "Bearer ${MCP_<SERVER>_API_KEY}"` — one
   var per server (`Acme-Feedback` → `MCP_ACME_FEEDBACK_API_KEY`), no global fallback. Expanded
   from the environment at run time, never hardcoded. No secret ever belongs in a case file.
+  For a server behind an IdP, set `MCP_<SERVER>_CLIENT_ID` / `_CLIENT_SECRET` / `_TOKEN_URL`
+  instead and the runner mints the token itself — `references/mcp-auth.md`.
 - **Validate it loads before spending a run**, and expect the first run to debug the
   *case* (ungranted tool, wrong column) before it tests the skill.
 

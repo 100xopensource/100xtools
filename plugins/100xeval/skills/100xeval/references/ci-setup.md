@@ -21,7 +21,7 @@ Ask only what you cannot read off the repository. Each answer changes the file:
 | --- | --- |
 | Which cases run per PR | Read the `tags` in existing `case.yaml` files. If there is no cheap subset, propose adding a `pr` tag rather than running the whole suite on every push |
 | Whether behavioral runs at all | If no `evals/**/case.yaml` exists yet, write the static job only. A `cases` job with no cases is a red build with nothing to fix |
-| Whether the plugin needs MCP | Look for `.mcp.json` in the plugin, or `mcp_config` in a case. Its server names decide the secret names — one `MCP_<SERVER>_API_KEY` each. No MCP means neither |
+| Whether the plugin needs MCP, and which credential shape | Look for `.mcp.json` in the plugin, or `mcp_config` in a case. Its server names decide the variable names. Ask which the server issues: a static key (`MCP_<SERVER>_API_KEY`) or client credentials (four vars). No MCP means neither |
 | The threshold | Default `1.0` fails on one bad run of a repeated case. `0.8` is the sane starting gate; say which you chose and why |
 
 ## The file
@@ -135,7 +135,8 @@ Two kinds, authenticating different things. One will not do the other's job:
 | Secret | Authenticates | Source |
 | --- | --- | --- |
 | `CLAUDE_CODE_OAUTH_TOKEN` | The model — the run itself | `claude setup-token`, valid one year |
-| `MCP_<SERVER>_API_KEY` | One MCP server — its data access | One per server in the plugin's `.mcp.json`. **See `mcp-auth.md`** for how to obtain it and for the client-credentials option |
+| `MCP_<SERVER>_API_KEY` | One MCP server — its data access | One per server in the plugin's `.mcp.json`. **See `mcp-auth.md`** |
+| `MCP_<SERVER>_CLIENT_ID` / `_CLIENT_SECRET` / `_TOKEN_URL` / `_SCOPE` | The same server, via OAuth client credentials | Their IdP. Use **instead of** the API key when the server issues machine tokens — the runner mints the token itself |
 
 Added under **Settings → Secrets and variables → Actions → New repository secret**, with the
 name spelled exactly as above.
@@ -149,9 +150,10 @@ and no headless credential can. If the plugin's data access comes from a connect
 added in the claude.ai UI, that path cannot work in CI at all; settle the MCP credential with
 `mcp-auth.md` before promising a CI run will work.
 
-**If the server issues short-lived tokens** rather than static keys, the workflow needs a mint
-step before the run — `mcp-auth.md` has the client-credentials recipe and the `::add-mask::`
-line that keeps the minted token out of the build log.
+**If the server issues short-lived tokens** rather than static keys, set the four
+client-credentials variables instead of the API key. The workflow needs no mint step and no
+`::add-mask::` line: the exchange happens inside the engine, so the token never passes through
+the shell and is never written to the config or the run folder. See `mcp-auth.md`.
 
 ## Verify before declaring it done
 
