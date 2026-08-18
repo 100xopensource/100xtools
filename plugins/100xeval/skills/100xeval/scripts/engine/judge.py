@@ -129,7 +129,9 @@ def _claude_runner(prompt: str, model: str, allowed_tools: list[str] | None,
         # authenticated by a minted OAuth token needs that token in its own environment.
         # Authenticating the run but not the judge fails exactly the grader that checks the
         # numbers, and blames the answer for it.
-        child_env = {**os.environ, **mcp_oauth.env_for_servers((mcp_config or {}).get("mcpServers", {}))}
+        judge_servers = {name: (entry or {}).get("url", "")
+                         for name, entry in (mcp_config or {}).get("mcpServers", {}).items()}
+        child_env = {**os.environ, **mcp_oauth.env_for_servers(judge_servers)}
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, timeout=JUDGE_TIMEOUT_S,
                                   env=child_env)

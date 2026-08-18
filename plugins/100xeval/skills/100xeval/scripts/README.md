@@ -38,10 +38,11 @@ the plugin's declared MCP as shipped rather than an account connector.
 export MCP_ACME_API_KEY='<acme-key>'                     # one var per declared server
 export MCP_ACME_FEEDBACK_API_KEY='<acme-feedback-key>'   # `Acme-Feedback` → ACME_FEEDBACK
 
-# …or let the runner mint a short-lived token instead of holding a static key:
+# …or let the runner mint a short-lived token instead of holding a static key.
+# Two vars: the token endpoint is discovered from the MCP URL (RFC 9728 -> RFC 8414).
 export MCP_ACME_CLIENT_ID='<client-id>'
 export MCP_ACME_CLIENT_SECRET='<client-secret>'
-export MCP_ACME_TOKEN_URL='https://idp.example.com/oauth2/token'
+# optional: _TOKEN_URL to skip discovery, _AUTH_STYLE=post, _SCOPE (usually omit)
 python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --tag asktickets
 ```
 

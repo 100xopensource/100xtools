@@ -186,8 +186,9 @@ them (`security` ×2, `token_efficiency` ×0.5) and applies a flag-count penalty
 `mcp__claude_ai_<Server>__<tool>`, strict plugin config (`--mcp-config … --strict-mcp-config`)
 gives `mcp__<Server>__<tool>`. `canonical_tool_name` / `expand_tool_aliases` normalize across
 both. Strict mode is preferred — auth comes from `MCP_<SERVER>_API_KEY` in the environment,
-or from `MCP_<SERVER>_CLIENT_ID`/`_CLIENT_SECRET`/`_TOKEN_URL` which `mcp_oauth.py` exchanges
-for a short-lived token, rather than from whichever account is logged in, so runs behave
+or from `MCP_<SERVER>_CLIENT_ID`/`_CLIENT_SECRET` which `mcp_oauth.py` exchanges for a
+short-lived token (discovering the endpoint via RFC 9728 → RFC 8414, Basic auth and no scope by
+default because that is what real connectors accept), rather than from whichever account is logged in, so runs behave
 identically locally and in CI. A minted token is published to the **child process env** so the
 config on disk still holds only `${VAR}` — both spawn sites (harness and agentic judge) apply
 the overlay, and missing the judge would fail the grader that checks the numbers. The

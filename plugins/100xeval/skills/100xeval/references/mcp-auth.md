@@ -17,8 +17,8 @@ the environment and never written to disk.
 
 **Prefer client credentials where the server supports it.** A static key in a CI secret is valid
 until someone remembers to rotate it; a client-credentials token is minted per run and expires
-on its own. Both are the same amount of setup — four variables instead of one — and the run
-behaves identically either way.
+on its own. The setup is two variables instead of one, the token endpoint is discovered, and
+the run behaves identically either way.
 
 ### Method 1 — API key
 
@@ -44,19 +44,39 @@ before the run — no pre-step, no minting shell in your workflow, nothing to ke
 ```bash
 export MCP_ACME_CLIENT_ID='<client-id>'
 export MCP_ACME_CLIENT_SECRET='<client-secret>'
-export MCP_ACME_TOKEN_URL='https://idp.example.com/oauth2/token'
-export MCP_ACME_SCOPE='mcp:read'          # optional; omitted if unset
 python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --tag <suite>
 ```
 
+Two variables is the whole setup. The token endpoint is **discovered** from the MCP server's
+own URL — RFC 9728 protected-resource metadata, then RFC 8414 authorization-server metadata —
+so the same configuration works against staging and production without naming an endpoint.
+
 Same `MCP_<SERVER>_…` naming as the static key, so `Acme-Feedback` reads
-`MCP_ACME_FEEDBACK_CLIENT_ID` and so on. In CI these are four repository secrets and no extra
-workflow steps.
+`MCP_ACME_FEEDBACK_CLIENT_ID`. Three optional variables exist for servers that need them:
 
-What the runner does with them:
+| Variable | When to set it |
+| --- | --- |
+| `MCP_<SERVER>_TOKEN_URL` | Discovery fails, or you want to skip the two metadata requests. Must be `https://` |
+| `MCP_<SERVER>_AUTH_STYLE` | `basic` (default) or `post`. Set `post` for a server that wants form-encoded credentials |
+| `MCP_<SERVER>_SCOPE` | **Usually leave unset.** See below |
 
-- **One exchange per process**, cached and shared. A suite at `runs: 3` with three graders hits
-  the token endpoint once, not once per subprocess.
+**Two defaults chosen from what real servers do, not from what the spec permits.** Both were
+established against live connectors, and both are the opposite of the most common example code:
+
+- **HTTP Basic for the client credentials.** Form-encoded (`client_secret_post`) is equally
+  legal and is what most tutorials show, but connectors observed in practice want Basic. A
+  rejection says so and names `_AUTH_STYLE=post` as the remedy.
+- **No `scope` is sent.** An authorization server usually assigns the client's own
+  resource-server scope, and sending one it does not expect — `openid` especially — is
+  *rejected* rather than ignored. Set `_SCOPE` only when you know the server wants one.
+
+What the runner does with the credentials:
+
+- **Mints once per token endpoint**, cached for the process and shared by every server behind
+  that endpoint. A suite at `runs: 3` with three graders performs one exchange, not one per
+  subprocess.
+- **Re-mints inside a 5-minute expiry margin**, so a long suite never runs a token to its
+  boundary. That failure would hit only the later cases and read as a flaky skill.
 - **The token goes into the child process's environment**, never into the MCP config on disk.
   The config still holds `"Authorization": "Bearer ${MCP_ACME_API_KEY}"`, and Claude Code
   expands it there. Neither the client secret nor the minted token reaches any file the run
@@ -73,12 +93,12 @@ Failures stop the run rather than degrading it, because an unauthenticated run r
 
 | What you did | What you get |
 | --- | --- |
-| Set `CLIENT_ID` but not `CLIENT_SECRET` | Abort naming every missing variable |
+| Set `CLIENT_ID` but not `CLIENT_SECRET` | Abort naming the missing variable |
 | An `http://` token URL | Abort — a client secret in cleartext is a disclosed secret |
-| Wrong credentials | Abort with the HTTP status. **The response body is withheld** — an error body can contain a token |
+| Wrong credentials | Abort with the HTTP status and the server's own `error` / `error_description`. **The raw body is never printed** — it can contain a token. On a 400/401 the message also names `_AUTH_STYLE=post` and, if you set one, an explicit scope as likely causes |
+| Discovery fails | Abort naming the metadata URL that could not be read, and telling you to set `_TOKEN_URL` |
 | Endpoint unreachable | Abort naming the error class, so you can tell DNS from a firewall |
 | A response with no `access_token` | Abort listing the keys that did come back |
-| A token expiring in under 5 minutes | A warning, not an abort. Recovering mid-suite is out of scope, so this is the one chance to notice before the later cases fail as "called 0×" |
 
 **What Claude Code still cannot do**, so you don't go looking for it: its own OAuth support is
 the authorization-code flow with a browser callback, including the "pre-configured OAuth

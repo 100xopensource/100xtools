@@ -136,7 +136,7 @@ Two kinds, authenticating different things. One will not do the other's job:
 | --- | --- | --- |
 | `CLAUDE_CODE_OAUTH_TOKEN` | The model — the run itself | `claude setup-token`, valid one year |
 | `MCP_<SERVER>_API_KEY` | One MCP server — its data access | One per server in the plugin's `.mcp.json`. **See `mcp-auth.md`** |
-| `MCP_<SERVER>_CLIENT_ID` / `_CLIENT_SECRET` / `_TOKEN_URL` / `_SCOPE` | The same server, via OAuth client credentials | Their IdP. Use **instead of** the API key when the server issues machine tokens — the runner mints the token itself |
+| `MCP_<SERVER>_CLIENT_ID` + `_CLIENT_SECRET` | The same server, via OAuth client credentials | Their IdP. Use **instead of** the API key when the server issues machine tokens — the runner mints the token and discovers the endpoint itself. `_TOKEN_URL` / `_AUTH_STYLE` / `_SCOPE` are optional; see `mcp-auth.md` |
 
 Added under **Settings → Secrets and variables → Actions → New repository secret**, with the
 name spelled exactly as above.
@@ -150,10 +150,10 @@ and no headless credential can. If the plugin's data access comes from a connect
 added in the claude.ai UI, that path cannot work in CI at all; settle the MCP credential with
 `mcp-auth.md` before promising a CI run will work.
 
-**If the server issues short-lived tokens** rather than static keys, set the four
-client-credentials variables instead of the API key. The workflow needs no mint step and no
-`::add-mask::` line: the exchange happens inside the engine, so the token never passes through
-the shell and is never written to the config or the run folder. See `mcp-auth.md`.
+**If the server issues short-lived tokens** rather than static keys, set `_CLIENT_ID` and
+`_CLIENT_SECRET` instead of the API key. The workflow needs no mint step and no `::add-mask::`
+line: the exchange happens inside the engine, so the token never passes through the shell and is
+never written to the config or the run folder. See `mcp-auth.md`.
 
 ## Verify before declaring it done
 

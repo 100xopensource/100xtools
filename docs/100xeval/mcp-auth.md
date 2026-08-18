@@ -30,8 +30,9 @@ with no human at a browser:
 
 * **An API key** — a long-lived key the server issues, valid until someone rotates it.
 * **An OAuth client-credentials token** — minted per run from an IdP and expiring on its own.
-  The engine performs the exchange itself from four environment variables, caches it for the
-  process, and publishes the result into the child process's environment. Claude Code still has
+  The engine performs the exchange itself from a client ID and secret — discovering the token
+  endpoint from the MCP URL per RFC 9728 and RFC 8414 — caches it per endpoint, re-mints inside
+  an expiry margin, and publishes the result into the child process's environment. Claude Code still has
   no headless OAuth mode of its own; this works because 100xeval does the grant and hands over
   a bearer credential.
 

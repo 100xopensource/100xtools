@@ -340,16 +340,16 @@ def mcp_env_overlay(case: Case) -> dict:
     Empty for the static-key path and for a case with no MCP, so the common case pays
     nothing and behaves exactly as before.
     """
-    servers = _strict_server_names(case)
+    servers = _strict_servers(case)
     return mcp_oauth.env_for_servers(servers) if servers else {}
 
 
-def _strict_server_names(case: Case) -> list:
-    """Server names this case will authenticate: its own mcp_config's, else the plugin's."""
+def _strict_servers(case: Case) -> dict:
+    """`{name: url}` for the servers this case authenticates — its mcp_config's, else the
+    plugin's. The URL matters: it is what token-endpoint discovery walks from."""
     cfg = load_case_mcp_config(case) if case.mcp_config else None
-    if cfg:
-        return list(cfg.get("mcpServers", {}))
-    return list(plugin_mcp_server_configs(case))
+    source = cfg.get("mcpServers", {}) if cfg else plugin_mcp_server_configs(case)
+    return {name: (entry or {}).get("url", "") for name, entry in source.items()}
 
 
 def mcp_token_for(server_name: str) -> str | None:
