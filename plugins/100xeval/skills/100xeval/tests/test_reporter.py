@@ -7,7 +7,7 @@ from engine.models import Scorecard
 
 def _card(name, score, passed):
     c = Scorecard(name=name, score=score, passed=passed, cost_usd=0.02, duration_ms=250,
-                  harness="claude_code", model="claude-sonnet-5")
+                  harness="claude_code", model="claude-sonnet-5", plugins=["acme-north"])
     c.graders = [
         {"name": "q", "type": "tool_used", "weight": 1, "passRate": score,
          "runs": [{"passed": passed, "detail": "called sql 1x"}]},
@@ -20,7 +20,7 @@ def _card(name, score, passed):
 class TestReporter(unittest.TestCase):
     def test_json_schema_shape(self):
         report = reporter.build_report([_card("a", 1.0, True), _card("b", 0.5, False)])
-        self.assertEqual(report["schemaVersion"], "2.0")
+        self.assertEqual(report["schemaVersion"], "2.1")
         self.assertEqual(report["casesTotal"], 2)
         self.assertEqual(report["casesPassed"], 1)
         self.assertAlmostEqual(report["overallScore"], 0.75)
@@ -31,6 +31,8 @@ class TestReporter(unittest.TestCase):
         # Flat: harness/model + graders sit on the case, no `cells` map.
         self.assertNotIn("cells", case)
         self.assertEqual(case["harness"], "claude_code")
+        # 2.1 added this, additively — a report can be grouped by plugin, not only by case.
+        self.assertEqual(case["plugins"], ["acme-north"])
         self.assertEqual(case["model"], "claude-sonnet-5")
         self.assertEqual([g["name"] for g in case["graders"]], ["q", "cite"])
 

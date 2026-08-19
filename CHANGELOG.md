@@ -22,6 +22,13 @@ First public release. Scoring version **1**.
 - `--dry-run` shows what would execute and the rough spend before spending it.
 - `--cases-dir` selects the case root, `--runs-dir` the artifact location (default
   `.runs/`), `--entrypoint` overrides the emulated surface for a whole run.
+- `--comment PATH` writes a PR-comment-shaped scorecard: verdict first, one section per
+  plugin, detail folded away, and hard-capped under GitHub's 65536-character comment limit.
+  What it drops to fit is named in the body rather than silently cut. The documented CI
+  workflow posts it as a sticky comment, which needs `pull-requests: write` on those jobs.
+- Report JSON `schemaVersion` **2.1**: each case gained a `plugins` list of plugin names, so
+  a report can be grouped by plugin. Additive — a 2.0 reader keeps working. **The scoring
+  version is unchanged at 1**; no score moves.
 
 ### 100xdrift-check
 

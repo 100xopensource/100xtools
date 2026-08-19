@@ -110,7 +110,7 @@ class TestStaticOnlyWritesReports(unittest.TestCase):
 
     def _args(self, **kw):
         import argparse
-        base = dict(report=None, json_path=None, html_path=None)
+        base = dict(report=None, json_path=None, html_path=None, comment_path=None)
         base.update(kw)
         return argparse.Namespace(**base)
 
@@ -129,6 +129,21 @@ class TestStaticOnlyWritesReports(unittest.TestCase):
                 body = fh.read()
         self.assertIn("plugins/x", body)
         self.assertIn("0.68", body)
+
+    def test_comment_flag_writes_the_pr_comment(self):
+        import os
+        import tempfile
+        from engine import cli
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, "comment.md")
+            cli._emit_static(self.REPORT, self._args(comment_path=path))
+            self.assertTrue(os.path.isfile(path), "--static-only --comment must write the file CI posts")
+            with open(path, encoding="utf-8") as fh:
+                body = fh.read()
+        self.assertIn("plugins/x", body)
+        self.assertIn("0.68", body)
+        # The comment is a different shape from --report, not a copy of it.
+        self.assertIn("| Plugin | design_score |", body)
 
     def test_json_and_html_flags_also_write(self):
         import json as _json

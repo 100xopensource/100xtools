@@ -73,6 +73,7 @@ python3 "$RUN" eval --case '<case-glob>'                # one case by name
 python3 "$RUN" eval --static-only --target plugins/<p>  # design quality only (free, no run)
 python3 "$RUN" eval --skip-static --tag <skill>         # behavioral only
 python3 "$RUN" eval --tag <skill> --report eval.md --json eval.json --html eval.html
+python3 "$RUN" eval --static-only --comment pr.md              # PR-comment shape, size-capped
 ```
 
 Useful flags: `--runs N` (default 3), `--threshold X` (default 1.0), `--judge-model`,
@@ -130,6 +131,10 @@ nothing.
 The shape: a free `--static-only` job on every PR, plus a guarded behavioral job with
 `CLAUDE_CODE_OAUTH_TOKEN` for the model and one `MCP_<SERVER>_API_KEY` per declared MCP
 server. No secret value is ever written into a file.
+
+Both jobs post their scorecard on the pull request with `--comment`, so a red check explains
+itself where the decision is made. A fork PR gets a read-only token and cannot be commented on;
+that is expected and does not fail the job.
 
 ## Report back
 
