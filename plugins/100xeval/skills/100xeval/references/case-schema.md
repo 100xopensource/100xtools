@@ -19,25 +19,25 @@ best practice, gotchas).
 ## Template
 
 ```yaml
-name: askinventory-turn-full-score          # required, unique; also the run-folder name
+name: asktickets-first-response-full-score  # required, unique; also the run-folder name
 description: >-
   What this case proves, in one or two sentences.
 
   Source: who asked for it (issue / report id).
 plugins: ["../../plugins/acme-analytics"]   # path(s) RELATIVE TO THIS FILE
-tags: [acme, askinventory]        # select with --tag (ALL given tags must match)
+tags: [acme, asktickets]          # select with --tag (ALL given tags must match)
 runs: 3                                     # repetitions; passRate = passed / runs
 execution:
-  prompt: "What were the slowest hours at the Northgate store last week?"
+  prompt: "Which hours had the slowest first response for the Billing EU team last week?"
   model: claude-sonnet-5
   harness: claude_code                      # RUNTIME (see SKILL.md: harness vs entrypoint)
   entrypoint: none                          # SURFACE emulated; `none` = the harness's own prompt
   max_turns: 20                             # agent tool-loop budget (--max-turns)
   allowed_tools: [Read, Glob, Grep, Skill, mcp__Acme__run_query]
   append_system_prompt: null                # extra text layered after the entrypoint
-  mcp_config: ../mcp-config.json            # strict mode; omit to auto-build from the plugin
+  mcp_config: ../mcp-config.json            # omit to auto-build from the plugin's .mcp.json
 graders:
-  - {type: tool_used, name: filtered-to-store, tool: mcp__Acme__run_query, input_match: "Northgate", min: 1}
+  - {type: tool_used, name: filtered-to-team, tool: mcp__Acme__run_query, input_match: "Billing", min: 1}
   - type: llm
     name: presentation
     focus: last_message
@@ -72,7 +72,7 @@ Scaffold a stub with `python3 "$RUN" init <name> --plugin plugins/<p> --tag <ski
 | `entrypoint` | str | `none` | The **surface** emulated: its real system prompt at `engine/entrypoints/<name>.md`. `none` passes no system prompt, so the harness's own applies. Any other name with no file **aborts in preflight** rather than emulating nothing. `cowork` ships; override per run with `--entrypoint`. See `engine/entrypoints/README.md`. |
 | `max_turns` | int | `15` | Agent tool-loop budget, passed to the CLI as `--max-turns`. Raise it for long multi-step work (a report build needs far more than a single question). |
 | `timeout_s` | int | `300` | Per-**run** wall clock, in seconds. A multi-step build is killed at the default; `--timeout` overrides it for a whole invocation. |
-| `allowed_tools` | list[str] | `[]` | Tools granted to the run. Both `mcp__X__t` and `mcp__claude_ai_X__t` spellings are expanded automatically, so either works. |
+| `allowed_tools` | list[str] | `[]` | Tools granted to the run. MCP tools are the strict-config scheme only, `mcp__<Server>__<tool>`, spelled exactly as the server declares itself — the name's case is significant. |
 | `append_system_prompt` | str | `null` | Case-specific text layered **after** the entrypoint prompt. |
 | `mcp_config` | str | `null` | Path (relative to the case dir) to an MCP config JSON → strict mode. Omit and, when a bearer is in the env, one is auto-built from the plugin's own `.mcp.json`. |
 
@@ -91,7 +91,7 @@ Asserts the **shape** of what was queried, never a figure, so it doesn't go stal
 | Param | Default | Meaning |
 | --- | --- | --- |
 | `tool` | **required** | Tool name, or a glob (`mcp__server__*`). Canonicalized, so account vs plugin-scoped spellings match. |
-| `input_match` | — | Substring that must appear in the call's input (e.g. a store name). |
+| `input_match` | — | Substring that must appear in the call's input (e.g. a team name). |
 | `min` | `1` | Minimum matching calls. |
 | `max` | — | Maximum matching calls. |
 

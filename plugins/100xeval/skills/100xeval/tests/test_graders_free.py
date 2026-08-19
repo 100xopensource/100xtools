@@ -107,9 +107,12 @@ class TestToolUsedGlob(unittest.TestCase):
         self.assertTrue(self._grade(["mcp__Acme__run_query"], "mcp__Acme__run_query", min=1).passed)
         self.assertFalse(self._grade(["mcp__Acme__other"], "mcp__Acme__run_query", min=1).passed)
 
-    def test_glob_still_normalises_the_account_connector_alias(self):
-        # mcp__claude_ai_X__t and mcp__X__t are the same tool under two auth paths.
-        self.assertTrue(self._grade(["mcp__claude_ai_portfolio__nav"], "mcp__portfolio__*", min=1).passed)
+    def test_glob_matching_is_case_sensitive_on_the_server_name(self):
+        # Strict config is the only MCP path, so a tool is spelled exactly as the server
+        # declares itself. A grader that gets the case wrong reports "called 0x" — the same
+        # symptom as bad auth, which is why this is asserted rather than assumed.
+        self.assertTrue(self._grade(["mcp__Acme__nav"], "mcp__Acme__*", min=1).passed)
+        self.assertFalse(self._grade(["mcp__Acme__nav"], "mcp__acme__*", min=1).passed)
 
     def test_glob_composes_with_input_match(self):
         r = RunResult(tool_calls=[ToolCall("mcp__gl__query", "entity 400")])

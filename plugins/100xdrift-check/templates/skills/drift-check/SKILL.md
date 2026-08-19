@@ -69,10 +69,12 @@ which plugins build on or override the changed behavior.
    in that plugin's or repo's ecosystem (e.g. every plugin's report-runner skill, every
    plugin's install command). Match like for like — a command's sibling is a command.
 3. Read each sibling in full (and its `references/` files if the change touches
-   referenced content) and judge the pair. One verdict per sibling:
+   referenced content) and judge the pair. Note what you **matched on** — same name and
+   path, near-identical frontmatter description, same role — so a reviewer can check the
+   matching instead of trusting it. One verdict per sibling:
    - **likely-applies** — the same defect or improvement exists there; porting is
      probably worthwhile
-   - **sibling-specific** — legitimate variation for that plugin's or repo's context;
+   - **different on purpose** — legitimate variation for that plugin's or repo's context;
      recommend ignore
    - **conflicts** — the change contradicts a rule or assumption the sibling relies on
    - **unclear** — flag for human judgment, and say what to look at
@@ -89,21 +91,79 @@ Write your report to `./drift-report.md` (markdown — CI posts it as a PR comme
     contradict this change; merging or porting blindly risks breakage)
   - `<!-- drift-status: warning -->` — no conflicts, but any verdict is
     **likely-applies** or **unclear** (a human decision is needed)
-  - `<!-- drift-status: good -->` — every sibling is **sibling-specific** (or the changed
+  - `<!-- drift-status: good -->` — every sibling is **different on purpose** (or the changed
     files have no siblings) and at most FYI wording drift remains
 
 - Directly under the marker, one line naming what was searched, so nobody mistakes it for
   a wider check than it is: `_Scope: this repository — N plugins searched._`
-- One `### <changed file>` section per changed file with a table:
-  `| sibling plugin | sibling file | verdict | why (one line) |`
-- For each likely-applies: one short fenced block sketching the concrete edit that would
-  port it (old → new), so a reviewer can act on it directly.
+- Then one section per changed file, each opened by a `---` rule. **The whole section is a
+  GitHub alert** — it renders as one coloured band a reviewer can skim past or stop at.
+  Prefix EVERY line of the section with `> `, including blank lines (`>` alone), the diff
+  fences, and the table rows. One missed prefix ends the block early and the rest of the
+  section falls out of the band. Exactly two types, and the choice says what the section
+  ASKS OF A READER:
+  - `> [!CAUTION]` (red) — **a pull request is owed.** Any sibling is **likely-applies**:
+    there is a change to port, so somebody has to open a PR on that sibling.
+  - `> [!WARNING]` (yellow) — **everything else.** No sibling is likely-applies, so nothing
+    is waiting to be ported — whether the siblings **conflict**, are **unclear**, are
+    **different on purpose**, or the file has none at all.
+
+  Red means a PR is owed, not that the section is the scariest. A **conflicts** section is
+  `[!WARNING]` because nothing should be copied across — it is still often the most
+  important section in the report, and the `critical` status marker at the top of the file
+  is what carries that. The colour will not say it for you, so the verdict line must.
+
+  The alert's own label is fixed by GitHub (`Caution` / `Warning`) and cannot be renamed,
+  so the section's title is the first line INSIDE it, in bold, followed by a `>` spacer
+  line:
+  `> **Changed in <plugin>: <path to the changed file>**`. Naming the plugin the change
+  landed in makes the direction of the review obvious at a glance, which matters once
+  several plugins have changed in one pull request. It is bold text rather than a `###`
+  heading because a heading cannot live inside an alert without breaking the band; the cost
+  is that sections no longer appear in a rendered file's outline.
+
+  Then the verdict line. `[!CAUTION]` takes one form; `[!WARNING]` covers a wide range, so
+  its line is what separates "read this before merging" from "nothing here" — never let it
+  be generic:
+  - `[!CAUTION]` → `> **Action required** — port this to <sibling>; it needs its own pull
+    request.`
+  - `[!WARNING]`, sibling **conflicts** or **unclear** → `> **Alert** — <what to read and
+    why>. Nothing to port.`
+  - `[!WARNING]`, **different on purpose** or no siblings → `> **No action** — <why>.`
+
+  After it, the rest of the section in this order, all still `> `-prefixed:
+  1. **The change** — a fenced ` ```diff ` block quoting the diff, trimmed to the lines
+     that carry the decision. Name the location in the label when it helps, as in
+     `**The change** — under ## Window:`. Evidence, not a proposal: quote, never paraphrase.
+  2. One line saying what the change does.
+  3. The sibling table:
+     `| sibling plugin | sibling file | matched on | verdict | why (one line) |`
+     `matched on` says why the pair is a pair — same name and path, near-identical
+     description, same role — so the matching is checkable rather than asserted.
+  4. One bold action line, never vaguer than these:
+     - **To copy it across:** … — likely-applies. Where, and what to preserve.
+     - **Nothing to copy across.** … — conflicts, or different on purpose. Say what rules
+       it out.
+     - **Unclear:** … — unclear. Say exactly what a human should look at.
+  5. For likely-applies, a **Suggested edit** — a second fenced ` ```diff ` block, directly
+     after the action line, showing the edit in the SIBLING (old → new) and introduced by
+     the sibling's path and section. Include it ONLY when it would differ from **The
+     change** above; where the sibling's lines are identical to the pre-change lines, a
+     second diff says the same thing twice, so the action line pointing at the sibling's
+     section replaces it.
+  6. If the sibling carries a rule this change does not touch but a careless port would
+     break, quote that rule so it survives the port. Inside the alert that is a nested
+     blockquote — every line starts `> > ` — and never a second `[!…]`, which does not
+     nest.
+- **Quote the sibling's own words wherever they decide the verdict** — a rule the sibling
+  states, or a line it shares with the pre-change original. A verdict a reviewer can trace
+  back to the file beats one they have to take on faith.
 - If a changed file has no sibling in this repo, say so in one line — that is a useful
   signal, not a failure. Do not speculate about copies in other repositories; you did not
   look, and looking is out of scope.
 - Keep the whole report under ~200 lines; be selective, not exhaustive.
-- End with: `_Advisory only — reviewers decide apply/ignore per sibling. Legitimate
-  variation is expected._`
+- End with a `---` rule, then: `_Advisory only — reviewers decide apply/ignore per sibling.
+  Legitimate variation is expected._`
 
 When run interactively by a reviewer (not CI), also give a two-line summary of the
 verdicts in your reply after writing the file.

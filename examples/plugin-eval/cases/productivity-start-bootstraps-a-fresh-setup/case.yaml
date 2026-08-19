@@ -1,0 +1,44 @@
+name: productivity-start-bootstraps-a-fresh-setup
+description: >-
+  productivity/start documents a fresh-setup path: create TASKS.md, put dashboard.html in
+  the working directory, tell the user to open it themselves rather than shelling out, then
+  ask where their todo list lives. The eval workspace is always empty, so a run always takes
+  that path. This checks it does, with no connector called.
+
+plugins: ["../../vendor/productivity"]   # relative to THIS file; see ../../NOTICE
+tags: [example, happy-path, productivity]
+runs: 1
+
+execution:
+  prompt: "Set up my productivity system."
+  model: claude-sonnet-5
+  harness: claude_code
+  entrypoint: cowork
+  max_turns: 12
+  # Bash is allowed because the skill's step 2 copies dashboard.html from the plugin root;
+  # without it the copy fails on tool availability, not on the skill.
+  allowed_tools: [Read, Write, Edit, Glob, Grep, Bash, Skill]
+
+# Asserts what the skill documents, not a house style. The plugin declares 7 live MCP
+# servers, but a fresh setup reaches none of them: the comprehensive scan is offered in
+# step 6 and only runs after the user opts in.
+graders:
+  - {type: tool_used, name: worked-standalone, tool: mcp__*, min: 0, max: 0}
+
+  - {type: tool_used, name: creates-the-task-file, tool: Write, input_match: "TASKS.md", min: 1}
+
+  - type: regex
+    name: names-the-dashboard-file
+    target: last_message
+    pattern: "(?i)dashboard\\.html"
+
+  - type: llm
+    name: hands-off-the-dashboard-and-asks-for-the-todo-source
+    focus: last_message
+    criteria: >-
+      Two things must both hold. First, the reply tells the user to open the dashboard
+      themselves (from a file browser or similar) and does not claim to have opened it or
+      launched a browser for them. Second, it asks the user where their existing todos or
+      task list live — a file, or a named app such as Asana, Linear, Jira, Notion, or
+      Todoist — so their shorthand can be learned. Do not require a specific wording,
+      ordering, section layout, or that every example app be listed.

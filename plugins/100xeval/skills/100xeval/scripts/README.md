@@ -10,41 +10,44 @@ no virtualenv, no install step).
 python3 plugins/100xeval/skills/100xeval/scripts/run.py init <name> --plugin plugins/<p> --tag <skill> --prompt "…"
 
 # run static + behavioral (default)
-python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --tag asksales
+python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --tag asktickets
 
 # design quality only, no execution (free)
 python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only --target plugins/acme-analytics
 
 # behavioral only
-python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --skip-static --case 'asksales-*'
+python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --skip-static --case 'asktickets-*'
 ```
 
 Exit codes: `0` all pass · `1` a case below `--threshold` (default 1.0) · `2` engine error.
 
-## Behavioral runs need auth — two paths
+## Behavioral runs need auth — two credentials
 
-**Local (interactive):** authenticate the connector once (`claude` → `/mcp`), then run.
-The run reuses your account-level connector (same server URL as the plugin's `.mcp.json`).
-Pre-flight checks `claude mcp list` and aborts with guidance if it isn't connected,
-rather than producing a misleading dataless run.
-
-**Headless / CI (token injection) — also higher fidelity.** Set a bearer token in the
-environment and the runner isolates to the plugin's *own* MCP via
-`--mcp-config … --strict-mcp-config` (injecting the `Authorization` header, ignoring all
-ambient/account MCP). This is what makes CI work without interactive OAuth, and it tests
-the plugin's declared MCP as shipped rather than an account connector.
+MCP always goes through `--mcp-config … --strict-mcp-config`: the runner isolates to the
+plugin's *own* declared servers and injects the `Authorization` header from the environment.
+claude.ai account connectors are **not** supported — they load only under an interactive
+claude.ai login, so a run that leaned on one could never be reproduced in CI. Same path
+locally and headless, which is the point.
 
 ```bash
-export EVAL_MCP_BEARER='<service-token>'                 # applied to every declared server
-export EVAL_MCP_BEARER_ACME='<acme-only-token>'          # optional per-server override
-python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --tag asksales
+export MCP_ACME_API_KEY='<acme-key>'                     # one var per declared server
+export MCP_ACME_FEEDBACK_API_KEY='<acme-feedback-key>'   # `Acme-Feedback` → ACME_FEEDBACK
+
+# …or let the runner mint a short-lived token instead of holding a static key.
+# Two vars: the token endpoint is discovered from the MCP URL (RFC 9728 -> RFC 8414).
+export MCP_ACME_CLIENT_ID='<client-id>'
+export MCP_ACME_CLIENT_SECRET='<client-secret>'
+# optional: _TOKEN_URL to skip discovery, _AUTH_STYLE=post, _SCOPE (usually omit)
+python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --tag asktickets
 ```
 
-The token is read from the environment only — **never committed, never written to any
-`.mcp.json`**. In this mode pre-flight skips the account-connector
-check (irrelevant); a bad token surfaces at run time as `tool_used` "called 0×". Tool-name
-schemes differ between the two paths (`mcp__claude_ai_Acme__…` vs `mcp__Acme__…`); the
-runner canonicalizes them so a case's graders match either way.
+The credential is read from the environment only — **never committed, never written to any
+`.mcp.json`**; the config on disk holds the literal `${VAR}` and Claude Code expands it.
+A declared server with no credential is still passed through, just without the header, and
+answers 401 — which surfaces at run time as `tool_used` "called 0×", never as an auth error.
+Tool names are the strict-config scheme only, `mcp__<Server>__<tool>`, and the server-name
+**case** is significant: a grader written `mcp__acme__*` never matches a server declared
+`Acme` and the failure looks identical to a bad credential.
 
 ## Tests
 

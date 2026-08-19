@@ -47,8 +47,6 @@ def _grade_tool_used(grader: Grader, result: RunResult, context: dict):
 
     Stale-proof accuracy — asserts the query SHAPE, never a hard-coded number.
     """
-    from .harnesses.claude_code import canonical_tool_name
-
     p = grader.params
     tool = p.get("tool")
     if not tool:
@@ -56,7 +54,6 @@ def _grade_tool_used(grader: Grader, result: RunResult, context: dict):
     if context.get("tool_calls_unavailable"):
         # The harness cannot expose tool calls: don't false-fail.
         return False, "tool_used unsupported on this harness (tool calls not observable)"
-    tool = canonical_tool_name(tool)  # match across account vs plugin-scoped naming
     substring = p.get("input_match")
     minimum = int(p.get("min", 1))
     maximum = p.get("max")
@@ -67,8 +64,10 @@ def _grade_tool_used(grader: Grader, result: RunResult, context: dict):
     is_glob = any(ch in tool for ch in "*?[")
 
     def _hit(call) -> bool:
-        canon = canonical_tool_name(call.name)
-        named = fnmatch.fnmatchcase(canon, tool) if is_glob else canon == tool
+        # Case-sensitive on purpose, matching how the server declares itself: a grader
+        # written `mcp__acme__*` does NOT match a server named `Acme`, and that failure
+        # looks exactly like bad auth. Check the name's case before the credential.
+        named = fnmatch.fnmatchcase(call.name, tool) if is_glob else call.name == tool
         return named and (substring is None or str(substring) in call.input_str)
 
     matches = [c for c in result.tool_calls if _hit(c)]

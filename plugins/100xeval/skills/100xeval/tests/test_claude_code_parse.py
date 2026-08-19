@@ -5,7 +5,7 @@ from engine.harnesses import claude_code
 # A representative Claude Code session transcript (.jsonl) with two tool_use blocks.
 TRANSCRIPT = """
 {"type":"user","message":{"role":"user","content":[{"type":"text","text":"slowest hours?"}]}}
-{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Let me query."},{"type":"tool_use","name":"mcp__claude_ai_Acme__run_query","input":{"sql":"SELECT hour FROM sales WHERE store='Eastern'"}}]}}
+{"type":"assistant","message":{"role":"assistant","content":[{"type":"text","text":"Let me query."},{"type":"tool_use","name":"mcp__Acme__run_query","input":{"sql":"SELECT hour FROM sales WHERE store='Eastern'"}}]}}
 {"type":"assistant","message":{"role":"assistant","content":[{"type":"tool_use","name":"Read","input":{"file":"x.md"}}]}}
 not-json-garbage-line
 {"type":"result"}
@@ -18,7 +18,7 @@ class TestCoworkParse(unittest.TestCase):
     def test_parse_transcript_tool_calls(self):
         calls = claude_code.parse_transcript_tool_calls(TRANSCRIPT)
         self.assertEqual(len(calls), 2)
-        self.assertEqual(calls[0].name, "mcp__claude_ai_Acme__run_query")
+        self.assertEqual(calls[0].name, "mcp__Acme__run_query")
         self.assertIn("Eastern", calls[0].input_str)
         self.assertEqual(calls[1].name, "Read")
 

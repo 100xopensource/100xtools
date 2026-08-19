@@ -55,7 +55,7 @@ follow from that one decision, and each lands differently against South's copy:
 | --- | --- | --- | --- |
 | `skills/weekly-report/SKILL.md` | The same rolling-7-day window | `likely-applies` | Same bug, same fix |
 | `agents/reconciler.md` | Keys ledger rows on the end date, and says so | `conflicts` | ISO week numbers repeat across years and would collide |
-| `commands/export-csv.md` | Names files by fiscal period, one per store | `sibling-specific` | Finance ingests it that way — deliberate |
+| `commands/export-csv.md` | Names files by fiscal period, one per store | `different on purpose` | Finance ingests it that way — deliberate |
 
 Two plugins, three verdicts. That spread is the point: the same change is worth porting in
 one place, dangerous in another, and irrelevant in a third. Telling those apart is the
@@ -64,7 +64,7 @@ judgment the tool exists to make, and the reason it never edits anything itself.
 Because one verdict is `conflicts`, the whole report is 🔴 Critical. That is a prompt to
 look, not a merge blocker.
 
-[`expected-report.md`](./expected-report.md) shows the shape of a good answer. It is
+[`drift-report.md`](./drift-report.md) shows the shape of a good answer. It is
 illustrative, not asserted — the model's wording varies between runs, the three calls
 should not.
 
@@ -72,7 +72,7 @@ should not.
 
 **All three prompt surfaces are watched**, not just skills: the change touches a `SKILL.md`,
 a `commands/` file and an `agents/` file, which is exactly what the shipped watch list
-covers. See [what gets reviewed](../../plugins/100xdrift-check/README.md#what-gets-reviewed).
+covers — the `paths:` list in `.github/workflows/drift-check.yml`.
 
 **Siblings come from the same repo.** Two plugins in one tree is the shape this tool is for.
 Nothing is cloned or fetched — see

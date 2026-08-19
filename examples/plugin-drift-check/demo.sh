@@ -3,7 +3,7 @@
 #
 #   ./examples/plugin-drift-check/demo.sh [target-dir]
 #
-# Copies the four Acme plugins into a fresh repo, commits them as the baseline, then applies
+# Copies the two Acme plugins into a fresh repo, commits them as the baseline, then applies
 # the-change.patch on a branch. Prints how to run the review. Nothing here touches 100xtools.
 
 set -eu
@@ -23,7 +23,7 @@ cp -R "$HERE/plugins/." "$TARGET/plugins/"
 cd "$TARGET"
 git init -q -b main
 git add -A
-git -c user.email=demo@example.com -c user.name=Demo commit -q -m "Four regional plugins, copied from one original"
+git -c user.email=demo@example.com -c user.name=Demo commit -q -m "Two regional plugins, copied from one original"
 BASE=$(git rev-parse HEAD)
 
 # The reviewer resolves origin/main by default. There is no remote here, so point the ref
@@ -44,7 +44,7 @@ cat <<EOF
 Demo repo ready: $TARGET
 
   baseline   $BASE  (main, and origin/main)
-  branch     fix-week-boundary — 2 files changed in acme-north
+  branch     fix-week-boundary — 3 files changed in acme-north
 
 The reviewer is already vendored at .claude/skills/drift-check/, so:
 
@@ -52,7 +52,7 @@ The reviewer is already vendored at .claude/skills/drift-check/, so:
   claude
   > /drift-check
 
-Expect four verdicts across two changed files. See expected-report.md next to this script
+Expect three verdicts across three changed files. See drift-report.md next to this script
 for the shape of a good answer — the wording will differ, the calls should not.
 
 To rehearse the real setup instead, delete .claude/skills/drift-check and run
