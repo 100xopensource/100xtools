@@ -11,7 +11,10 @@ import json
 
 # 2.0: the per-case `cells` map (the old harness × model matrix) was flattened away —
 # `harness`, `model`, `graders`, `executions` now sit directly on each case.
-SCHEMA_VERSION = "2.0"
+# 2.1: ADDITIVE — each case gained a `plugins` list of plugin names, so a report can be
+# grouped by plugin rather than only by case. Nothing was removed or renamed, so a 2.0
+# reader keeps working; require 2.1 only if you need the grouping.
+SCHEMA_VERSION = "2.1"
 
 
 def build_report(cards: list, started_at: str | None = None) -> dict:
@@ -20,6 +23,7 @@ def build_report(cards: list, started_at: str | None = None) -> dict:
     for card in cards:
         cases.append({
             "name": card.name,
+            "plugins": list(card.plugins),   # names; lets a reader group by plugin
             "score": round(card.score, 4),
             "passed": card.passed,
             "error": card.error,

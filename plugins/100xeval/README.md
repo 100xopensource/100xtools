@@ -124,6 +124,10 @@ to add it for you: *"add the plugin-evals workflow from the README"*.
 no credentials, so it runs on every pull request, including ones from forks. Cases cost roughly
 $1–2 a run, so they get a credential and a guard.
 
+**Both jobs comment their scorecard on the pull request**, which is the point: a result you have
+to go looking for is a result nobody reads. That costs one extra permission,
+`pull-requests: write`, granted per job below.
+
 ### Step 1 — add the workflow
 
 Save this as `.github/workflows/plugin-evals.yml`, commit it, and push:
@@ -134,9 +138,10 @@ name: plugin-evals
 on:
   pull_request:
 
-permissions:
-  contents: read
-
+# Declared per job below rather than here: only the jobs that post a PR comment need
+# write access to pull requests, and a workflow-level grant would hand it to every job
+# you add later too.
+#
 # A run costs money, so don't leave three of them racing after three quick pushes.
 concurrency:
   group: plugin-evals-${{ github.ref }}
@@ -145,6 +150,9 @@ concurrency:
 jobs:
   static:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write        # the sticky comment, nothing else
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -166,12 +174,48 @@ jobs:
       - name: Static design quality
         run: |
           python3 vendor/100xtools/plugins/100xeval/skills/100xeval/scripts/run.py \
-            eval --static-only --report static.md
+            eval --static-only --report static.md --comment comment.md
           { echo '## Static design quality'; echo; cat static.md; } >> "$GITHUB_STEP_SUMMARY"
+
+      # The scorecard, on the pull request itself. Two flags carry the whole safety story:
+      # continue-on-error keeps a GitHub API hiccup out of your build verdict, and
+      # !cancelled() (rather than always()) means the comment still posts when the eval
+      # FAILED — the run you most want to read — while a run superseded by a newer push
+      # stays quiet instead of overwriting the newer comment.
+      #
+      # On a pull request from a FORK this step gets a read-only token and cannot post.
+      # It goes amber and the job stays green; the scorecard is still in the run summary.
+      - name: Comment the scorecard on the PR (sticky, non-blocking)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        continue-on-error: true
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- 100xeval-static -->';
+            let body = '';
+            try { body = fs.readFileSync('comment.md', 'utf8'); } catch {}
+            if (!body.trim()) {
+              body = '_The static eval step produced no report — see the Actions log._';
+            }
+            const { owner, repo } = context.repo;
+            const run = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`;
+            const message = `${marker}\n${body}\n\n_[Full run and artifacts](${run})_`;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(
+              github.rest.issues.listComments, { owner, repo, issue_number });
+            const prev = comments.find(c => c.body?.includes(marker));
+            if (prev) await github.rest.issues.updateComment(
+              { owner, repo, comment_id: prev.id, body: message });
+            else await github.rest.issues.createComment(
+              { owner, repo, issue_number, body: message });
 
   cases:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
     # On a public repo GitHub withholds secrets from fork pull requests. Without this guard
     # the job runs credential-less and scores zero for a reason that has nothing to do with
     # the plugin — the worst kind of red build.
@@ -217,8 +261,43 @@ jobs:
           MCP_ACME_API_KEY: ${{ secrets.MCP_ACME_API_KEY }}
         run: |
           python3 vendor/100xtools/plugins/100xeval/skills/100xeval/scripts/run.py \
-            eval --tag pr --threshold 0.8 --report evals.md --json evals.json
+            eval --tag pr --threshold 0.8 --report evals.md --json evals.json \
+            --comment comment.md
           { echo '## Plugin evals'; echo; cat evals.md; } >> "$GITHUB_STEP_SUMMARY"
+
+      # Same sticky-comment step as the static job, under its own marker so the two
+      # comments replace themselves independently — the free one must still report when
+      # this paid one is skipped.
+      - name: Comment the scorecard on the PR (sticky, non-blocking)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        continue-on-error: true
+        uses: actions/github-script@v8
+        env:
+          HAS_TOKEN: ${{ steps.creds.outputs.ok }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- 100xeval-cases -->';
+            let body = '';
+            try { body = fs.readFileSync('comment.md', 'utf8'); } catch {}
+            if (!body.trim()) {
+              // Which no-report case this is matters: a missing secret and a crashed run
+              // need different fixes.
+              body = process.env.HAS_TOKEN === 'true'
+                ? '_The eval run produced no report (engine error or timeout) — see the Actions log._'
+                : '_Skipped: no `CLAUDE_CODE_OAUTH_TOKEN` secret, so the paid run did not execute._';
+            }
+            const { owner, repo } = context.repo;
+            const run = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`;
+            const message = `${marker}\n${body}\n\n_[Full run and artifacts](${run})_`;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(
+              github.rest.issues.listComments, { owner, repo, issue_number });
+            const prev = comments.find(c => c.body?.includes(marker));
+            if (prev) await github.rest.issues.updateComment(
+              { owner, repo, comment_id: prev.id, body: message });
+            else await github.rest.issues.createComment(
+              { owner, repo, issue_number, body: message });
 
       # Keep the evidence even when the gate fails — that is the run you actually want to read.
       - uses: actions/upload-artifact@v4
@@ -229,11 +308,19 @@ jobs:
           if-no-files-found: ignore     # nothing to upload when the run was skipped
 ```
 
-Both jobs write their scorecard to the run summary, so you read the result on the **Actions**
-tab without downloading anything.
+Both jobs write their scorecard **to the pull request as a comment**, and to the run summary as
+well. The comment replaces itself on every push, so a long-lived PR carries one current scorecard
+rather than a pile of stale ones. Each job owns its own comment, which is why you may see two.
+
+**This YAML is a copy.** The canonical version lives in the plugin's own reference,
+`skills/100xeval/references/ci-setup.md`, together with the reasoning for every load-bearing line
+in it. If the two ever disagree, that one is right.
 
 **How to tell it worked:** open a pull request that changes anything, and two jobs appear on
-it — `static` with a score, and `cases` reporting it was skipped until you finish step 2.
+it — `static` with a score, and `cases` reporting it was skipped until you finish step 2. Within
+a minute the `static` job leaves a comment on the PR holding a row per plugin. On a pull request
+from a **fork** that comment cannot be posted (GitHub gives forks a read-only token); the job
+still passes and the scorecard is still in the run summary.
 
 **`pull_request` workflows run from your default branch**, so the check is not live until this
 file is merged there. That is normal for GitHub, not something this tool does.

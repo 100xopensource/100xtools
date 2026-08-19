@@ -15,6 +15,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
+from . import comment as comment_mod
 from . import loader, reporter
 from .orchestrator import run_case
 
@@ -123,6 +124,8 @@ def main(argv=None) -> int:
     p_eval.add_argument("--report", default=None, help="write markdown here")
     p_eval.add_argument("--json", dest="json_path", default=None, help="write JSON here")
     p_eval.add_argument("--html", dest="html_path", default=None, help="write HTML here")
+    p_eval.add_argument("--comment", dest="comment_path", default=None, metavar="PATH",
+                        help="write a PR-comment-shaped markdown report here (size-capped)")
     p_eval.add_argument("--verbose", action="store_true")
     p_eval.add_argument("--dry-run", dest="dry_run", action="store_true",
                         help="list what would run and the rough spend, without running it")
@@ -301,6 +304,11 @@ def _cmd_eval(args) -> int:
         _write(args.json_path, reporter.to_json(report))
     if args.html_path:
         _write(args.html_path, reporter.to_html(report))
+    # Only where asked. The run dir holds RESULTS (report.{md,json,html}); the comment is a
+    # transport shaping of a result, useful only when something is going to post it, so
+    # writing one into every local run folder would add a file nobody reads.
+    if args.comment_path:
+        _write(args.comment_path, comment_mod.cases_comment(report))
     print(f"\n📁 run artifacts: {run_dir}")
 
     if engine_error or load_failed:
@@ -357,6 +365,8 @@ def _emit_static(report, args):
         _write(args.json_path, json.dumps(report, indent=2))
     if args.html_path:
         _write(args.html_path, static_html(report))
+    if args.comment_path:
+        _write(args.comment_path, comment_mod.static_comment(report))
 
 
 def static_html(report) -> str:

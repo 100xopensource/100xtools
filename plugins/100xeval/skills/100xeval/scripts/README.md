@@ -78,6 +78,7 @@ engine/
   lint.py                   standalone plugin conformance linter (tagged findings)
   static.py                 design-quality layer — scores lint.py's findings
   reporter.py               Scorecard → markdown + stable JSON (schemaVersion)
+  comment.py                report dict → one PR comment that fits GitHub's size cap
   judge.py                  LLM judge: grader system prompt + majority vote over `votes`
   cli.py                    argparse: init, eval
   entrypoints/              SURFACE system prompts (none ship — see its README)

@@ -31,6 +31,23 @@ def case_dirname(case: Case) -> str:
     return _safe(case.name)
 
 
+def plugin_names(case: Case) -> list[str]:
+    """`Case.plugins` resolved to plugin names, for grouping a report by plugin.
+
+    The paths in a case file are relative to that case file, so the same plugin is spelled
+    differently from cases at different depths (`../../plugins/x` vs `../plugins/x`).
+    Resolving then taking the basename is what `graders.py` and `harnesses/claude_code.py`
+    already do to find the plugin on disk; here it also makes the name stable enough to
+    group on.
+    """
+    names = []
+    for rel in case.plugins:
+        name = os.path.basename(os.path.normpath(os.path.join(case.path, rel)))
+        if name and name not in names:
+            names.append(name)
+    return names
+
+
 def run_case(case: Case, threshold: float = 1.0, concurrency: int = 4,
              context_builder=None, judge_model=None, judge_votes=3, run_dir=None,
              judge_system_prompt=None, run_slots=None) -> Scorecard:
@@ -42,7 +59,8 @@ def run_case(case: Case, threshold: float = 1.0, concurrency: int = 4,
     not the per-case one. Held only around `harness.run`: a case that has finished running
     and is grading releases its slot so another case can start.
     """
-    card = Scorecard(name=case.name, harness=case.harness, model=case.model)
+    card = Scorecard(name=case.name, harness=case.harness, model=case.model,
+                     plugins=plugin_names(case))
     case_dir = os.path.join(run_dir, case_dirname(case)) if run_dir else None
     base_ctx = {"judge_model": judge_model, "judge_votes": judge_votes,
                 "judge_system_prompt": judge_system_prompt}

@@ -9,6 +9,10 @@ assumes you know which `MCP_<SERVER>_API_KEY` values the run needs; that one cov
 come from, the API-key and OAuth-client-credentials options, and why the claude.ai account
 connector is not a supported path anywhere.
 
+**Both jobs report twice: the run summary, and a sticky comment on the pull request.** The
+comment is the point of the exercise — a result nobody reads is a gate nobody trusts — and it
+costs one extra permission (`pull-requests: write`) plus one step per job.
+
 **Two jobs, because the layers cost differently.** The static check is free, needs no
 credentials, and can run on every pull request including forks. Behavioral cases cost roughly
 $1–2 a run, need a token, and must be guarded.
@@ -23,11 +27,16 @@ Ask only what you cannot read off the repository. Each answer changes the file:
 | Whether behavioral runs at all | If no `evals/**/case.yaml` exists yet, write the static job only. A `cases` job with no cases is a red build with nothing to fix |
 | Whether the plugin needs MCP, and which credential shape | Look for `.mcp.json` in the plugin, or `mcp_config` in a case. Its server names decide the variable names. Ask which the server issues: a static key (`MCP_<SERVER>_API_KEY`) or client credentials (four vars). No MCP means neither |
 | The threshold | Default `1.0` fails on one bad run of a repeated case. `0.8` is the sane starting gate; say which you chose and why |
+| Whether it comments on the PR | Default yes — it is the reason most people ask for this. Leave it out only for a repo where PR comments are actively policed, and then say the result lives in the run summary only. Dropping it also lets `permissions` stay `contents: read` |
 
 ## The file
 
-`.github/workflows/plugin-evals.yml`. Same content as the README's copy — keep the two in step
-if you change one.
+`.github/workflows/plugin-evals.yml`.
+
+**This page is the canonical copy of the YAML below.** `plugins/100xeval/README.md` carries a
+derived copy for a person who wants to paste the whole file without reading this page. Change
+this one first, then re-sync the README; the two must not disagree, because whichever a reader
+found first is the one they will trust.
 
 ```yaml
 name: plugin-evals
@@ -35,9 +44,8 @@ name: plugin-evals
 on:
   pull_request:
 
-permissions:
-  contents: read
-
+# Declared per job, not here: only the jobs that post a comment need write access to
+# pull requests, and a workflow-level grant would hand it to every job added later too.
 concurrency:
   group: plugin-evals-${{ github.ref }}
   cancel-in-progress: true
@@ -45,6 +53,9 @@ concurrency:
 jobs:
   static:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write        # the sticky comment, nothing else
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -58,12 +69,40 @@ jobs:
       - name: Static design quality
         run: |
           python3 vendor/100xtools/plugins/100xeval/skills/100xeval/scripts/run.py \
-            eval --static-only --report static.md
+            eval --static-only --report static.md --comment comment.md
           { echo '## Static design quality'; echo; cat static.md; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment the scorecard on the PR (sticky, non-blocking)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        continue-on-error: true
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- 100xeval-static -->';
+            let body = '';
+            try { body = fs.readFileSync('comment.md', 'utf8'); } catch {}
+            if (!body.trim()) {
+              body = '_The static eval step produced no report — see the Actions log._';
+            }
+            const { owner, repo } = context.repo;
+            const run = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`;
+            const message = `${marker}\n${body}\n\n_[Full run and artifacts](${run})_`;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(
+              github.rest.issues.listComments, { owner, repo, issue_number });
+            const prev = comments.find(c => c.body?.includes(marker));
+            if (prev) await github.rest.issues.updateComment(
+              { owner, repo, comment_id: prev.id, body: message });
+            else await github.rest.issues.createComment(
+              { owner, repo, issue_number, body: message });
 
   cases:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      pull-requests: write
     if: github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - uses: actions/checkout@v5
@@ -98,8 +137,42 @@ jobs:
           MCP_ACME_API_KEY: ${{ secrets.MCP_ACME_API_KEY }}   # one per declared server
         run: |
           python3 vendor/100xtools/plugins/100xeval/skills/100xeval/scripts/run.py \
-            eval --tag pr --threshold 0.8 --report evals.md --json evals.json
+            eval --tag pr --threshold 0.8 --report evals.md --json evals.json \
+            --comment comment.md
           { echo '## Plugin evals'; echo; cat evals.md; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Comment the scorecard on the PR (sticky, non-blocking)
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        continue-on-error: true
+        uses: actions/github-script@v8
+        env:
+          HAS_TOKEN: ${{ steps.creds.outputs.ok }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- 100xeval-cases -->';
+            let body = '';
+            try { body = fs.readFileSync('comment.md', 'utf8'); } catch {}
+            if (!body.trim()) {
+              // Say WHICH no-report case this is. "No report" from a missing secret and
+              // "no report" from a crashed run need different fixes, and a reader who
+              // cannot tell them apart goes to the log for both.
+              body = process.env.HAS_TOKEN === 'true'
+                ? '_The eval run produced no report (engine error or timeout) — see the Actions log._'
+                : '_Skipped: no `CLAUDE_CODE_OAUTH_TOKEN` secret, so the paid run did not execute._';
+            }
+            const { owner, repo } = context.repo;
+            const run = `https://github.com/${owner}/${repo}/actions/runs/${context.runId}`;
+            const message = `${marker}\n${body}\n\n_[Full run and artifacts](${run})_`;
+            const issue_number = context.payload.pull_request.number;
+            const comments = await github.paginate(
+              github.rest.issues.listComments, { owner, repo, issue_number });
+            const prev = comments.find(c => c.body?.includes(marker));
+            if (prev) await github.rest.issues.updateComment(
+              { owner, repo, comment_id: prev.id, body: message });
+            else await github.rest.issues.createComment(
+              { owner, repo, issue_number, body: message });
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -108,7 +181,7 @@ jobs:
           if-no-files-found: ignore
 ```
 
-## Four things in that file that are load-bearing
+## Six things in that file that are load-bearing
 
 Do not "tidy" any of these — each is there because the obvious alternative is wrong.
 
@@ -127,6 +200,17 @@ Do not "tidy" any of these — each is there because the obvious alternative is 
 4. **The token check before the CLI install.** It makes the secret optional: a repo that has the
    workflow but no token gets a summary note instead of a failing build, so the free static gate
    is usable on its own.
+5. **`continue-on-error` and `!cancelled()` on both comment steps.** `continue-on-error` keeps the
+   comment out of the verdict: the eval result decides the build, and a GitHub API hiccup or a
+   missing permission must not turn a passing eval into a red check. `!cancelled()` rather than
+   `always()` is what makes the comment run when the eval **failed** — which is the run you most
+   want commented — while still skipping a run killed by `cancel-in-progress`, so a superseded
+   job cannot overwrite a newer one's comment.
+6. **The fork asymmetry, which is not symmetrical with the jobs.** GitHub gives a fork pull
+   request a read-only token, so `pull-requests: write` is not actually granted there and posting
+   returns 403. The `cases` job already skips itself on forks, so the job that hits this is
+   **`static`** — the free one every contributor sees. It stays green (see 5) and the scorecard
+   stays in the run summary. Tell the user this rather than letting them read it as a bug.
 
 ## Secrets — tell the user to do this part
 
@@ -162,6 +246,10 @@ never written to the config or the run folder. See `mcp-auth.md`.
   `0`. A gate that passes because it evaluated nothing is the failure mode this tool exists to
   catch, so check the case count in the report, not just the exit code.
 - Say plainly that `pull_request` workflows only take effect once merged to the default branch.
+- **The comment cannot be verified locally.** `--comment out.md` proves the body is generated and
+  what it says; that it *posts* is only observable on a real pull request after this file is on
+  the default branch. Do not report the comment as working before then — say which half you
+  checked.
 
 ## Failure modes
 
@@ -174,5 +262,9 @@ never written to the config or the run folder. See `mcp-auth.md`.
 | `tool_used` "called 0×" | A missing, bad, or expired `MCP_<SERVER>_API_KEY` — including a name that does not match the server. Check the key before the skill |
 | Exit `2` | Engine error — a case that will not parse, a missing plugin path. Nothing was evaluated |
 | Green build, zero cases run | `--tag` matches no case |
+| No comment appears, job green | Fork pull request (expected — see load-bearing item 6), or `pull-requests: write` missing from that job |
+| Comment appears twice | Two jobs each own a comment by design, one `<!-- 100xeval-static -->` and one `<!-- 100xeval-cases -->`. Two of the *same* marker means the marker was edited between runs, so the update step could not find its predecessor |
+| Comment says "Trimmed to fit" | Normal on a large suite: the body hit GitHub's 65536-character cap and named what it withheld. The full report is in the run summary and the artifact |
+| Comment says a plugin "could not be analyzed" | A bad `--target` or a directory with no `.claude-plugin/plugin.json`. This is the one static failure that *does* set a non-zero exit |
 
 Exit codes: `0` at or above threshold, `1` a case below it, `2` engine error.

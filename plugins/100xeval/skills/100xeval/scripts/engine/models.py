@@ -144,6 +144,10 @@ class Scorecard:
     graders: list = field(default_factory=list)
     # executions[i] = {run, session_id, transcript_path, cost_usd, duration_ms, error, …}
     executions: list = field(default_factory=list)
+    # Plugin NAMES, not `Case.plugins`' case-relative paths — a report grouped under
+    # `../../plugins/acme-north` names the case's directory layout, not the plugin.
+    # Resolved at the construction site in orchestrator.py.
+    plugins: list = field(default_factory=list)
     error: str | None = None
 
     def label(self) -> str:
