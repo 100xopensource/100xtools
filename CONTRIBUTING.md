@@ -41,12 +41,31 @@ and what Claude invokes at runtime, so the suite stays out of that payload. Test
 `engine.*` absolutely, so `PYTHONPATH=scripts` is what makes them resolve.
 
 ```bash
+# will the plugins load? manifest, layout, marketplace registration
+python3 scripts/validate_plugins.py
+
 # static self-check — both plugins should score 1.00
 python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only
 ```
 
-CI runs these two plus `scripts/check_docs.py` and a manifest-consistency check. If they
-pass locally they pass there.
+Those two linters answer different questions and neither repeats the other: the validator
+asks whether a plugin loads, the static layer asks whether it is any good. A skill folder
+with no `SKILL.md` scores a clean 1.00, because the design linter walks `SKILL.md` files and
+a folder without one is invisible to it. Run both.
+
+CI runs all three of the above plus `scripts/check_docs.py`. If they pass locally they pass
+there.
+
+### The skills we develop with
+
+`.claude/skills/` holds the plugin-development workflow itself — dev-only, not part of any
+plugin. `create-plugin` scaffolds a new `plugins/<name>/`, `create-skill` writes a SKILL.md
+and explains why it will or won't trigger, `lint-plugin` runs both linters and turns each
+finding into an edit, and `review-plugin` is the judgment pass before you open the PR.
+
+They carry the current Claude Code contract — frontmatter fields, the 1,536-character
+listing cap, hook event names. If you find one out of step with
+[the docs](https://code.claude.com/docs/en/plugins-reference), that is a bug worth a PR.
 
 ### The pre-commit hook
 

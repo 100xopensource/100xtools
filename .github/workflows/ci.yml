@@ -83,32 +83,16 @@ jobs:
       - name: Validate the docs/ knowledge bundle
         run: python3 scripts/check_docs.py
 
+  # Will the plugins LOAD, as opposed to the `static` job's will they SCORE. A malformed
+  # manifest, a component stranded inside .claude-plugin/, or an unlisted plugin fails at
+  # install time for a user, with a worse error message than this one.
   manifests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
 
-      # A malformed manifest fails at install time for a user, with a worse error message
-      # than this one. Cheap to check here.
-      - name: Validate plugin + marketplace manifests
-        run: |
-          set -e
-          for f in .claude-plugin/marketplace.json plugins/*/.claude-plugin/plugin.json; do
-            python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f"
-            echo "ok  $f"
-          done
-          # Every plugin in the marketplace must exist, and every plugin must be listed.
-          python3 - <<'PY'
-          import json, os, sys
-          mp = json.load(open(".claude-plugin/marketplace.json"))
-          listed = {p["name"]: p["source"].lstrip("./") for p in mp["plugins"]}
-          on_disk = {d for d in os.listdir("plugins")
-                     if os.path.isfile(f"plugins/{d}/.claude-plugin/plugin.json")}
-          missing = {n: s for n, s in listed.items() if not os.path.isdir(s)}
-          unlisted = on_disk - {os.path.basename(s) for s in listed.values()}
-          if missing:
-              sys.exit(f"marketplace lists plugins with no directory: {missing}")
-          if unlisted:
-              sys.exit(f"plugins on disk not listed in marketplace.json: {sorted(unlisted)}")
-          print(f"ok  {len(listed)} plugins listed and present")
-          PY
+      - name: Validate plugin structure, manifests and registration
+        run: python3 scripts/validate_plugins.py

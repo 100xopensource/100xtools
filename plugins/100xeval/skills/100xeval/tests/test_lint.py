@@ -283,6 +283,18 @@ class TestSecurityChecks(PluginFixture):
               "---\nname: greet\ndescription: Greets people.\ntriggers: hello, hi\n---\n\nhi\n")
         self.assertNotIn("FM4", self.ids())
 
+    def test_documented_frontmatter_fields_are_known(self):
+        # Every field in the SKILL.md frontmatter reference. A field the runtime accepts but
+        # this set does not know is one FM4 finding per skill that uses it, against a plugin
+        # doing nothing wrong.
+        for key, val in (("background", "false"), ("compatibility", "claude-code"),
+                         ("user-invocable", "false"), ("shell", "bash"),
+                         ("disallowed-tools", "Write"), ("paths", "src/**")):
+            with self.subTest(key=key):
+                write(os.path.join(self.plugin, "skills", "greet", "SKILL.md"),
+                      f"---\nname: greet\ndescription: Greets people.\n{key}: {val}\n---\n\nhi\n")
+                self.assertNotIn("FM4", self.ids())
+
     def test_plugin_namespaced_skill_name_is_fine(self):
         # `zoom-cobrowse-sdk` in `cobrowse-sdk/` is a convention, not a defect.
         write(os.path.join(self.plugin, "skills", "cobrowse-sdk", "SKILL.md"),

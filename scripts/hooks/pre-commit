@@ -53,11 +53,13 @@ if [ -n "$staged" ]; then
 fi
 if [ -n "$leaks" ]; then bad; printf "%b\n" "$leaks"; else ok; fi
 
-# ── 2. Manifests ─────────────────────────────────────────────────────────────────
-step "manifests parse"
-if for f in .claude-plugin/marketplace.json plugins/*/.claude-plugin/plugin.json; do
-     python3 -c "import json,sys; json.load(open(sys.argv[1]))" "$f" || exit 1
-   done >/dev/null 2>&1; then ok; else bad; fi
+# ── 2. Plugins load ──────────────────────────────────────────────────────────────
+# Manifests, layout, marketplace registration, agent frontmatter, hooks and MCP config.
+# Every failure here is one a user would otherwise meet at install time, with a worse
+# message than this one.
+step "plugins load"
+load_out=$(python3 scripts/validate_plugins.py 2>&1) && ok \
+  || { bad; echo "$load_out" | sed 's/^/    /'; }
 
 # ── 3. Docs bundle ───────────────────────────────────────────────────────────────
 step "docs bundle"

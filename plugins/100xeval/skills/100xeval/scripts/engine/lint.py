@@ -64,8 +64,9 @@ from dataclasses import dataclass
 SKILL_FM_KNOWN = {
     "name", "description", "when_to_use", "argument-hint", "arguments",
     "disable-model-invocation", "user-invocable", "allowed-tools",
-    "disallowed-tools", "model", "effort", "context", "agent", "hooks",
-    "paths", "shell", "license", "version", "metadata", "triggers",
+    "disallowed-tools", "model", "effort", "context", "agent", "background",
+    "hooks", "paths", "shell", "license", "compatibility", "version",
+    "metadata", "triggers",
 }
 
 VAGUE_SKILL_NAMES = {"helper", "helpers", "util", "utils", "tools", "misc"}

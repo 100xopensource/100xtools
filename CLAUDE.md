@@ -11,10 +11,12 @@ from a clean clone, with no install step.
 
 ```
 .claude-plugin/marketplace.json   one entry per plugin; CI checks it against plugins/
+.claude/skills/                   how WE develop here — dev-only, never shipped
 docs/                             OKF knowledge bundle — concepts, NOT shipped with plugins
 examples/<tool>/                  worked eval cases + vendored third-party plugins
 plugins/<name>/                   self-contained plugin: manifest, README, skills/
 scripts/check_docs.py             OKF bundle conformance + link check
+scripts/validate_plugins.py       will a plugin LOAD: manifest, layout, registration
 .github/workflows/ci.yml          test · static · examples · docs · manifests
 ```
 
@@ -86,12 +88,46 @@ GitHub; `docs/index.md` records that deviation.
 `scripts/check_docs.py` enforces all of the above plus link resolution, and fails on a
 leftover v0.1 `timestamp` field so a spec migration cannot half-happen.
 
+## The two linters
+
+A plugin here goes through two, and they answer different questions. Neither repeats the
+other, so a green from one means nothing about the other:
+
+| | `scripts/validate_plugins.py` | `100xeval`'s `engine/lint.py` |
+| --- | --- | --- |
+| Question | will it **load**? | is it any **good**? |
+| Covers | manifest, layout, marketplace entry, agent frontmatter, hooks/MCP config | skill design, progressive disclosure, reference hygiene, security smells |
+| Result | errors and warnings | `design_score` 0..1 with sub-scores |
+| Ships with a plugin | no — repo dev tool and CI gate | yes, it is what 100xeval *is* |
+
+The split is why a skill folder containing no SKILL.md scores 1.00: the design linter walks
+SKILL.md files, so a folder without one is invisible to it. That gap is the validator's.
+Conversely a vague description is invisible to the validator. Both run in CI and in the
+pre-commit hook.
+
+## Developing here
+
+`.claude/skills/` is the dev surface — how we build plugins in this repo, not part of any
+plugin. Alongside the two `-concepts` skills that explain the shipped tools:
+
+| Skill | For |
+| --- | --- |
+| `create-plugin` | a new `plugins/<name>/`: manifest, layout, registration |
+| `create-skill` | a SKILL.md inside an existing plugin, and why it will or won't trigger |
+| `lint-plugin` | running both linters and turning findings into edits |
+| `review-plugin` | the judgment pass a script cannot do, before commit or on a PR |
+
+They carry the current Claude Code contract — frontmatter fields, the 1,536-character
+listing cap, hook event names. When the docs move, these move with them, along with
+`SKILL_FM_KNOWN` in `lint.py` and the constant tables in `validate_plugins.py`.
+
 ## Commands
 
 No install, build, or lockfile step anywhere.
 
 ```bash
 # From the REPO ROOT
+python3 scripts/validate_plugins.py                                          # will they load?
 python3 plugins/100xeval/skills/100xeval/scripts/run.py eval --static-only   # design quality, free
 python3 scripts/check_docs.py                                                # docs bundle
 
@@ -246,9 +282,9 @@ the workflow's `/drift-check` prompt resolves against the vendored copy or nothi
 It also pins the contract to the commit under review. The cost: the copy goes stale
 silently, and in the consuming repo anyone who can open a PR can edit it.
 
-This repo does **not** vendor a copy — `.claude/skills/` carries only the two `-concepts`
-skills, which explain the tools rather than operate them. To try the reviewer here, install
-it into a scratch repo, or use the fixture under `examples/plugin-drift-check/`.
+This repo does **not** vendor a copy — the `-concepts` skills in `.claude/skills/` explain
+the tools rather than operate them. To try the reviewer here, install it into a scratch
+repo, or use the fixture under `examples/plugin-drift-check/`.
 
 `templates/skills/drift-check/SKILL.md` and `templates/workflows/drift-check.yml` are **one
 contract split across two files**. The skill writes `drift-report.md` whose first line must
