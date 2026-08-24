@@ -1,0 +1,37 @@
+name: ux-copy-rewrites-an-error-message
+description: >-
+  design/ux-copy documents a structure for error messages — what happened, why, how to fix.
+  This gives it a message with none of that and checks the rewrite has all three.
+
+plugins: ["../../vendor/design"]   # relative to THIS file; see ../../NOTICE
+tags: [example, happy-path, design]
+runs: 1
+
+execution:
+  prompt: >-
+    Review this error message and rewrite it. It appears when a file upload fails because
+    the file is larger than the 25 MB limit: "Error 500: Something went wrong."
+  model: claude-sonnet-5
+  harness: claude_code
+  entrypoint: cowork
+  max_turns: 8
+  allowed_tools: [Read, Glob, Grep, Skill]
+
+# Asserts the skill's own documented pattern, not a house style.
+graders:
+  - {type: tool_used, name: worked-standalone, tool: mcp__*, min: 0, max: 0}
+
+  - type: regex
+    name: offers-a-way-forward
+    target: last_message
+    pattern: "(?i)\\b(try|choose|select|compress|reduce|use|upload)\\b"
+
+  - type: llm
+    name: follows-what-why-fix
+    focus: last_message
+    criteria: >-
+      The rewritten message states what happened, why (the file exceeds the size limit),
+      and what the user can do next. It is written in plain language with no raw error
+      code or stack-trace jargon carried into the rewrite, though quoting the original for
+      comparison is fine. Do not require a specific wording, length, or that the 25 MB
+      figure appear verbatim.

@@ -1,0 +1,41 @@
+name: code-review-finds-sql-injection
+description: >-
+  engineering/code-review claims to work STANDALONE — paste a diff, get a security audit
+  covering injection. This pastes a function with an obvious SQL injection and checks it
+  is named, without any connector.
+
+plugins: ["../../vendor/engineering"]   # relative to THIS file; see ../../NOTICE
+tags: [example, happy-path, engineering]
+runs: 1
+
+execution:
+  prompt: |
+    Review this before I merge:
+
+    def get_user(conn, email):
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM users WHERE email = '" + email + "'")
+        return cur.fetchone()
+  model: claude-sonnet-5
+  harness: claude_code
+  entrypoint: cowork
+  max_turns: 8
+  allowed_tools: [Read, Glob, Grep, Skill]
+
+# Asserts what the skill documents: a standalone security audit that names injection.
+graders:
+  - {type: tool_used, name: worked-standalone, tool: mcp__*, min: 0, max: 0}
+
+  - type: regex
+    name: names-the-vulnerability-class
+    target: last_message
+    pattern: "(?i)sql injection"
+
+  - type: llm
+    name: flags-it-and-shows-the-fix
+    focus: last_message
+    criteria: >-
+      The review identifies the SQL injection caused by concatenating `email` into the
+      query, and shows or describes the fix (a parameterised or prepared query). It must
+      not claim the code is safe. Other findings are fine; do not require a particular
+      format, severity label, or section layout.

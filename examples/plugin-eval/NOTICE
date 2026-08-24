@@ -1,0 +1,44 @@
+Third-party content vendored into examples/plugin-eval/vendor/
+==================================================
+
+The plugins under `examples/plugin-eval/vendor/` are NOT part of 100xtools. They are copies of
+third-party work, included so the example eval cases resolve and run from a clean clone
+with no network access.
+
+    Source:    https://github.com/anthropics/knowledge-work-plugins
+    Path:      {design, engineering, productivity}
+    Commit:    2cf42948f0b79c5492bb38981752b815fc6788ec
+    Date:      2026-08-10
+    Copyright: Anthropic, PBC
+    Licence:   Apache License 2.0 — see examples/plugin-eval/vendor/LICENSE
+
+    Modifications: NONE. All three plugin directories are byte-for-byte copies of the
+    upstream directories at the commit above, verified with `diff -r`.
+
+    `productivity` is the only one of the three that ships an `.mcp.json`, so it is the
+    one plugin here that can exercise the strict-config path. Two cases name it:
+    `productivity-start-bootstraps-a-fresh-setup` runs connector-free, and
+    `productivity-creates-a-linear-ticket` narrows the plugin's nine declared servers to
+    one and writes to it, so that case needs a credential and has a real side effect.
+
+Why they are vendored rather than fetched
+-----------------------------------------
+An eval case names the plugin it exercises as a path, and a case whose plugin directory is
+missing fails to load. Fetching at run time would leave a fresh clone with two broken cases
+until a script ran, and would make CI depend on network access to validate them. Pinning a
+copy to one commit also makes the examples reproducible: they assert how *this* snapshot
+behaves, so a change upstream cannot silently rewrite what the examples claim.
+
+Updating the snapshot
+---------------------
+Re-copy the directories from a newer commit, update the commit and date above, and
+re-run the example cases. Expect the assertions to need review: they describe how the
+plugins actually behave, not how they ought to.
+
+Note for readers
+----------------
+`examples/plugin-eval/vendor/` is excluded from this repo's own static sweep — vendored third-party code
+is not ours to score. Lint it deliberately if you want to:
+
+    python3 plugins/100xeval/skills/100xeval/scripts/run.py \
+      eval --static-only --target examples/plugin-eval/vendor/design

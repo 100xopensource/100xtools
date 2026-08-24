@@ -1,0 +1,28 @@
+# Secrets — tokens come from the environment at run time.
+.env
+.env.*
+!.env.example
+
+# Eval run output. Large, machine-specific, and can contain whatever your MCP returned.
+# This is the default location; a custom --runs-dir needs its own entry here.
+.runs/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Editors / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Claude Code local settings, not project config
+.claude/settings.local.json
+
+# Your org's private leak patterns for the pre-commit hook. Listing the internal names you
+# are blocking would publish them, which is the thing the hook exists to prevent.
+scripts/hooks/leak-patterns.local

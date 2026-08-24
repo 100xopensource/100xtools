@@ -1,0 +1,68 @@
+name: productivity-creates-a-linear-ticket
+description: >-
+  Exercises the strict-MCP-config write path end to end: one server, authenticated from the
+  environment, and a tool call that changes state in Linear. This is the case productivity
+  was vendored for — the other two example plugins ship no `.mcp.json`.
+
+  OFF-CONTRACT, on purpose. productivity's documented tracker flow is inbound only: `update`
+  fetches issues assigned to the user into TASKS.md. No skill claims to create a ticket, so
+  this asserts the connector works, not that a skill behaves. A failure here points at auth
+  or the MCP server, not at the plugin's design.
+
+  SIDE EFFECT: every run creates a real issue in whatever Linear workspace the credential
+  belongs to. `runs: 1` for that reason. The title carries a 100xeval prefix so the
+  leftovers are easy to find and delete. There is no cleanup step — a second run makes a
+  second ticket.
+
+  AUTH: `MCP_LINEAR_API_KEY` only. A personal Linear API key works, sent as a Bearer —
+  verified against the live endpoint, and not obvious from the server's own metadata, which
+  answers an unauthenticated request with `WWW-Authenticate: Bearer realm="OAuth"`. The
+  `MCP_<SERVER>_CLIENT_ID`/`_CLIENT_SECRET` path CANNOT work here: this authorization server
+  advertises `authorization_code`, `refresh_token` and `jwt-bearer`, and `mcp_oauth.py`
+  implements `client_credentials`, which is absent.
+
+  ATTRIBUTION: on a machine with user-level plugins installed, a passing run may prove
+  nothing about the plugin under test. The first green run of this case reached Linear via a
+  *user-installed* plugin's skill, not via anything the vendored plugin ships — see the
+  hermeticity note in the repo's CLAUDE.md. The graders below assert the connector works,
+  which is still a true and useful thing to know, but do not read a pass as a verdict on
+  `productivity`.
+
+plugins: ["../../vendor/productivity"]   # relative to THIS file; see ../../NOTICE
+tags: [example, mcp, write-side-effect, productivity]
+runs: 1
+
+execution:
+  # Narrows the plugin's 9 declared servers to the 1 this case needs. Without it all 7 with
+  # a non-empty URL are spawned and each wants its own MCP_<SERVER>_API_KEY.
+  mcp_config: mcp-linear-only.json
+  prompt: >-
+    Create a ticket in Linear titled "100xeval smoke test — safe to delete" with a
+    description saying it was created by an automated eval run and can be closed. Put it on
+    whichever team you find first. Tell me the identifier you got back.
+  model: claude-sonnet-5
+  harness: claude_code
+  entrypoint: cowork
+  max_turns: 12
+  allowed_tools: [Read, Glob, Grep, Skill, mcp__linear__list_teams, mcp__linear__save_issue]
+
+graders:
+  # Split from the write check on purpose: "server unreachable" and "server reached but the
+  # write never happened" are different failures and want different fixes.
+  - {type: tool_used, name: reached-the-linear-server, tool: mcp__linear__*, min: 1}
+
+  - {type: tool_used, name: created-the-issue, tool: mcp__linear__save_issue, min: 1}
+
+  - type: regex
+    name: reports-the-issue-identifier
+    target: last_message
+    pattern: "[A-Z][A-Z0-9]+-[0-9]+"
+
+  - type: llm
+    name: confirms-the-ticket-exists
+    focus: last_message
+    criteria: >-
+      The reply states that a ticket was created in Linear and gives its identifier. It must
+      not describe the ticket as a draft, a proposal, or something the user still needs to
+      create, and must not report an error or a missing connection. Do not require a
+      particular team, URL, or formatting.
