@@ -309,12 +309,12 @@ Missing the factory framing is the single most expensive mistake here. `skills/`
 skills a person actually talks to (`hand-off`, `pick-up`) live under `templates/kit/` and
 exist only inside emitted Kits, the same split 100xdrift-check uses for its reviewer.
 
-**One entry point, and Plan and Emit are phases rather than skills.** They were two skills;
-the chain then had a step nobody started. In the first real run `verify` was named four
-times and never performed, and the Operator ended up asking how to test any of it — so
-`set-up-handoff` runs interview → plan → approval → write → verify, and its self-check says
-`verify` was *run*, not offered. `verify` stays separately invokable because "a teammate
-says pick-up is broken" must not re-interview anyone. See `docs/adr/0001-one-setup-skill.md`.
+**One entry point, and Plan and Emit are phases rather than skills.** `set-up-handoff` runs
+interview → plan → approval → write → verify in one turn, and its self-check asserts `verify`
+was *run*, not offered — a chain split across skills has a step nobody starts, and the step
+that gets skipped is always the last one. `verify` stays separately invokable because "a
+teammate says pick-up is broken" must not re-interview anyone. `store-service` likewise: it
+is re-run whenever that server changes. See `docs/adr/0001-one-setup-skill.md`.
 
 | Factory path | Becomes, in the Operator's repo |
 | --- | --- |
@@ -378,8 +378,8 @@ becomes the lenient one.
 
 **Every failure carries two strings.** `say` is one plain sentence for a Teammate; `hint`
 is the engine's own wording for whoever maintains it. The Kit skills are told to repeat
-`say` and never `hint`, because relaying `hint` verbatim is how *transcript* and *bundle*
-reached people who had never heard of either — measured at 0/3 before the split existed.
+`say` and never `hint`. A Kit that relays `hint` puts *transcript* and *bundle* in front of
+someone who has never heard of either, and `evals/errors-stay-in-plain-words` scores that.
 `_plain()` in `cli.py` is deliberately lossy: anything it cannot map collapses to "that
 didn't work, and nothing was sent", because a vague true sentence beats an exact one full
 of words the reader has no use for.

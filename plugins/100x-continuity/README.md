@@ -18,6 +18,34 @@ you, in Claude Code                    your teammates, in Cowork
 └────────────────────┘                 └──────────────────────────┘
 ```
 
+## How setting it up goes
+
+```mermaid
+flowchart TD
+    A["You: build my team a handoff plugin"] --> B[set-up-handoff]
+    B --> C{Is a Kit already in this repo?}
+    C -->|Yes| D[Read kit.json. Use it for the defaults.]
+    C -->|No| E[Read the repo. Find the synced folders.]
+    D --> F[Ask: the name, the repo, who it is for]
+    E --> F
+    F --> G{Where do handoffs go?}
+    G -->|Folder store| H[Ask for the folder and the group]
+    G -->|Store service| I[store-service]
+    I --> I1[Copy the server template]
+    I1 --> I2[Ask which storage vendor you use]
+    I2 --> I3[Run the server from your own .env]
+    I3 --> I4[You deploy it. You register it with your org.]
+    I4 --> J[Ask for the registered server name]
+    H --> K[Write continuity-plan.md]
+    J --> K
+    K --> L{Do you approve the Plan?}
+    L -->|No| F
+    L -->|Yes| M[Write the Kit into your repo]
+    M --> N[verify]
+    N --> O[Run the contract test. Hand this session over. Open it again.]
+    O --> P["Report: proven / proven against a stand-in / not proven yet"]
+```
+
 ## What your teammates get
 
 Two skills, in ordinary words. No configuration, nothing to set up, no store to choose —
@@ -43,9 +71,9 @@ Then, from inside the plugin repository your organisation ships from:
 | `verify` | on its own, later | proves a kit round-trips — for "a teammate says pick-up is broken" |
 | `store-service` | only for a service store | copies out the MCP server, gets credentials, runs it locally |
 
-One entry point on purpose. Splitting the interview from the writing meant the chain had a
-step nobody started: in the first real run the verification was named four times and never
-performed, and the Operator had to ask how to test it.
+One entry point. `set-up-handoff` does the interview, writes the plugin, and checks it in a
+single run. It stops one time only: it asks you to approve the Plan. `docs/adr/0001-one-setup-skill.md`
+records why.
 
 Nothing is branched, committed, or pushed. You release it however your org releases
 plugins — for most, merging to the marketplace repo's main branch is the release.

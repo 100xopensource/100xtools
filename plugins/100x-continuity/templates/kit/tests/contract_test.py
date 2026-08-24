@@ -243,11 +243,10 @@ class FolderStore(_Contract):
 class ServiceStore(_Contract):
     """Everything up to and including the download digest.
 
-    The store's own server is reached over MCP, which a shell cannot speak, so minting
-    is not exercised here. What is exercised is the half that has actually been wrong:
-    whether a download is checked against the digest the server reported. The transport
-    is stubbed rather than served locally, because the engine refuses a plain-http URL
-    and that refusal is itself worth keeping — see the first check below.
+    The store's own server is reached over MCP, which a shell cannot speak, so minting is
+    not exercised here. What is exercised is the download: the bytes must match the digest
+    the server reported. The transport is stubbed rather than served locally, because the
+    engine refuses a plain-http URL — see the first check below.
     """
 
     def test_a_plain_http_url_is_refused(self) -> None:
@@ -283,7 +282,7 @@ class ServiceStore(_Contract):
         self.assertEqual((self.tmp / "in.zip").read_bytes(), body)
 
     def test_bytes_that_do_not_match_are_refused(self) -> None:
-        """The check the reading skill promises. As invoked, it once never ran."""
+        """The check `pick-up` promises the reader. It must run without a flag."""
         body = pathlib.Path(self.pack()["bundle"]).read_bytes()
         wrong = bytearray(body)
         wrong[len(wrong) // 2] ^= 0xFF
@@ -291,7 +290,7 @@ class ServiceStore(_Contract):
             self._download(bytes(wrong), hashlib.sha256(body).hexdigest())
 
     def test_the_reading_skill_passes_the_reported_digest_through(self) -> None:
-        """The defect was here: `fetch` honoured only --sha256, which nothing passed."""
+        """`fetch` must read the digest out of the mint answer, not only from --sha256."""
         mint = self.tmp / "mint.json"
         mint.write_text(
             json.dumps({

@@ -22,6 +22,5 @@ cannot.
 | `pick-up-explains-an-unknown-code` | a code that opens nothing invents nothing |
 | `errors-stay-in-plain-words` | the failure path repeats `say`, never `hint` |
 
-Two of these were failing when this plugin's templates were written, both on `hand-off`,
-and both were fixed in the factory rather than here. Edits in this directory are build
-output: the next time somebody re-runs the factory, they are overwritten.
+Edits in this directory are build output. The next run of the factory overwrites them. Fix
+a case in the factory, then emit this plugin again.

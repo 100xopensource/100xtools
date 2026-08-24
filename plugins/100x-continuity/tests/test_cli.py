@@ -362,10 +362,9 @@ if __name__ == "__main__":
 class PlainErrorTests(_CliCase):
     """Every failure carries a sentence a teammate can read.
 
-    The Kit relays what the engine says. When the only string on offer was `hint`,
-    written for whoever debugs this engine, words like `transcript` and `bundle`
-    reached people who had never heard of either — measured at 0/3 in the Kit's own
-    eval cases before `say` existed.
+    A Kit relays what the engine says, so the engine must offer a string it is safe to
+    relay. `hint` is written for whoever debugs this engine and uses words like
+    `transcript` and `bundle`; `say` is for the person handing work to a colleague.
     """
 
     #: Words the Kit's skills are told never to put in front of a person.
