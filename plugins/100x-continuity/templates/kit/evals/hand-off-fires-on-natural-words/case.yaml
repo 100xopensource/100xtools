@@ -1,0 +1,24 @@
+schema_version: "1.1"
+name: hand-off-fires-on-natural-words
+description: >
+  Nobody types the skill's name. They say what they want, and the routing has to work
+  from that alone — this is the sentence the whole plugin exists to answer.
+tags: [routing, hand-off]
+plugins: ["../.."]
+runs: 3
+execution:
+  prompt: |
+    Can you hand this over to Dana? She's picking it up in the morning.
+  max_turns: 8
+  allowed_tools: [Bash, Read, Glob, Grep, Skill]
+graders:
+  - name: routed-to-hand-off
+    type: tool_used
+    tool: Skill
+    input_match: hand-off
+    min: 1
+  - name: did-not-route-to-pick-up
+    type: tool_used
+    tool: Skill
+    input_match: pick-up
+    max: 0

@@ -55,8 +55,17 @@ caught only on a second pass.
 
 **4. Trust-boundary files need author ≠ reviewer.** `.github/workflows/*`,
 `plugins/100xdrift-check/templates/workflows/drift-check.yml`,
-and `plugins/100xdrift-check/templates/skills/drift-check/SKILL.md` decide what CI does with
-model output and what tools the model gets. Checks there only ever tighten; if a change relaxes a guard, say
+`plugins/100xdrift-check/templates/skills/drift-check/SKILL.md`,
+`plugins/100x-continuity/scripts/engine/redact.py`,
+`plugins/100x-continuity/scripts/engine/bundle.py`, and
+`plugins/100x-continuity/templates/store-service/server.py` decide what CI does with
+model output, what tools the model gets, and what runs automatically on a user's machine.
+`redact.py` is on that list because it is the only thing standing between a full session
+transcript and a folder that syncs to somebody's cloud account; `bundle.py` because it is
+what refuses a hostile archive somebody else wrote before it is unpacked onto a reader's
+disk, and what refuses to publish a staged file holding a credential; `server.py` because
+it is the template that decides who can read whose session, on infrastructure the user
+runs. A change that weakens a pattern in any of them is a privacy incident, not a bug. Checks there only ever tighten; if a change relaxes a guard, say
 so explicitly rather than letting a reviewer find it.
 
 **5. Every plugin scores 1.00** on the static linter this repo ships. CI dogfoods it, so a
@@ -86,6 +95,12 @@ GitHub; `docs/index.md` records that deviation.
 `scripts/check_docs.py` enforces all of the above plus link resolution, and fails on a
 leftover v0.1 `timestamp` field so a spec migration cannot half-happen.
 
+**`docs/adr/` is the one directory under `docs/` that is not part of the bundle.** An ADR
+records a decision and the trade behind it; an OKF doc explains a thing that exists.
+Conformance skips it — dressing an ADR in `type:` frontmatter to get it past the checker
+would be calling it something it is not — but the link check does not, because a broken
+link is a broken link either way.
+
 ## Commands
 
 No install, build, or lockfile step anywhere.
@@ -103,9 +118,11 @@ for f in static.analyze('plugins/100xeval')['findings']: print(f)"
 ```
 
 ```bash
-# Engine tests — offline; no model, MCP, or network calls. Two plugins ship a suite, and
+# Engine tests — offline; no model, MCP, or network calls. Two plugins ship a suite and
 # CI's `test` job matrixes over both, so a new suite means a new row in that matrix.
-cd plugins/100xeval/skills/100xeval          # or plugins/100xcontinuity/skills/100xcontinuity
+# The path is wherever `scripts/` and `tests/` sit: a skill directory when one skill owns
+# the engine, the plugin root when several skills share it (100x-continuity).
+cd plugins/100xeval/skills/100xeval          # or plugins/100x-continuity
 PYTHONPATH=scripts python3 -m unittest discover -s tests -p 'test_*.py'
 
 # One module / class / test
@@ -278,46 +295,151 @@ The workflow is not active in this repo — it is a template for repos that inst
 files carrying that one line read as duplication to `token_efficiency`, which counts
 frontmatter. Re-add it together with a fix excluding frontmatter from that metric.
 
-### 100xcontinuity — session continuity
+### 100x-continuity — a factory that builds a team's session handoff
 
-Saves artifacts and conversation records into a durable store and loads them back in a
-later session. **Plugin-only: there is no server**, so it writes to the user's own storage
-directly and never needs a presigned URL.
+**It is not a handoff plugin. It is the thing that writes one.** An Operator installs it
+in Claude Code, answers questions about their team and their storage, and it emits a
+**Kit** — a tailored plugin, with the store baked in, written into *their* plugin repo
+with its marketplace row. Their Teammates install the Kit and use it in Cowork; they never
+see this. Everything below follows from that one fact. `plugins/100x-continuity/CONTEXT.md`
+is the glossary: Factory, Kit, Emit, Plan, Operator, Teammate, Handle, Bundle, Store.
 
-**"Local" means a folder someone's sync client already watches** — iCloud Drive, OneDrive,
-a synced SharePoint library, Google Drive, Dropbox. That client does the uploading; the
-plugin syncs nothing. So a successful save proves bytes reached local disk, *never* that
-they reached the cloud, and there is no completion signal to wait on. Say so rather than
-describing a save as backed up.
+Missing the factory framing is the single most expensive mistake here. `skills/` holds
+`set-up-handoff`, `verify` and `store-service` — none of them hand anything over. The
+skills a person actually talks to (`hand-off`, `pick-up`) live under `templates/kit/` and
+exist only inside emitted Kits, the same split 100xdrift-check uses for its reviewer.
 
-That one choice explains the whole storage design, and each piece looks arbitrary without
-it:
+**One entry point, and Plan and Emit are phases rather than skills.** They were two skills;
+the chain then had a step nobody started. In the first real run `verify` was named four
+times and never performed, and the Operator ended up asking how to test any of it — so
+`set-up-handoff` runs interview → plan → approval → write → verify, and its self-check says
+`verify` was *run*, not offered. `verify` stays separately invokable because "a teammate
+says pick-up is broken" must not re-interview anyone. See `docs/adr/0001-one-setup-skill.md`.
 
-- **Blobs are content-addressed** by their own sha256, so two machines writing identical
-  bytes produce one file.
-- **The entry log is append-only.** Nothing is ever rewritten, so a sync client never has
-  two versions to reconcile — conflict copies are structurally impossible rather than
-  resolved after the fact. The cost is that history grows monotonically.
-- **Reads verify bytes against the digest in the key.** An evicted file reads as short or
-  empty with *no error*, and only iCloud leaves a marker a store could spot — Dropbox and
-  Google Drive do not. The digest check is therefore the real guarantee and lives in
-  `session.load_artifact`; `store.py`'s `.icloud` check is a fast path with a better
-  message. Short bytes are `ObjectNotMaterialized` (wait for the client); full-length
-  mismatch is corruption, a different problem with a different remedy.
+| Factory path | Becomes, in the Operator's repo |
+| --- | --- |
+| `templates/kit/**` | the Kit's manifest, README, two skills, two references, `tests/`, `evals/` |
+| `scripts/run.py`, `scripts/engine/*.py` | the Kit's own copy of the engine |
+| `templates/kit/fragments/*.md` | spliced into the skills; never copied as files |
+| `scripts/emit.py` | stays here — the only factory-side module |
 
-`normalize_session_id` maps unresolved sentinels — `unknown`, `unknown-session`, an
-unexpanded `${CLAUDE_SESSION_ID}` — to a single `unattributed` slot. An unresolved save
-still **succeeds**; losing the artifact would be worse. The CLI says so in the result, and
-that hint is load-bearing: without it a store quietly fills with work nobody can find.
+**Emitting is a script, not a copy-and-substitute done by hand** (`scripts/emit.py`,
+`tests/test_emit.py`). A skill copying twenty files and filling placeholders does it
+slightly differently every run, and the difference surfaces in a Teammate's session weeks
+later. Four rules it owns:
 
-`evals/` holds behavioral cases that need the sibling 100xeval plugin, so they are
-repo-only and not part of what a marketplace install operates. They cost money and are not
-in CI. Their graders read the **store**, not the transcript — and any case built mainly
-from absence assertions needs one positive assertion too, or a run that never happened
-scores well.
+- **Placeholders are all-or-nothing.** One unfilled `{{TEAM}}` aborts the write. A
+  placeholder that reaches a Kit still loads and still instructs the model, silently.
+  Fragments are rendered *before* being spliced, because substitution is a single pass and
+  a value carried in by a fragment would otherwise never be filled.
+- **A Kit describes one store.** The passages for the other are never copied in — a skill
+  offering two routes invites the model to try the one that team never set up.
+- **`source` in the marketplace row is relative to the repo root.** Getting it wrong
+  yields a manifest that validates and an install that finds nothing.
+- **A non-empty directory with no `kit.json` is refused**, and the marketplace path is
+  resolved *before* any file is written, so a wrong `--into` cannot leave half a plugin in
+  someone's repo.
 
-The S3-compatible backend and the MCP surface are declared in the seam and not yet built;
-`--backend s3` fails with a modelled error rather than writing nowhere.
+**`kit.json` is the whole point of the config tier.** Precedence is flag › environment ›
+**kit** › config file › default, so a Teammate who configured nothing gets the team's
+store and an Operator debugging can still override. `root` is stored with `~` unexpanded:
+a Teammate's home is not the Operator's, and the part after it usually is the same. The
+file's presence is also how a re-emit tells a Kit from somebody else's plugin.
+
+**A publication is one immutable bundle plus a marker.** `bundle.zip` holds
+`manifest.json` + `start-here.html` + `transcript/` + `artifacts/`; `publication.json`
+sits beside it and is written **last**, so an interrupted publish leaves a directory every
+reader skips rather than a publication that looks small. Inside the archive the manifest
+is likewise the last member. `page.py` renders the landing page — self-contained HTML, no
+script and no network, because it is opened straight from a synced folder.
+
+**The manifest describes content and nothing else** — no timestamp, no source path, no
+store. Those are facts about a *publication*, and keeping them out is what makes bundles
+**reproducible**: the same conversation and files pack to identical bytes, so a republish
+of unchanged work is recognised as the publication it already is (`already_published`)
+instead of filed twice. A publication id is `<stamp>-<sha12>`, so changed work lands
+beside its predecessor and nothing is ever rewritten — conflict copies in a synced folder
+are structurally impossible rather than resolved after the fact.
+
+**Store paths are human-readable on purpose.** `<root>/<namespace>/<session>/<publication>/`
+— because the handoff *is* a path a person pastes, so an opaque digest tree would make the
+product unusable. The tradeoff is stated in the skills rather than engineered away: a
+folder store has **no access control at all**, and redaction is its only boundary.
+
+**Two store kinds, and `s3` is deliberately not one of them.** `folder` is a directory a
+sync client watches — verified working inside Cowork, where a Teammate's granted drives
+appear under `~/mnt/`. `service` is object storage behind an MCP server the *Operator*
+runs and registers with their org, which mints presigned URLs — so a Kit still holds no
+credential and still cannot list or read back what it PUTs. `config.check_store_kind`
+rejects `s3`/`minio` by name pointing at that path, because it is the wrong shape rather
+than a missing feature. `wire.py` holds the URL refusals (https only, no credentials, no
+redirects, optional host pin) once for both directions; a second copy is how one of them
+becomes the lenient one.
+
+**Every failure carries two strings.** `say` is one plain sentence for a Teammate; `hint`
+is the engine's own wording for whoever maintains it. The Kit skills are told to repeat
+`say` and never `hint`, because relaying `hint` verbatim is how *transcript* and *bundle*
+reached people who had never heard of either — measured at 0/3 before the split existed.
+`_plain()` in `cli.py` is deliberately lossy: anything it cannot map collapses to "that
+didn't work, and nothing was sent", because a vague true sentence beats an exact one full
+of words the reader has no use for.
+
+**Artifacts travel verbatim and are scanned, never rewritten.** They are files a person
+composed, so `bundle.py` fails closed instead: a credential-shaped value inside a text
+artifact stops the publish by name, a credential-shaped *filename* is refused outright,
+and a non-text file is reported `unscanned` rather than clean. Reading is the mirrored
+problem — a bundle arrives from someone else, so every member is validated (inside the
+known directories, no absolute paths, no `..`, no links or devices, no Windows drive or
+backslash shapes, size and count capped) before a byte is written to disk. The zip
+metadata carries no file-type bits unless written with them, so `_safe_members` checks
+`stat.S_IFMT` only when present and refuses anything that is not a regular file.
+
+**`pick-up` never guesses which publication you meant.** There is no "most recent
+publish" fallback and no index session: a handle or a publication id is always required.
+An index would be one more file two machines can disagree about inside a synced folder,
+and the directory tree already holds the answer.
+
+**Inside Cowork, `${CLAUDE_PLUGIN_ROOT}` may not resolve.** The base path a skill is told
+it has does not exist there; the files are reachable under
+`~/mnt/.remote-plugins/plugin_<id>/`. Both Kit skills try the advertised path first and
+fall back to that one, scoped to `.remote-plugins` — never a search across `~/mnt`, which
+also holds the team's synced drives.
+
+`transcript.py`, `digest.py`, `redact.py` and the presigned-PUT logic came from the
+retired 100xcontinuity rather than being shared with it (invariant 1) — the fixes there
+were hard-won, and the copy was the point. One difference: `identify()` here reads
+**`aiTitle`**, the field the host actually writes; reading `title` alone returned None for
+every real session, silently.
+
+`redact.py`'s patterns look like `100xeval`'s `SECRET_PATTERNS` and must not be merged
+with them: the linter optimizes for **precision** (a false positive costs a plugin its
+security sub-score), the redactor for **recall** (redacting a placeholder costs nothing,
+missing a credential costs everything).
+
+`templates/store-service/` is a FastMCP server implementing the service-store contract
+— two tools plus listing and access, ownership from the verified principal, server-chosen
+keys, a per-publication reader list — with a Dockerfile and no deploy recipe, because
+where it runs is the Operator's. `principal()` fails closed without a verified identity.
+It is a starting point the user owns, and it is on the trust-boundary list.
+
+**Two test layers, and only one of them gates anything.** `templates/kit/tests/contract_test.py`
+ships *inside* every Kit: deterministic, no model, no money, driven from a synthetic session
+in a throwaway `HOME` because packing a real conversation would put it in the store. It
+branches on `kit.json` and skips the half its store does not have, so a folder Kit and a
+service Kit each report what they actually proved. CI emits a Kit and runs it. The Kit's
+`evals/` are `claude plugin eval` cases about what the *model* does with the two skills;
+they cost money, gate nothing, and exist for the failures a contract test structurally
+cannot see — a skill that fires on the wrong words, or leaks internal vocabulary.
+
+That split came from a real run: the contract test found that `fetch` never checked the
+digest the store reported, and the eval cases found the two prompt defects. Neither tool
+would have found the other's.
+
+The **repo's own** `evals/` need the sibling 100xeval plugin, so they are repo-only and not
+part of what a marketplace install operates. They cost money and are not in CI. Their
+graders read the **emitted Kit and the store**, not the transcript — and any case built
+mainly from absence assertions needs one positive assertion too, or a run that never
+happened scores well.
 
 ## Adding a plugin
 

@@ -19,6 +19,7 @@ venv/
 .idea/
 .vscode/
 *.swp
+*.code-workspace
 
 # Claude Code local settings, not project config
 .claude/settings.local.json

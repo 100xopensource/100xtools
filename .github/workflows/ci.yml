@@ -22,11 +22,13 @@ jobs:
         # 3.11 is the floor we claim in the README; test the ends of the supported range so
         # a version-specific stdlib change can't break a user we told it would work for.
         python-version: ["3.11", "3.13"]
-        # One entry per plugin that ships a suite. A plugin with no tests is simply absent
-        # here rather than carrying an empty tests/ to keep a wildcard happy.
+        # One entry per plugin that ships a suite: the directory holding its `scripts/`
+        # and `tests/`, which is the skill directory when one skill owns the engine and
+        # the plugin root when several skills share it. A plugin with no tests is simply
+        # absent here rather than carrying an empty tests/ to keep a wildcard happy.
         suite:
           - plugins/100xeval/skills/100xeval
-          - plugins/100xcontinuity/skills/100xcontinuity
+          - plugins/100x-continuity
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-python@v6
@@ -42,6 +44,29 @@ jobs:
         env:
           PYTHONPATH: scripts
         run: python3 -m unittest discover -s tests -p 'test_*.py' -v
+
+      # The factory's unit tests prove it writes the right files. This proves the files
+      # it writes actually work: emit a Kit of each store kind into a scratch directory
+      # and run the contract test that ships inside it. Deterministic, offline, and the
+      # only check here that exercises an emitted plugin rather than a template.
+      - name: Emitted Kit round-trips
+        if: matrix.suite == 'plugins/100x-continuity'
+        working-directory: ${{ matrix.suite }}
+        run: |
+          set -euo pipefail
+          for kind in folder service; do
+            out="${RUNNER_TEMP}/kit-${kind}"
+            if [ "$kind" = folder ]; then
+              extra=(--store folder --root "${RUNNER_TEMP}/store-${kind}")
+            else
+              extra=(--store service --service-name ci-store)
+            fi
+            python3 scripts/emit.py --into "$out" --name ci-handoff \
+              --team "the CI team" --org CI --namespace ci "${extra[@]}" > /dev/null
+            # A placeholder reaching a Kit still loads and still instructs the model.
+            ! grep -rq '{{' "$out" || { echo "unfilled placeholder in $kind kit"; exit 1; }
+            ( cd "$out" && python3 tests/contract_test.py )
+          done
 
   static:
     runs-on: ubuntu-latest
