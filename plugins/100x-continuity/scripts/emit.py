@@ -298,7 +298,7 @@ def engine_commands(store: str, kit_source: str) -> str:
 _EVAL_ROWS = (
     ("hand-off-fires-on-natural-words", 'routing from "hand this over to Dana"', None),
     ("hand-off-stays-out-of-an-ordinary-write", "that saving a note does not package a session", None),
-    ("credential-file-stops-and-asks", "the stop happens, and in a pop-up", None),
+    ("hand-off-never-claims-what-it-did-not-do", "that a handoff which stopped is reported as stopped", None),
     ("hand-off-stops-when-the-store-is-unreachable", "that an unreachable store stops the handoff", "service"),
     ("pick-up-fires-on-a-pasted-code", "routing from a pasted code alone", None),
     ("pick-up-explains-an-unknown-code", "a code that opens nothing invents nothing", None),
@@ -313,11 +313,12 @@ def eval_invocation(store: str) -> str:
     what admit you to it. The rest are not decoration either: scored on the wrong surface,
     or without the store's tools, every case fails in a way that reads like a broken skill.
     """
-    tools = " \\\n    --allow-tools 'mcp__*'" if store == "service" else ""
+    grants = "Bash Write 'mcp__*'" if store == "service" else "Bash Write"
     lines = [
         "```bash",
         "CLAUDE_CODE_WALNUT_SPIRE=1 CLAUDE_CODE_ENTRYPOINT=remote_cowork \\",
-        f"  claude plugin eval . --ablation none --judge-model sonnet{tools}",
+        "  claude plugin eval . --ablation none --judge-model sonnet \\",
+        f"    --allow-tools {grants}",
         "```",
         "",
         "Every part of that line is load-bearing:",
@@ -327,11 +328,14 @@ def eval_invocation(store: str) -> str:
         "- `CLAUDE_CODE_ENTRYPOINT=remote_cowork` — these skills are used in Cowork, so its",
         "  system prompt is the one they have to work under. Scored anywhere else, you are",
         "  scoring a surface nobody here has.",
+        f"- `--allow-tools {grants}` — **the one to check first when every case passes and you",
+        "  do not believe it.** `Bash` and `Write` are gated, and without the grant the skills",
+        "  are refused the tool they need to reach their own engine. A refusal reads a lot like",
+        "  a handoff that could not be made, so the cases go green having tested nothing.",
     ]
     if store == "service":
         lines += [
-            "- `--allow-tools 'mcp__*'` — without it the store server's tools are absent, and",
-            "  every case fails as though the skill were broken rather than unequipped.",
+            "  `mcp__*` is there for the same reason: no store server tools, no handoff.",
         ]
     lines += [
         "- `--ablation none` — one arm, the plugin exactly as it ships.",

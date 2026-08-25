@@ -29,14 +29,21 @@ if [ ! -f "$CARRY" ]; then
   ID=$(printf '%s' "$SKILL_BASE_DIR" | tr '/' '\n' | grep -m1 '^plugin_')
   CARRY="$HOME/mnt/.remote-plugins/$ID/scripts/run.py"
 fi
+if [ ! -f "$CARRY" ]; then
+  CARRY="$SKILL_BASE_DIR/../../scripts/run.py"
+fi
 SESSION="${CLAUDE_SESSION_ID}"
 ```
 
-The first path is the ordinary one. The second is for a session where the folder this
-skill is told it lives in doesn't resolve — the files are reachable under
-`~/mnt/.remote-plugins/plugin_<id>/` instead. Search only inside that folder if you have
-to look; searching all of `~/mnt` is slow, because the team's shared folders are under
-there too.
+Three places, in order. The first is the ordinary one. The second is for a session where
+the folder this skill is told it lives in doesn't resolve — the files are reachable under
+`~/mnt/.remote-plugins/plugin_<id>/` instead. The third needs nothing set at all: this
+skill sits at `<plugin>/skills/hand-off/`, so the engine is always two levels up from it.
+
+If all three miss, say so and stop. Do **not** go hunting with `find` — the third path is
+derived from where this file is, so if it is wrong the plugin is not laid out the way it
+ships, and a search will either come back empty or turn up somebody else's copy. Searching
+all of `~/mnt` is the worst of these: the team's shared folders are under there too.
 
 Results come back as JSON. A failure exits non-zero and carries two strings: **`say`**
 is one plain sentence written for the person in front of you — repeat that one.

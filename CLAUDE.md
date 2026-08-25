@@ -491,9 +491,24 @@ CLAUDE_CODE_WALNUT_SPIRE=1 CLAUDE_CODE_ENTRYPOINT=remote_cowork \
 
 `CLAUDE_CODE_WALNUT_SPIRE=1` admits you to the command at all; `remote_cowork` is the
 surface a Teammate actually runs these skills on, so scoring anywhere else scores a system
-prompt nobody has; `--allow-tools 'mcp__*'` is emitted **only into a service Kit**, whose
-cases otherwise fail as though the skill were broken rather than unequipped. `eval_invocation()`
-in `emit.py` owns that split, next to `eval_table()` and `engine_commands()`.
+prompt nobody has. `eval_invocation()` in `emit.py` owns the line, next to `eval_table()`
+and `engine_commands()`, and adds `'mcp__*'` only for a service Kit.
+
+**`--allow-tools Bash Write` is the part that decides whether anything is tested at all.**
+Those tools are gated; without the grant the skills are refused the tool they need to reach
+their own engine, and a refusal reads almost exactly like a handoff that could not be
+made — so every case goes green having exercised nothing. That is not hypothetical: a run
+of `pick-up-explains-an-unknown-code` scored 1.00 three times over while Bash was denied and
+`open --handle` was never called once. **Suspect the grant first when a suite passes and you
+do not believe it.**
+
+**Two things a Kit's eval cases structurally cannot see**, both properties of the runner:
+each run gets a throwaway `HOME`, so there is no conversation to package and `hand-off`
+stops at its own session check — nothing past that point is exercised; and
+`AskUserQuestion` is not among the tools a headless run is offered, so the pop-up rule for
+a credential-shaped file cannot be scored. `hand-off-never-claims-what-it-did-not-do` is
+written around the invariant that survives both — a handoff that stopped is reported as
+stopped — rather than around one cause, so it stays honest as the harness changes.
 
 The **repo's own** `evals/` need the sibling 100xeval plugin, so they are repo-only and not
 part of what a marketplace install operates. They cost money and are not in CI. Their

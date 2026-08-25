@@ -16,5 +16,23 @@ cannot.
 | --- | --- |
 {{EVAL_TABLE}}
 
+## What this harness cannot reach
+
+Worth knowing before you read a green run as proof, because both of these are properties
+of the runner rather than of this plugin:
+
+- **There is no conversation in the sandbox.** Each run gets a throwaway home, so the
+  engine finds no session to package and `hand-off` stops at its own session check. Nothing
+  past that point — choosing files, the scrub, the credential stop, the code coming back —
+  is exercised here. `tests/contract_test.py` covers those mechanics; what stays unproven
+  is the *model's* judgement inside them.
+- **`AskUserQuestion` is not offered to a headless run.** So the rule that a
+  credential-shaped file goes to a pop-up rather than a line in the chat cannot be scored
+  at all. It is a real rule and it is written into the skill; it is simply not observable
+  from here.
+
+Neither is a reason to skip these cases. Routing, refusals and wording are most of what
+goes wrong in a skill, and all of it is visible.
+
 Edits in this directory are build output. The next run of the factory overwrites them. Fix
 a case in the factory, then emit this plugin again.

@@ -230,11 +230,20 @@ class EmitTests(unittest.TestCase):
         listed = (folder / "evals" / "README.md").read_text(encoding="utf-8")
         self.assertIn("CLAUDE_CODE_WALNUT_SPIRE=1", listed)
         self.assertIn("CLAUDE_CODE_ENTRYPOINT=remote_cowork", listed)
-        # A folder Kit has no server, so the tool flag would be noise it cannot act on.
-        self.assertNotIn("--allow-tools", listed)
+        # Bash and Write are gated. Without the grant the skills are refused the tool they
+        # need to reach their own engine, and the cases pass having tested nothing.
+        self.assertIn("--allow-tools Bash Write", listed)
+        self.assertNotIn("mcp__", listed)
         listed = (service / "evals" / "README.md").read_text(encoding="utf-8")
         self.assertIn("CLAUDE_CODE_WALNUT_SPIRE=1", listed)
-        self.assertIn("--allow-tools 'mcp__*'", listed)
+        self.assertIn("--allow-tools Bash Write 'mcp__*'", listed)
+
+    def test_the_engine_is_findable_without_anything_set(self):
+        """Two of the three rungs need an env var. The third is derived from the file."""
+        _, kit = self._emit()
+        for name in ("hand-off", "pick-up"):
+            body = (kit / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
+            self.assertIn('"$SKILL_BASE_DIR/../../scripts/run.py"', body, name)
 
     def test_kit_config_says_nothing_about_the_operators_machine(self):
         """kit.json ships to every Teammate; where the Operator keeps the server is theirs."""

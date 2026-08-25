@@ -19,14 +19,19 @@ files that travelled with it.
 
 ## 1. Locate the engine
 
-Same two places as anything else in this plugin — the ordinary path first, then the
-fallback for a session where the advertised folder doesn't resolve:
+Same three places as anything else in this plugin: the ordinary path, then the fallback
+for a session where the advertised folder doesn't resolve, then the one derived from where
+this skill file itself sits, which needs nothing set at all. If all three miss, say so
+rather than searching for it.
 
 ```bash
 OPEN="${CLAUDE_PLUGIN_ROOT:-}/scripts/run.py"
 if [ ! -f "$OPEN" ]; then
   SLUG=$(printf '%s' "$SKILL_BASE_DIR" | tr '/' '\n' | grep -m1 '^plugin_')
   OPEN="$HOME/mnt/.remote-plugins/$SLUG/scripts/run.py"
+fi
+if [ ! -f "$OPEN" ]; then
+  OPEN="$SKILL_BASE_DIR/../../scripts/run.py"
 fi
 ```
 

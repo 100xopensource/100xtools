@@ -16,6 +16,7 @@ graders:
   - name: no-handoff-skill-fired
     type: tool_used
     tool: Skill
+    min: 0
     max: 0
   - name: the-note-was-written
     type: file_exists

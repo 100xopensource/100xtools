@@ -21,4 +21,5 @@ graders:
     type: tool_used
     tool: Skill
     input_match: pick-up
+    min: 0
     max: 0

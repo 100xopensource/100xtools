@@ -23,5 +23,6 @@ graders:
   - name: no-invented-content
     type: regex
     target: last_message
-    pattern: "(?i)(the session was about|they were working on|the work covered)"
+    pattern: "(the session was about|they were working on|the work covered)"
+    flags: "i"
     match: not_contains

@@ -33,5 +33,6 @@ graders:
   - name: no-internal-vocabulary
     type: regex
     target: last_message
-    pattern: "(?i)\\b(bundle|transcript|namespace|publication|redact\\w*|manifest|mint)\\b"
+    pattern: "\\b(bundle|transcript|namespace|publication|redact\\w*|manifest|mint)\\b"
+    flags: "i"
     match: not_contains
