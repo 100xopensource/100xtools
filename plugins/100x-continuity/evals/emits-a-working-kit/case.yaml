@@ -1,0 +1,98 @@
+name: cont-emits-a-working-kit
+description: >-
+  The factory's own headline path. An Operator has already settled what they want, so
+  this case starts after the interview and holds `set-up-handoff` to what it writes: a plugin
+  directory with the store baked in, a marketplace row pointing at it, and no placeholder
+  surviving into either.
+
+  The seeded repo carries one unrelated marketplace row, so a factory that rewrites the
+  manifest instead of adding a row fails here rather than in somebody's pull request.
+
+  Seed: python3 plugins/100x-continuity/evals/seed.py
+
+plugins: ["../.."]
+tags: [continuity, factory, emit]
+runs: 2
+
+execution:
+  prompt: |
+    Write the handoff plugin into /tmp/100x-continuity-evals/emits-a-working-kit/acme-plugins.
+    We settled this already: call it `acme-handoff`, it's for the Acme importer team,
+    handoffs go in the folder ~/OneDrive - Acme/Handoffs under the group `importer`, and
+    add it to that repo's marketplace.
+
+    Don't commit anything.
+  model: claude-sonnet-5
+  harness: claude_code
+  entrypoint: none
+  max_turns: 14
+  timeout_s: 360
+  allowed_tools: [Bash, Read, Glob, Grep, Write, Edit, Skill]
+
+graders:
+  - {type: static, name: design-quality, min_score: 1.0}
+
+  # Positive assertion on the trace: it went through the emitter rather than hand-copying.
+  - type: regex
+    name: used-the-emitter
+    target: trace
+    pattern: "emit\\.py"
+
+  - type: llm
+    name: wrote-a-usable-kit
+    allowed_tools: [Bash]
+    criteria: |-
+      Verify the emitted plugin on disk. Run exactly these commands and judge only on
+      their output:
+
+        find /tmp/100x-continuity-evals/emits-a-working-kit/acme-plugins -type f | sort
+        cat /tmp/100x-continuity-evals/emits-a-working-kit/acme-plugins/plugins/acme-handoff/kit.json
+        cat /tmp/100x-continuity-evals/emits-a-working-kit/acme-plugins/.claude-plugin/marketplace.json
+        cat /tmp/100x-continuity-evals/emits-a-working-kit/acme-plugins/CLAUDE.md
+        grep -rl '{{' /tmp/100x-continuity-evals/emits-a-working-kit/acme-plugins ; echo "placeholders_exit:$?"
+
+      PASS only if ALL of these hold:
+        1. A plugin directory exists holding .claude-plugin/plugin.json, kit.json,
+           README.md, scripts/run.py, scripts/engine/*.py, and skills for handing off and
+           picking up.
+        2. kit.json says store "folder", carries the OneDrive path, and names the group
+           `importer`.
+        3. marketplace.json still holds the pre-existing acme-lint row AND a new row for
+           acme-handoff whose `source` is repo-root-relative (./plugins/acme-handoff),
+           not an absolute path and not ./acme-handoff.
+        4. CLAUDE.md still holds the seeded house rule about READMEs, AND carries a
+           marked section naming acme-handoff that says what is left for the Operator to
+           do — sharing the folder, and releasing it. The factory runs once, so a repo
+           whose own guidance was replaced rather than added to is a failure here.
+        5. The grep finds no `{{` anywhere (placeholders_exit:1). A surviving placeholder
+           still loads and still instructs the model, silently — it is the worst outcome
+           here, worse than a failed write.
+
+      FAIL if nothing was written, if the marketplace row is missing or its source is
+      wrong, if the repo's own CLAUDE.md content was lost, or if any placeholder
+      survived.
+
+  - type: llm
+    name: did-not-commit
+    allowed_tools: [Bash]
+    criteria: |-
+      The factory writes files and stops; branching and committing are the Operator's.
+      The seeded target is deliberately not a git repository, so any git state there was
+      created by this run. Run exactly this and judge only on its output:
+
+        ls -a /tmp/100x-continuity-evals/emits-a-working-kit/acme-plugins
+        test -d /tmp/100x-continuity-evals/emits-a-working-kit/acme-plugins/.git && echo "GIT_PRESENT" || echo "no git"
+
+      PASS if the output says "no git" and no .git appears in the listing. FAIL on
+      GIT_PRESENT — initialising a repository, committing, or branching in someone else's
+      directory is outside what this was asked to do.
+
+  - type: llm
+    name: says-what-is-left-to-do
+    focus: last_message
+    criteria: >-
+      The reply says where the plugin landed, and that nothing was committed or pushed —
+      releasing it is the Operator's step. PASS if both appear. Pointing at the notes
+      written into the repo's CLAUDE.md, or saying the Kit should be round-tripped before
+      the team depends on it, also passes. FAIL if it implies the plugin is already live
+      for the team, or claims to have committed, branched, or opened a pull request.

@@ -1,0 +1,22 @@
+schema_version: "1.1"
+name: hand-off-stays-out-of-an-ordinary-write
+description: >
+  The negative case, and the one that decides whether this plugin is pleasant to have
+  installed. Saving a file is not handing work over, and a skill that fires here would
+  package a session every time somebody wrote a note.
+tags: [routing, hand-off, negative]
+plugins: ["../.."]
+runs: 3
+execution:
+  prompt: |
+    Save a note called groceries.md with milk, bread and coffee in it.
+  max_turns: 6
+  allowed_tools: [Bash, Read, Write, Glob, Grep, Skill]
+graders:
+  - name: no-handoff-skill-fired
+    type: tool_used
+    tool: Skill
+    max: 0
+  - name: the-note-was-written
+    type: file_exists
+    path: groceries.md

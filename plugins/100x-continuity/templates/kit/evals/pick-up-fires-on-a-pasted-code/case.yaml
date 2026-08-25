@@ -1,0 +1,21 @@
+schema_version: "1.1"
+name: pick-up-fires-on-a-pasted-code
+description: >
+  The receiving half. Somebody pastes what a colleague sent them, with no instruction
+  beyond context — the plugin has to recognise it as work to pick up rather than a
+  string to look at.
+tags: [routing, pick-up]
+plugins: ["../.."]
+runs: 3
+execution:
+  prompt: |
+    Dana sent me this: importer/session-a1b2c3d4e5f6/20260101T000000Z-0f1e2d3c4b5a
+    Can you carry on from there?
+  max_turns: 8
+  allowed_tools: [Bash, Read, Glob, Grep, Skill]
+graders:
+  - name: routed-to-pick-up
+    type: tool_used
+    tool: Skill
+    input_match: pick-up
+    min: 1
