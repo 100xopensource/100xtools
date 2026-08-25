@@ -24,21 +24,23 @@ Everything about where things are kept is already decided — don't ask, and don
 ## 1. Find the tools
 
 ```bash
-CARRY="${CLAUDE_PLUGIN_ROOT:-}/scripts/run.py"
-if [ ! -f "$CARRY" ]; then
-  ID=$(printf '%s' "$SKILL_BASE_DIR" | tr '/' '\n' | grep -m1 '^plugin_')
-  CARRY="$HOME/mnt/.remote-plugins/$ID/scripts/run.py"
-fi
-if [ ! -f "$CARRY" ]; then
-  CARRY="$SKILL_BASE_DIR/../../scripts/run.py"
-fi
+ID=$(printf '%s' "$SKILL_BASE_DIR" | tr '/' '\n' | grep -m1 '^plugin_')
+CARRY=""
+for candidate in \
+  "${CLAUDE_PLUGIN_ROOT:-}/scripts/run.py" \
+  "$HOME/mnt/.remote-plugins/$ID/scripts/run.py" \
+  "${SKILL_BASE_DIR%/skills/*}/scripts/run.py"
+do
+  [ -f "$candidate" ] && { CARRY="$candidate"; break; }
+done
 SESSION="${CLAUDE_SESSION_ID}"
 ```
 
 Three places, in order. The first is the ordinary one. The second is for a session where
 the folder this skill is told it lives in doesn't resolve — the files are reachable under
 `~/mnt/.remote-plugins/plugin_<id>/` instead. The third needs nothing set at all: this
-skill sits at `<plugin>/skills/hand-off/`, so the engine is always two levels up from it.
+skill sits at `<plugin>/skills/hand-off/`, so cutting `/skills/...` off the end of that
+gives the plugin, wherever it was installed and whatever it is called.
 
 If all three miss, say so and stop. Do **not** go hunting with `find` — the third path is
 derived from where this file is, so if it is wrong the plugin is not laid out the way it

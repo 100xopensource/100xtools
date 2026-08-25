@@ -1,9 +1,20 @@
-**Check the place exists first.** `python3 "$CARRY" where` names the folder this Kit
-files into. If that folder is not on this machine, stop and say the shared drive is not
-set up here yet, and that nothing was sent. Creating the folder yourself would file the
-handoff somewhere nobody syncs, and it would look like it worked.
+Handoffs for {{TEAM}} are filed under {{SYNC_CLIENT}}, here:
 
-Then one command does the whole thing — package it, strip out anything credential-shaped, and
+```
+{{STORE_ROOT}}/{{NAMESPACE}}/
+```
+
+That is baked into this plugin. Don't search for it and don't ask about it — if the path
+is not on this machine, the shared drive is not set up here yet. Say that, say nothing was
+sent, and stop. Creating the folder yourself files the handoff where nobody syncs, and it
+looks exactly like success.
+
+{{SYNC_NOTE}}
+
+Inside Cowork the same drive is mounted under `~/mnt/` instead, so the beginning of that
+path differs there while the end of it does not.
+
+One command does the whole thing — package it, strip out anything credential-shaped, and
 file it where {{TEAM}} can reach it:
 
 ```bash

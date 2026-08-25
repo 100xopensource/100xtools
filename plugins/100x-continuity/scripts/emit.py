@@ -87,6 +87,38 @@ def store_sentence(store: str, *, root: str | None, service_name: str | None) ->
     )
 
 
+# Which sync client owns a root, recognised from the path itself, plus the one thing about
+# that client a Teammate's session has to know. A Kit is built for one store, so the client
+# is knowable at emit time — and a skill told "don't go looking" has to be told where things
+# are, or looking is the only thing left to do.
+_SYNC_CLIENTS = (
+    ("Mobile Documents/com~apple~CloudDocs", "iCloud Drive",
+     "iCloud drops file contents to save disk and leaves the name in place, so a read can "
+     "come back short. That means wait for it, never empty."),
+    ("OneDrive", "OneDrive or SharePoint",
+     "Under a single tenant the part after the home directory is usually identical on every "
+     "machine, so this path travels."),
+    ("Google Drive", "Google Drive",
+     "In streaming mode Google Drive drops file contents and leaves the name, so a read can "
+     "come back short. That means wait for it, never empty."),
+    ("Dropbox", "Dropbox",
+     "With Smart Sync on, Dropbox drops file contents and leaves the name, so a read can "
+     "come back short. That means wait for it, never empty."),
+)
+
+
+def sync_client(root: str | None) -> tuple[str, str]:
+    """The client that owns this root, and its one sharp edge. Generic if unrecognised."""
+    for needle, name, note in _SYNC_CLIENTS:
+        if needle.lower() in (root or "").lower():
+            return name, note
+    return (
+        "a synced folder",
+        "Whatever syncs it may drop file contents and leave the name in place, so a read "
+        "can come back short. That means wait for it, never empty.",
+    )
+
+
 def tool_prefix(store: str, route: str, service_name: str | None) -> str:
     """How the store server's tools are most likely spelled in a Teammate's session.
 
@@ -111,6 +143,10 @@ def _substitutions(args: argparse.Namespace, emitted_at: str) -> dict[str, str]:
         "ORG": args.org,
         "TEAM": args.team,
         "SERVICE_NAME": args.service_name or "",
+        "STORE_ROOT": args.root or "",
+        "NAMESPACE": args.namespace,
+        "SYNC_CLIENT": sync_client(args.root)[0],
+        "SYNC_NOTE": sync_client(args.root)[1],
         "SERVER_URL": args.server_url or PLACEHOLDER_SERVER_URL,
         "TOOL_PREFIX": tool_prefix(args.store, args.server_route, args.service_name),
         "STORE_SENTENCE": store_sentence(

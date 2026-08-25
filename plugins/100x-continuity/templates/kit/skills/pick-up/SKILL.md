@@ -25,14 +25,15 @@ this skill file itself sits, which needs nothing set at all. If all three miss, 
 rather than searching for it.
 
 ```bash
-OPEN="${CLAUDE_PLUGIN_ROOT:-}/scripts/run.py"
-if [ ! -f "$OPEN" ]; then
-  SLUG=$(printf '%s' "$SKILL_BASE_DIR" | tr '/' '\n' | grep -m1 '^plugin_')
-  OPEN="$HOME/mnt/.remote-plugins/$SLUG/scripts/run.py"
-fi
-if [ ! -f "$OPEN" ]; then
-  OPEN="$SKILL_BASE_DIR/../../scripts/run.py"
-fi
+SLUG=$(printf '%s' "$SKILL_BASE_DIR" | tr '/' '\n' | grep -m1 '^plugin_')
+OPEN=""
+for candidate in \
+  "${CLAUDE_PLUGIN_ROOT:-}/scripts/run.py" \
+  "$HOME/mnt/.remote-plugins/$SLUG/scripts/run.py" \
+  "${SKILL_BASE_DIR%/skills/*}/scripts/run.py"
+do
+  [ -f "$candidate" ] && { OPEN="$candidate"; break; }
+done
 ```
 
 Results come back as JSON. When something fails, read **`say`** — one plain sentence

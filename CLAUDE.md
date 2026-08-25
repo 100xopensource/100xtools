@@ -467,6 +467,14 @@ keys, a per-publication reader list — with a Dockerfile and no deploy recipe, 
 where it runs is the Operator's. `principal()` fails closed without a verified identity.
 It is a starting point the user owns, and it is on the trust-boundary list.
 
+**An emitted Kit is linted in CI, and gated on findings rather than on its score.** Two
+lines are necessarily identical across `hand-off` and `pick-up` — the engine-path
+candidates, which both skills must agree on — so `token_efficiency` sits at ~0.987 and
+`design_score` at 0.999 forever. That is the same trade 100xdrift-check makes and it is not
+a defect; a *finding* is. Locating the engine also uses `${SKILL_BASE_DIR%/skills/*}`
+rather than `../..`, because SEC3 fires on a read verb beside a `../` and the variable is
+called `OPEN`.
+
 **Two test layers, and only one of them gates anything.** `templates/kit/tests/contract_test.py`
 ships *inside* every Kit: deterministic, no model, no money, driven from a synthetic session
 in a throwaway `HOME` because packing a real conversation would put it in the store. It

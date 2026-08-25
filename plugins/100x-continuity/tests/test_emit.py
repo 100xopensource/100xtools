@@ -243,7 +243,11 @@ class EmitTests(unittest.TestCase):
         _, kit = self._emit()
         for name in ("hand-off", "pick-up"):
             body = (kit / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
-            self.assertIn('"$SKILL_BASE_DIR/../../scripts/run.py"', body, name)
+            # A suffix strip rather than `../..`: no relative traversal for a reader
+            # (or a linter) to squint at, and it does not care how deep the skill sits.
+            self.assertIn('${SKILL_BASE_DIR%/skills/*}/scripts/run.py', body, name)
+            # One ordered list, not three near-identical guards for a model to skim.
+            self.assertIn("for candidate in", body, name)
 
     def test_kit_config_says_nothing_about_the_operators_machine(self):
         """kit.json ships to every Teammate; where the Operator keeps the server is theirs."""

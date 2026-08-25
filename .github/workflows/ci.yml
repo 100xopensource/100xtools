@@ -68,6 +68,11 @@ jobs:
             # A placeholder reaching a Kit still loads and still instructs the model.
             ! grep -rq '{{' "$out" || { echo "unfilled placeholder in $kind kit"; exit 1; }
             ( cd "$out" && python3 tests/contract_test.py )
+            # A Kit lands in somebody else's repo, where they may run our own linter on
+            # it. Gated on findings rather than on the score: two engine-path literals
+            # are necessarily identical across the two skills, which costs a little
+            # token_efficiency forever and is not a defect.
+            PYTHONPATH="${GITHUB_WORKSPACE}/plugins/100xeval/skills/100xeval/scripts" python3 -c 'import sys; from engine import static; f = static.analyze(sys.argv[1])["findings"]; [print("emitted kit finding:", x) for x in f]; sys.exit(1 if f else 0)' "$out"
           done
 
   static:
