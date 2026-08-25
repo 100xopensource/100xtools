@@ -480,6 +480,21 @@ That split came from a real run: the contract test found that `fetch` never chec
 digest the store reported, and the eval cases found the two prompt defects. Neither tool
 would have found the other's.
 
+**`claude plugin eval` is early access and does not run bare.** The Kit's `evals/README.md`
+is generated with the whole line in it, because a documented command that fails on the first
+try reads as a broken plugin:
+
+```bash
+CLAUDE_CODE_WALNUT_SPIRE=1 CLAUDE_CODE_ENTRYPOINT=remote_cowork \
+  claude plugin eval . --ablation none --judge-model sonnet --allow-tools 'mcp__*'
+```
+
+`CLAUDE_CODE_WALNUT_SPIRE=1` admits you to the command at all; `remote_cowork` is the
+surface a Teammate actually runs these skills on, so scoring anywhere else scores a system
+prompt nobody has; `--allow-tools 'mcp__*'` is emitted **only into a service Kit**, whose
+cases otherwise fail as though the skill were broken rather than unequipped. `eval_invocation()`
+in `emit.py` owns that split, next to `eval_table()` and `engine_commands()`.
+
 The **repo's own** `evals/` need the sibling 100xeval plugin, so they are repo-only and not
 part of what a marketplace install operates. They cost money and are not in CI. Their
 graders read the **emitted Kit and the store**, not the transcript — and any case built

@@ -200,6 +200,42 @@ class EmitTests(unittest.TestCase):
         self.assertNotIn(case, listed)
         self.assertIn(case, (service / "evals" / "README.md").read_text(encoding="utf-8"))
 
+    def test_the_readme_draws_this_kit_s_store_and_no_other(self):
+        """A diagram of a server this team never ran is a diagram of somebody else's system."""
+        _, folder = self._emit()
+        _, service = self._emit(
+            into=self.root / "svc", store="service", root=None, service_name="acme-store"
+        )
+        drawn = (folder / "README.md").read_text(encoding="utf-8")
+        self.assertIn("```mermaid", drawn)
+        self.assertIn("the cloud drive moves it", drawn)
+        self.assertNotIn("acme-store", drawn)
+        drawn = (service / "README.md").read_text(encoding="utf-8")
+        self.assertIn("```mermaid", drawn)
+        self.assertIn("acme-store", drawn)
+        self.assertNotIn("cloud drive", drawn)
+        # Raw newlines inside a quoted mermaid label do not parse; `<br/>` does.
+        for kit in (folder, service):
+            body = (kit / "README.md").read_text(encoding="utf-8")
+            block = body.split("```mermaid", 1)[1].split("```", 1)[0]
+            for line in block.splitlines():
+                self.assertEqual(line.count('"') % 2, 0, line)
+
+    def test_the_eval_command_carries_what_it_needs_to_run(self):
+        """A documented command that fails on the first try reads as a broken plugin."""
+        _, folder = self._emit()
+        _, service = self._emit(
+            into=self.root / "svc", store="service", root=None, service_name="acme-store"
+        )
+        listed = (folder / "evals" / "README.md").read_text(encoding="utf-8")
+        self.assertIn("CLAUDE_CODE_WALNUT_SPIRE=1", listed)
+        self.assertIn("CLAUDE_CODE_ENTRYPOINT=remote_cowork", listed)
+        # A folder Kit has no server, so the tool flag would be noise it cannot act on.
+        self.assertNotIn("--allow-tools", listed)
+        listed = (service / "evals" / "README.md").read_text(encoding="utf-8")
+        self.assertIn("CLAUDE_CODE_WALNUT_SPIRE=1", listed)
+        self.assertIn("--allow-tools 'mcp__*'", listed)
+
     def test_kit_config_says_nothing_about_the_operators_machine(self):
         """kit.json ships to every Teammate; where the Operator keeps the server is theirs."""
         result, _ = self._emit(
@@ -293,6 +329,9 @@ class OperatorNotesTests(unittest.TestCase):
         self.assertEqual(result["operator_notes"]["action"], "created")
         body = self.notes.read_text(encoding="utf-8")
         self.assertIn("acme-handoff", body)
+        # Created about the handoff plugin, not titled as if it described the whole repo.
+        self.assertTrue(body.startswith("# CLAUDE.md"), body[:40])
+        self.assertNotIn("# acme-plugins", body)
         begin, end = emit_mod.notes_markers("acme-handoff")
         self.assertIn(begin, body)
         self.assertIn(end, body)

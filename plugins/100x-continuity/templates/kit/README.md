@@ -17,6 +17,10 @@ Two skills, both in ordinary words:
 
 {{STORE_SENTENCE}}
 
+## How a handoff actually moves
+
+{{ARCHITECTURE}}
+
 ## What travels, and what doesn't
 
 **Travels:** the conversation, a readable summary of it, and the files named at handoff.

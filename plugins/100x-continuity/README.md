@@ -30,26 +30,22 @@ flowchart TD
     E --> F
     F --> G{Where do handoffs go?}
     G -->|A folder your drive syncs| H[Ask for the folder and the group]
-    G -->|A store service| I["Ask the name you will register it under,
-    how teammates reach it, and where its source will live"]
+    G -->|A store service| I["Ask the name you will register it under,<br/>how teammates reach it, and where its source will live"]
     H --> K[Write continuity-plan.md]
     I --> K
     K --> L{Do you approve the Plan?}
     L -->|No| F
-    L -->|Yes| M["Write the Kit, its marketplace row,
-    and your notes into this repo's CLAUDE.md"]
+    L -->|Yes| M["Write the Kit, its marketplace row,<br/>and your notes into this repo's CLAUDE.md"]
     M --> N{Did the Plan choose a service?}
     N -->|No| V[verify]
     N -->|Yes| S[store-service]
-    S --> S1["Copy the server template out,
-    to a directory outside this repo"]
+    S --> S1["Copy the server template out,<br/>to a directory outside this repo"]
     S1 --> S2[Ask which storage vendor you use]
     S2 --> S3[Run it from your own .env and check it answers]
     S3 --> V
     V --> O[Run the contract test. Hand this session over. Open it again.]
     O --> P["Report: proven / proven against a stand-in / not proven yet"]
-    P --> Q["Left in your CLAUDE.md: deploy and register the server,
-    or share the folder — then release it however you release plugins"]
+    P --> Q["Left in your CLAUDE.md: deploy and register the server,<br/>or share the folder — then release it however you release plugins"]
 ```
 
 The service store's name is settled **before** anything is written, and the server is

@@ -143,6 +143,10 @@ def _fragments(store: str, values: dict[str, str]) -> dict[str, str]:
         # Shipping the folder wording to a service Kit told people to wait for a
         # download that was never going to arrive.
         "BAD_READ": f"damage.{store}.md",
+        # The README's picture of how a handoff actually moves. Store-specific for the
+        # same reason as everything else here: a diagram of a server this team never ran
+        # is a diagram of somebody else's system.
+        "ARCHITECTURE": f"diagram.{store}.md",
     }
     out = {}
     for key, filename in names.items():
@@ -302,6 +306,40 @@ _EVAL_ROWS = (
 )
 
 
+def eval_invocation(store: str) -> str:
+    """How to run these cases, with the flags without which they do not run at all.
+
+    `claude plugin eval` is an early-access command, and the environment variables are
+    what admit you to it. The rest are not decoration either: scored on the wrong surface,
+    or without the store's tools, every case fails in a way that reads like a broken skill.
+    """
+    tools = " \\\n    --allow-tools 'mcp__*'" if store == "service" else ""
+    lines = [
+        "```bash",
+        "CLAUDE_CODE_WALNUT_SPIRE=1 CLAUDE_CODE_ENTRYPOINT=remote_cowork \\",
+        f"  claude plugin eval . --ablation none --judge-model sonnet{tools}",
+        "```",
+        "",
+        "Every part of that line is load-bearing:",
+        "",
+        "- `CLAUDE_CODE_WALNUT_SPIRE=1` — `claude plugin eval` is an early-access command",
+        "  and does not run without it.",
+        "- `CLAUDE_CODE_ENTRYPOINT=remote_cowork` — these skills are used in Cowork, so its",
+        "  system prompt is the one they have to work under. Scored anywhere else, you are",
+        "  scoring a surface nobody here has.",
+    ]
+    if store == "service":
+        lines += [
+            "- `--allow-tools 'mcp__*'` — without it the store server's tools are absent, and",
+            "  every case fails as though the skill were broken rather than unequipped.",
+        ]
+    lines += [
+        "- `--ablation none` — one arm, the plugin exactly as it ships.",
+        "- `--judge-model sonnet` — the model behind the `llm` graders.",
+    ]
+    return "\n".join(lines)
+
+
 def eval_table(store: str) -> str:
     return "\n".join(
         f"| `{name}` | {pins} |" for name, pins, only in _EVAL_ROWS if only in (None, store)
@@ -334,8 +372,18 @@ def write_operator_notes(repo_root: pathlib.Path, section: str, kit_name: str) -
     begin, end = notes_markers(kit_name)
     block = f"{begin}\n{section.strip()}\n{end}\n"
     if not path.exists():
-        heading = f"# {repo_root.name}\n\n"
-        path.write_text(heading + block, encoding="utf-8")
+        # Created about the handoff system and nothing else. Titling a fresh file after
+        # the repository would claim to describe the whole of it, and this knows about
+        # exactly one plugin in it — the rest is the Operator's to write, around ours.
+        preamble = (
+            "# CLAUDE.md\n\n"
+            "Guidance for Claude Code working in this repository.\n\n"
+            f"The marked section below is generated. It describes `{kit_name}`, the "
+            "session-handoff plugin in this repo, and it is rewritten whenever that "
+            "plugin is regenerated. Anything written outside the markers is left alone, "
+            "so this is a good place to put the rest of what Claude should know here.\n\n"
+        )
+        path.write_text(preamble + block, encoding="utf-8")
         return {"path": str(path), "action": "created"}
     current = path.read_text(encoding="utf-8")
     if begin in current and end in current:
@@ -372,6 +420,7 @@ def emit(args: argparse.Namespace) -> dict[str, object]:
     values["OPERATOR_TODO"] = operator_todo(args, market_source)
     values["ENGINE_COMMANDS"] = engine_commands(args.store, market_source)
     values["EVAL_TABLE"] = eval_table(args.store)
+    values["EVAL_INVOCATION"] = eval_invocation(args.store)
     values["KIT_SOURCE"] = market_source
     values.update(_fragments(args.store, values))
 

@@ -45,6 +45,26 @@ does not have.
 
 If it fails, stop and report that. Everything below assumes the mechanics hold.
 
+### The layer this does not run
+
+The Kit also carries `evals/` — `claude plugin eval` cases on what the *model* does with
+the two skills. They cost money and gate nothing, so they are no part of verifying, but
+they catch the defect a contract test structurally cannot: a skill that fires on the wrong
+words, or one that puts internal vocabulary in front of a Teammate.
+
+Point anyone who asks at the Kit's own `evals/README.md`, which carries the exact line for
+that Kit's store. It is long because every part of it is required:
+
+```bash
+CLAUDE_CODE_WALNUT_SPIRE=1 CLAUDE_CODE_ENTRYPOINT=remote_cowork \
+  claude plugin eval . --ablation none --judge-model sonnet --allow-tools 'mcp__*'
+```
+
+The command is early access and `CLAUDE_CODE_WALNUT_SPIRE=1` is what admits you to it.
+`remote_cowork` is the surface these skills actually run on. `--allow-tools 'mcp__*'` is
+for a service Kit only — without it the store server's tools are absent and every case
+fails as if the skill were broken.
+
 ## 3. Hand a real session through it
 
 The contract test uses a synthetic conversation on purpose. This step uses the actual one,

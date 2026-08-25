@@ -5,9 +5,7 @@ words a person actually uses, stay quiet on the words they don't, put a credenti
 in a pop-up, and keep internal vocabulary out of the chat. The table below is the list
 this plugin actually carries.
 
-```bash
-claude plugin eval .
-```
+{{EVAL_INVOCATION}}
 
 These cost money and need a model, so they gate nothing. **`tests/contract_test.py` is what
 gates a release** — it is deterministic, free, and covers the mechanics. Run these when a
