@@ -26,13 +26,18 @@ interview, not a form:
 - **Carry on to the end.** Approval is the one place a human is needed. Everything after
   it is yours to finish — do not stop and offer to continue.
 
-## 1. Read what is already there
+## 1. Say what the run is, then read what is already there
+
+Show the shape of it before asking anything. Somebody who knows there are ten steps and
+one question waits through the interview differently from somebody who does not:
 
 ```bash
 FACTORY="${CLAUDE_PLUGIN_ROOT}"
+python3 "$FACTORY/scripts/board.py" outline
 ```
 
-Then look at the Operator's side:
+It writes nothing. The real board goes up at step 3, once the answers say which half of
+it applies. Then look at the Operator's side:
 
 - Are they in a plugin repository? A `.claude-plugin/marketplace.json` at the root says
   yes, and its rows say what naming they already use.
@@ -184,6 +189,7 @@ branch is the release, and that call is theirs.
 
 ## Self-check
 
+- [ ] The run was laid out before the first question, not after.
 - [ ] Facts that could be looked up were looked up, not asked.
 - [ ] An existing `kit.json` was found and used as defaults, not overwritten blind.
 - [ ] The access consequence of the store choice was said before it was chosen.

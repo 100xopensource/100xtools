@@ -7,6 +7,7 @@ they can see rather than a paragraph, and marks each one off as it finishes. Wha
 proven, what was only stood in for, and what is still theirs then outlives the
 conversation that produced it.
 
+    python3 board.py outline
     python3 board.py init --into ../acme-plugins --name acme-handoff \\
         --store folder --root '~/OneDrive - Acme/Continuity'
     python3 board.py set  --into ../acme-plugins emit --status done --evidence "29 files"
@@ -352,6 +353,33 @@ def render(data: dict[str, object]) -> str:
     return "\n".join(lines)
 
 
+def outline() -> str:
+    """The shape of the run, before a single answer is in.
+
+    Said at the top of a setup, where the store is not settled yet and so a real board
+    cannot be seeded. Rendered from the same task list rather than written out in the
+    skill, because a run described in two places is a run described differently in two
+    places.
+    """
+    folder = {t["key"] for t in _setup_tasks("folder")}
+    lines = ["This is the whole run. Nothing is written until you say yes.", ""]
+    for number, task in enumerate(_setup_tasks("service"), start=1):
+        only = "" if task["key"] in folder else "   (only for a store service)"
+        gate = "   <- the one place you are needed" if task["key"] == "plan" else ""
+        lines.append(f"  {number}. {task['title']}{only}{gate}")
+    lines += [
+        "",
+        "Then what is left is yours: sharing the folder or registering the server, "
+        "releasing it, and telling the team what to say. Those go on the board too, "
+        "once the answers say which of them apply.",
+    ]
+    return "\n".join(lines)
+
+
+def cmd_outline(args: argparse.Namespace) -> dict[str, object]:
+    return {"ok": True, "text": outline()}
+
+
 def cmd_init(args: argparse.Namespace) -> dict[str, object]:
     directory = board_dir(args.into)
     existing = directory / TASKS_NAME
@@ -480,6 +508,9 @@ def build_parser() -> argparse.ArgumentParser:
     call.add_argument("--line", required=True)
     call.set_defaults(handler=cmd_verdict)
 
+    shape = subs.add_parser("outline", help="the shape of a run, before any answers")
+    shape.set_defaults(handler=cmd_outline)
+
     look = subs.add_parser("show", help="print the board for the chat")
     common(look)
     look.set_defaults(handler=cmd_show)
@@ -493,7 +524,7 @@ def main(argv: list[str] | None = None) -> int:
     except BoardError as exc:
         print(json.dumps({"ok": False, "say": str(exc)}, indent=2))
         return 2
-    if args.command == "show":
+    if args.command in ("show", "outline"):
         print(result["text"])
         return 0
     print(json.dumps(result, indent=2))
