@@ -38,6 +38,10 @@ the R2 page of their dashboard. The endpoint is
 `https://<account-id>.r2.cloudflarestorage.com` and the region is the literal string
 `auto`. R2 has no regions; anything else there signs wrong.
 
+R2 also rejects SigV2 with a `401 Unauthorized` that reads exactly like a bad token. The
+template pins SigV4 so this does not arise, which is worth knowing before anyone re-rolls
+a token chasing it.
+
 Docs: <https://developers.cloudflare.com/r2/api/s3/tokens/>
 
 ## Backblaze B2

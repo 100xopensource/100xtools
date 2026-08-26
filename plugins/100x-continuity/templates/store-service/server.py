@@ -47,6 +47,7 @@ import sqlite3
 from typing import Any
 
 import boto3
+from botocore.config import Config
 from fastmcp import FastMCP
 
 # --- configuration -----------------------------------------------------------
@@ -150,7 +151,14 @@ def db() -> sqlite3.Connection:
 
 def s3():
     # The endpoint URL is what makes this work against MinIO, R2, or B2 as well as AWS.
-    return boto3.client("s3", endpoint_url=os.environ.get("CONTINUITY_S3_ENDPOINT") or None)
+    # SigV4 is pinned rather than left to botocore's default: presigning falls back to
+    # SigV2 in some endpoint/region combinations, and R2 refuses SigV2 outright with a
+    # 401 that reads like a bad credential and is not one. Every vendor here speaks V4.
+    return boto3.client(
+        "s3",
+        endpoint_url=os.environ.get("CONTINUITY_S3_ENDPOINT") or None,
+        config=Config(signature_version="s3v4"),
+    )
 
 
 def now() -> str:

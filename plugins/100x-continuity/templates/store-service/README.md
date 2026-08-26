@@ -92,8 +92,14 @@ Whatever else changes, these are the parts that make the store trustworthy:
 
 ## Compatibility notes
 
-`ChecksumSHA256` in a presigned `PUT` is supported by AWS S3 and by current MinIO. If
-your store rejects it, drop that parameter and the `x-amz-checksum-sha256` header
+**Signing is pinned to SigV4** in `s3()`. Left to botocore's default, presigning falls
+back to SigV2 against some endpoint and region combinations. R2 refuses SigV2 with a
+`401 Unauthorized`, which reads like a bad credential and is not one, and SigV2 is
+deprecated on AWS S3 and B2 besides. Do not remove the `Config(signature_version="s3v4")`
+to make something else work; every vendor listed here speaks V4.
+
+`ChecksumSHA256` in a presigned `PUT` is supported by AWS S3, Cloudflare R2, and current
+MinIO. If your store rejects it, drop that parameter and the `x-amz-checksum-sha256` header
 together — the signature and the headers must always agree — and accept that the 2xx
 then proves only that *something* of the right length arrived. The reader still
 verifies the digest, so the failure surfaces there rather than never.
