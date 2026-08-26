@@ -39,6 +39,14 @@ First public release. Scoring version **1**.
 - Three skills: `set-up-handoff` (interview → plan → your approval → write → verify),
   `verify`, and `store-service`. One entry point on purpose — see
   `docs/adr/0001-one-setup-skill.md`.
+- **A setup run is put up as a board before it happens.** `status/board.html` and
+  `status/tasks.json` land in the Operator's repo at plan time with every task still todo
+  — the factory's steps and the ones that stay theirs — so they approve a plan they can
+  see. Each is marked off as it lands, with the evidence that settled it and whether it
+  was proven here or against a stand-in. It outlives the conversation: what is still
+  outstanding, who each piece waits on, and what was never actually proven. Its operator
+  half and the checklist in their `CLAUDE.md` are rendered from one list, and everything
+  written to it is redacted first.
 - Two store kinds: a **folder** a sync client already watches, or a **service** — object
   storage behind an MCP server the Operator runs, which mints presigned URLs so a Kit
   never holds a credential. `s3` is not a kind; it is what a service store sits on.

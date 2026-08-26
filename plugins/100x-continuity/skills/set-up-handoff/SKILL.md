@@ -68,14 +68,45 @@ If no server exists yet, say that `store-service` builds one later in this same 
 that the Kit cannot be proven end to end until it is registered. Do not stop — a Kit
 waiting on a server is still worth having on disk.
 
-## 3. Write the plan, and get one yes
+## 3. Write the plan, put the board up, and get one yes
 
 Write `continuity-plan.md` into the target repo: what it will be called and where it goes;
 its two skills and one line each on what a Teammate says; where handoffs go and **who can
 read them**; and what will be created or overwritten, including the marked section this
 adds to the repo's `CLAUDE.md`. For a service store, add the three answers above.
 
-Show it and ask in the chat — not a pop-up, which invites a click. This is the gate.
+Then put the whole run on a board, while everything on it is still a plan:
+
+```bash
+python3 "$FACTORY/scripts/board.py" init --into <repo> --name <kit-name> \
+  --store folder --root '<the synced directory>' --kit-source plugins/<kit-name> \
+  --subtitle '<one line: what this is and where it keeps things>'
+```
+
+Swap in `--store service --service-name <the chosen name> --server-route <org|mcp-json>
+--server-location <where its source will live>` for a service store, and the board grows
+the tasks only a server has. It writes `status/board.html` and `status/tasks.json` and
+prints the same board as text — put that text in the chat, and say it can be watched:
+
+```bash
+cd <repo>/status && python3 -m http.server 4173    # then open localhost:4173/board.html
+```
+
+Every task carries a `key`. Mark one off the moment it lands, never in a batch at the
+end, and give it the evidence that convinced you rather than the word *done*:
+
+```bash
+python3 "$FACTORY/scripts/board.py" set --into <repo> read-the-repo \
+  --status done --proof proven --evidence '<what you actually found>'
+```
+
+`--proof proven` means it was proven here; `--proof stand-in` means something stood in
+for the real thing, which is the honest label for anything a synthetic session or a local
+process satisfied. Anything the run turns up that no plan predicted goes on with `add`.
+
+Mark `read-the-repo` now, with what reading the repo actually turned up. Then show the
+plan and the board, and ask in the chat — not a pop-up, which invites a click. This is
+the gate. Their yes is what marks `plan`.
 
 ## 4. Write it
 
@@ -102,6 +133,9 @@ with no `kit.json` is refused, and only the text between its own markers in `CLA
 ever rewritten. Add `--dry-run` first if the target already holds files, and show what
 `overwrote` names before doing it for real.
 
+Then mark `emit` and `marketplace` off — the file count and whatever `overwrote` named,
+and the row as it was written.
+
 ## 5. Stand the server up, if the plan chose one
 
 Service store only, and it belongs here rather than earlier: the registered name is settled
@@ -112,19 +146,38 @@ This is a step inside this run, not homework to hand back. If the Kit carries it
 `.mcp.json`, re-run the emit command with `--server-url <the address>` once there is one —
 the Kit is a build output, so it is regenerated rather than edited.
 
+Three tasks are waiting on it: `copy-store-service`, `credential-uncommittable` and
+`server-answers`. Mark each as it lands. A server proven against a local process is
+`stand-in`, not `proven`, however green it looked.
+
 ## 6. Prove it, now
 
 Run the `verify` skill. Do not end the turn having only named it — an emitted Kit that has
 never round-tripped is a plausible-looking directory, and "shall I verify?" is how a team
 ends up shipping one that was never run.
 
+It settles three more: `contract-test`, `baked-config` and `round-trip`. A task that
+failed is marked `blocked` with what it said, not quietly left in `todo`.
+
 ## 7. Say what happened, and where the rest of it is written
 
-Where the Kit landed, what its skills are called, what `verify` proved and what it could
-not. Then point at the marked section in their `CLAUDE.md`: it lists what is still theirs —
-releasing it, sharing the folder or registering the server, telling the team the two
-sentences that drive it. That file is the handover, because this runs once and this
-conversation ends.
+Close the board first. Set the verdict to the one true sentence about the state of this
+thing — what works, and what is not yet reachable by anybody else:
+
+```bash
+python3 "$FACTORY/scripts/board.py" verdict --into <repo> --state blocked \
+  --line '<what works, and what nobody else can do yet>'
+```
+
+`--state ok` only when nothing stands between a Teammate and a handoff. A Kit whose store
+is not shared or whose server is not registered is `blocked`, and saying otherwise is the
+one thing the board exists to prevent.
+
+Then say where the Kit landed, what its skills are called, and what `verify` proved and
+what it could not. Point at two files. `status/board.html` is what is left and who each
+piece is waiting on. The marked section in their `CLAUDE.md` says what the Kit is and how
+to drive it from their own code. Between them they are the handover, because this runs
+once and this conversation ends.
 
 Nothing was committed or pushed. For most orgs a merge to the marketplace repo's main
 branch is the release, and that call is theirs.
@@ -135,9 +188,14 @@ branch is the release, and that call is theirs.
 - [ ] An existing `kit.json` was found and used as defaults, not overwritten blind.
 - [ ] The access consequence of the store choice was said before it was chosen.
 - [ ] For a service store, the registered name was chosen before anything was emitted.
-- [ ] The plan was written to a file and approved in the chat.
+- [ ] The plan was written to a file, the board was up beside it, and both were approved
+      in the chat.
+- [ ] Every task was marked as it happened, with evidence, and nothing that stood in for
+      the real thing was marked `proven`.
 - [ ] The target is the Operator's repo, never this factory's own.
 - [ ] `store-service` was run in this same turn when the plan chose a service store.
 - [ ] `verify` was actually run, not offered.
-- [ ] The Operator was pointed at the notes in their `CLAUDE.md`, not told it all in chat.
+- [ ] The verdict says what nobody else can do yet, rather than that it all works.
+- [ ] The Operator was pointed at the board and the notes in their `CLAUDE.md`, not told
+      it all in chat.
 - [ ] Nothing was branched, committed, or pushed.

@@ -247,57 +247,211 @@ def _plan_files(store: str, route: str) -> list[tuple[pathlib.Path, str]]:
     return files
 
 
-def operator_todo(args: argparse.Namespace, kit_source: str) -> str:
-    """What is left for the Operator after the Factory stops, as a checklist.
+def operator_items(args: argparse.Namespace, kit_source: str) -> list[dict[str, object]]:
+    """What is left for the Operator after the Factory stops, as structured work.
 
     Built here rather than in the template because every line of it is a fact about the
     answers just given. A checklist assembled by hand in a skill is a checklist that
     quietly loses the item nobody remembered this time.
+
+    Two surfaces read this: the checklist in the Operator's notes, which is a snapshot
+    taken when the Kit was written, and the board, which stays live. They are generated
+    from one list so they cannot come to disagree about what is outstanding.
     """
-    items: list[str] = []
+    items: list[dict[str, object]] = []
     if args.store == "folder":
         items.append(
-            f"Share `{args.root}` with the team, through whichever sync client owns it. "
-            "Until that is done a handoff opens only for the person who sent it, and the "
-            "failure looks to them like a bad code."
+            {
+                "key": "share-the-folder",
+                "title": f"Share `{args.root}` with the team",
+                "body": (
+                    "Through whichever sync client owns it. Until that is done a handoff "
+                    "opens only for the person who sent it, and the failure looks to them "
+                    "like a bad code."
+                ),
+                "labels": ["store", "access"],
+                "priority": "urgent",
+            }
         )
     else:
         where = args.server_location or "wherever you decided to run it"
         items.append(
-            f"Deploy the store server ({where}). The Dockerfile builds it; where it runs "
-            "is yours."
+            {
+                "key": "verified-principal",
+                "title": "Replace `principal()` with an identity your infrastructure verified",
+                "body": (
+                    "It is the whole authorization model. Until it returns a caller the "
+                    "deployment authenticated, and never one taken from a tool argument, "
+                    "every caller is the same person. Remove `CONTINUITY_DEV_PRINCIPAL` "
+                    "wherever it is set: it turns nobody into somebody."
+                ),
+                "labels": ["store", "security"],
+                "priority": "urgent",
+            }
+        )
+        items.append(
+            {
+                "key": "deploy",
+                "title": f"Deploy the store server ({where})",
+                "body": "The Dockerfile builds it; where it runs is yours.",
+                "labels": ["store", "deploy"],
+                "priority": "high",
+                "blocked_by": ["verified-principal"],
+            }
         )
         if args.server_route == "org":
             items.append(
-                f"Register the deployed server with your organisation's connectors under "
-                f"exactly the name `{args.service_name}`. A Kit built against "
-                f"`{args.service_name}` and a server registered under any other spelling "
-                "never meet, and nothing reports it."
+                {
+                    "key": "register",
+                    "title": (
+                        "Register the deployed server with your organisation's connectors "
+                        f"under exactly the name `{args.service_name}`"
+                    ),
+                    "body": (
+                        f"A Kit built against `{args.service_name}` and a server registered "
+                        "under any other spelling never meet, and nothing reports it. The "
+                        "tools are simply absent."
+                    ),
+                    "labels": ["store", "deploy"],
+                    "priority": "urgent",
+                    "blocked_by": ["deploy"],
+                }
             )
         else:
             items.append(
-                f"Put the deployed server's URL into `{kit_source}/.mcp.json`, replacing "
-                f"`{PLACEHOLDER_SERVER_URL}`. That address is a reserved example domain and "
-                "answers nothing on purpose."
+                {
+                    "key": "register",
+                    "title": f"Put the deployed server's URL into `{kit_source}/.mcp.json`",
+                    "body": (
+                        f"Replacing `{PLACEHOLDER_SERVER_URL}`, which is a reserved example "
+                        "domain and answers nothing on purpose. Re-run the factory with "
+                        "`--server-url` rather than editing the file: a Kit is regenerated, "
+                        "not edited."
+                    ),
+                    "labels": ["store", "deploy"],
+                    "priority": "urgent",
+                    "blocked_by": ["deploy"],
+                }
             )
         items.append(
-            "Decide who reads what. A publication is readable by whoever sent it until "
-            "they share it; `set_publication_access` is the one place that list is edited."
+            {
+                "key": "who-reads-what",
+                "title": "Decide who reads what",
+                "body": (
+                    "A publication is readable by whoever sent it until they share it; "
+                    "`set_publication_access` is the one place that list is edited."
+                ),
+                "labels": ["store", "access"],
+                "priority": "medium",
+            }
+        )
+        items.append(
+            {
+                "key": "retention",
+                "title": "Set a retention policy on the bucket",
+                "body": (
+                    "Publications accumulate forever by default, and they hold redacted "
+                    "prompts and whatever files people chose to send. Redacted is not the "
+                    "same as safe. Decide the period rather than inheriting never delete."
+                ),
+                "labels": ["store", "security"],
+                "priority": "medium",
+            }
+        )
+        items.append(
+            {
+                "key": "re-verify",
+                "title": "Run `verify` again against the registered server",
+                "body": (
+                    "The only thing that proves the Kit and the server found each other. "
+                    "Everything proven during setup went through a local process this "
+                    "machine was pointed at by hand."
+                ),
+                "labels": ["kit", "test"],
+                "priority": "high",
+                "blocked_by": ["register"],
+            }
         )
     items.append(
-        f"Release it the way this repo releases plugins. Nothing here was branched, "
-        f"committed, or pushed, and until the marketplace row reaches your default branch "
-        f"nobody can install `{args.name}`."
+        {
+            "key": "release",
+            "title": "Release it the way this repo releases plugins",
+            "body": (
+                "Nothing here was branched, committed, or pushed, and until the marketplace "
+                f"row reaches your default branch nobody can install `{args.name}`."
+            ),
+            "labels": ["repo"],
+            "priority": "high",
+        }
     )
     items.append(
-        f"Tell the team the two sentences that drive it: *hand this over to <name>* at the "
-        f"end of a piece of work, and *pick up what <name> sent me — <code>* at the start."
+        {
+            "key": "tell-the-team",
+            "title": "Tell the team the two sentences that drive it",
+            "body": (
+                "*hand this over to <name>* at the end of a piece of work, and *pick up "
+                "what <name> sent me — <code>* at the start."
+            ),
+            "labels": ["kit"],
+            "priority": "medium",
+            "blocked_by": ["release"],
+        }
     )
     items.append(
-        f"Re-run the contract test — `cd {kit_source} && python3 tests/contract_test.py` — "
-        "after anyone changes the Kit. It is deterministic, free, and needs no model."
+        {
+            "key": "teammate-pick-up",
+            "title": "Have somebody else pick a handoff up",
+            "body": (
+                "From their own machine and their own account. This is the failure the "
+                "whole exercise exists to catch, a Kit that works only for the person who "
+                "built it, and until it happens the receiving half is unproven however "
+                "green everything else looks."
+            ),
+            "labels": ["test"],
+            "priority": "urgent",
+            "blocked_by": ["release"],
+        }
     )
-    return "\n".join(f"- [ ] {item}" for item in items)
+    items.append(
+        {
+            "key": "re-run-contract",
+            "title": "Re-run the contract test after anyone changes the Kit",
+            "body": (
+                f"`cd {kit_source} && python3 tests/contract_test.py`. It is deterministic, "
+                "free, and needs no model."
+            ),
+            "labels": ["kit", "test"],
+            "priority": "low",
+        }
+    )
+    return items
+
+
+def operator_todo(args: argparse.Namespace, kit_source: str) -> str:
+    """The same work as a checklist, for the Operator's notes."""
+    return "\n".join(
+        f"- [ ] **{item['title']}.** {item['body']}"
+        for item in operator_items(args, kit_source)
+    )
+
+
+def board_note(repo_root: pathlib.Path | None) -> str:
+    """A pointer to the board, but only for a repo that has one.
+
+    This checklist is a snapshot taken the moment the Kit was written; the board keeps
+    moving. Sending a reader to a file the run never made would be worse than sending
+    them nowhere, so a Kit emitted without one says nothing about it.
+    """
+    if repo_root is None or not (repo_root / "status" / "tasks.json").is_file():
+        return ""
+    return (
+        "The live version of this list is the board the setup run left behind. It holds "
+        "the same items plus whatever that run turned up, and it says which are waiting "
+        "on which:\n\n"
+        "```bash\n"
+        "cd status && python3 -m http.server 4173    # then open localhost:4173/board.html\n"
+        "```\n"
+    )
 
 
 def engine_commands(store: str, kit_source: str) -> str:
@@ -462,6 +616,7 @@ def emit(args: argparse.Namespace) -> dict[str, object]:
     values["EVAL_TABLE"] = eval_table(args.store)
     values["EVAL_INVOCATION"] = eval_invocation(args.store)
     values["KIT_SOURCE"] = market_source
+    values["BOARD_NOTE"] = board_note(_notes_root(args))
     values.update(_fragments(args.store, values))
 
     existing = into / KIT_CONFIG_NAME

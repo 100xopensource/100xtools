@@ -57,15 +57,18 @@ caught only on a second pass.
 `plugins/100xdrift-check/templates/workflows/drift-check.yml`,
 `plugins/100xdrift-check/templates/skills/drift-check/SKILL.md`,
 `plugins/100x-continuity/scripts/engine/redact.py`,
-`plugins/100x-continuity/scripts/engine/bundle.py`, and
+`plugins/100x-continuity/scripts/engine/bundle.py`,
+`plugins/100x-continuity/scripts/board.py`, and
 `plugins/100x-continuity/templates/store-service/server.py` decide what CI does with
 model output, what tools the model gets, and what runs automatically on a user's machine.
 `redact.py` is on that list because it is the only thing standing between a full session
 transcript and a folder that syncs to somebody's cloud account; `bundle.py` because it is
 what refuses a hostile archive somebody else wrote before it is unpacked onto a reader's
-disk, and what refuses to publish a staged file holding a credential; `server.py` because
-it is the template that decides who can read whose session, on infrastructure the user
-runs. A change that weakens a pattern in any of them is a privacy incident, not a bug. Checks there only ever tighten; if a change relaxes a guard, say
+disk, and what refuses to publish a staged file holding a credential; `board.py` because
+it is the only thing between model-composed evidence — a `.env` read back, a server's
+reply, a command that echoed more than it meant to — and a file written into a repo other
+people clone; `server.py` because it is the template that decides who can read whose
+session, on infrastructure the user runs. A change that weakens a pattern in any of them is a privacy incident, not a bug. Checks there only ever tighten; if a change relaxes a guard, say
 so explicitly rather than letting a reviewer find it.
 
 **5. Every plugin scores 1.00** on the static linter this repo ships. CI dogfoods it, so a
@@ -323,7 +326,8 @@ is re-run whenever that server changes. See `docs/adr/0001-one-setup-skill.md`.
 | `templates/kit/fragments/*.md` | spliced into the skills; never copied as files |
 | `templates/kit-extras/**` | copied only when this Kit's store or route calls for it |
 | `templates/operator-notes.md` | a marked section in the destination repo's `CLAUDE.md` |
-| `scripts/emit.py` | stays here — the only factory-side module |
+| `templates/status/board.html` | `status/board.html`, beside their plugins, never inside one |
+| `scripts/emit.py`, `scripts/board.py` | stay here — the only two factory-side modules |
 
 `kit-extras/` exists because `templates/kit/**` is copied wholesale. Anything conditional
 — the `.mcp.json` for a Kit that declares its own server, an eval case that only one store
@@ -349,6 +353,29 @@ later. Four rules it owns:
 - **Only the text between its own markers in the destination `CLAUDE.md` is rewritten.**
   The markers carry the Kit's name, because one repo can ship two Kits and a repo-wide
   marker lets the second emit eat the first one's notes.
+
+**A setup run is put up as a board before it happens** (`scripts/board.py`,
+`templates/status/board.html`). Most of the run is unattended, so the whole thing goes
+into the Operator's repo as tasks at Plan time, all still todo — they approve something
+they can see, and each task is marked off as it lands with the evidence that settled it
+and whether it was `proven` here or against a `stand-in`. Four things it owns:
+
+- **The Operator's half of the board is `emit.operator_items()`**, the same list the
+  checklist in their `CLAUDE.md` is rendered from. Two hand-written lists of what is
+  outstanding is two lists that stop agreeing. `test_board` checks the board's titles
+  against the *rendered checklist* rather than against `operator_items` — comparing a
+  function with itself would pass whatever anybody did to it.
+- **Everything written goes through `redact.py` first**, because evidence lines are
+  composed from what just happened on the Operator's machine and the file lands in a repo
+  Teammates clone. Recall over precision: a mangled evidence line costs nothing.
+- **`blockedBy` means cannot be started, never comes after.** Sequencing the Factory's own
+  steps through it opened every board with most cards in Blocked, which is the opposite of
+  showing somebody their plan. `relieve()` moves tasks between `todo` and `blocked` and
+  those two only, so a card parked in `needsyou` stays parked.
+- **The board is never copied into a Kit.** It is the record of one run, and it holds the
+  Operator's machine; Teammates install the Kit. `board.html` and `board.py` are one
+  contract split across two files, the same shape as 100xdrift-check's reviewer and
+  workflow, so `test_board` asserts the page reads no field the script never writes.
 
 **`set-up-handoff` runs once, so the handover is a file, not the conversation.** Emitting
 writes a marked section into the *destination repo's* `CLAUDE.md`: what the Kit is, what a

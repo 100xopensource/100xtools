@@ -317,6 +317,43 @@ class MarketplaceTests(unittest.TestCase):
         self.assertEqual(self.manifest.read_text(encoding="utf-8"), "{ not json")
 
 
+
+class BoardNoteTests(unittest.TestCase):
+    """The notes may only send a reader to a board the run actually left."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo = pathlib.Path(self.tmp.name)
+        self.addCleanup(self.tmp.cleanup)
+
+    def test_a_repo_with_no_board_is_told_nothing_about_one(self):
+        self.assertEqual(emit_mod.board_note(self.repo), "")
+        self.assertEqual(emit_mod.board_note(None), "")
+
+    def test_a_repo_with_a_board_is_pointed_at_it(self):
+        (self.repo / "status").mkdir()
+        (self.repo / "status" / "tasks.json").write_text("{}", encoding="utf-8")
+        self.assertIn("board.html", emit_mod.board_note(self.repo))
+
+    def test_the_notes_carry_it_only_when_it_exists(self):
+        market = self.repo / ".claude-plugin" / "marketplace.json"
+        market.parent.mkdir(parents=True)
+        market.write_text(
+            json.dumps({"name": "p", "owner": {"name": "Acme"}, "plugins": []}),
+            encoding="utf-8",
+        )
+        args = _args(
+            into=str(self.repo / "plugins" / "acme-handoff"), marketplace=str(market)
+        )
+        emit_mod.emit(args)
+        self.assertNotIn("board.html", (self.repo / "CLAUDE.md").read_text(encoding="utf-8"))
+
+        (self.repo / "status").mkdir()
+        (self.repo / "status" / "tasks.json").write_text("{}", encoding="utf-8")
+        emit_mod.emit(args)
+        self.assertIn("board.html", (self.repo / "CLAUDE.md").read_text(encoding="utf-8"))
+
+
 if __name__ == "__main__":
     unittest.main()
 

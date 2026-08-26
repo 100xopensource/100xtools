@@ -17,6 +17,7 @@ Two skills, both driven by ordinary sentences rather than commands:
 
 ### Still yours to do
 
+{{BOARD_NOTE}}
 {{OPERATOR_TODO}}
 
 ### Driving it from your own code

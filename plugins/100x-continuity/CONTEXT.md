@@ -34,6 +34,14 @@ what the Kit is, and what is still the Operator's to do once the Factory stops. 
 runs once, so this — not the conversation — is where the remaining work lives.
 _Avoid_: handover doc, instructions, README (the Kit has one of those, for Teammates).
 
+**Board**:
+One setup run written down as tasks, put up before anything is written so the Operator
+approves a plan they can see, and marked off as each one finishes. It says who each piece
+is waiting on and what was actually proven rather than merely done. It lives in the
+Operator's repository, not in the Kit: it is the record of a run, and Teammates install
+the Kit.
+_Avoid_: backlog, roadmap, todo list (it holds work already decided, for one run).
+
 ### The people
 
 **Operator**:

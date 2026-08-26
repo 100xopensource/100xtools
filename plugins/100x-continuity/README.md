@@ -33,7 +33,8 @@ flowchart TD
     G -->|A store service| I["Ask the name you will register it under,<br/>how teammates reach it, and where its source will live"]
     H --> K[Write continuity-plan.md]
     I --> K
-    K --> L{Do you approve the Plan?}
+    K --> BD["Put the whole run up as a board:<br/>status/board.html, everything still todo"]
+    BD --> L{Do you approve the Plan?}
     L -->|No| F
     L -->|Yes| M["Write the Kit, its marketplace row,<br/>and your notes into this repo's CLAUDE.md"]
     M --> N{Did the Plan choose a service?}
@@ -45,12 +46,29 @@ flowchart TD
     S3 --> V
     V --> O[Run the contract test. Hand this session over. Open it again.]
     O --> P["Report: proven / proven against a stand-in / not proven yet"]
-    P --> Q["Left in your CLAUDE.md: deploy and register the server,<br/>or share the folder — then release it however you release plugins"]
+    P --> Q["Left on the board and in your CLAUDE.md: deploy and register<br/>the server, or share the folder — then release it however you release plugins"]
 ```
 
 The service store's name is settled **before** anything is written, and the server is
 built to answer to it afterwards. Asking for the name once a server already exists is how
 a Kit and a server end up never meeting, which nothing reports.
+
+### Watching it, and what it leaves behind
+
+Most of a setup run happens without you. So before the first file is written, the whole
+run goes up as a board in your repo — the Factory's steps and the ones that will still be
+yours at the end, all of them still todo. You approve a plan you can see. Each task is
+marked off as it lands, with the evidence that settled it and whether it was **proven**
+here or only against a **stand-in**.
+
+```bash
+cd status && python3 -m http.server 4173    # then open localhost:4173/board.html
+```
+
+It stays after the run ends, which is the point: it is what is still outstanding, who
+each piece waits on, and what was never actually proven. It belongs to your repo rather
+than to the kit — your teammates install the kit, and this is the record of the day you
+built it.
 
 ## What your teammates get
 
