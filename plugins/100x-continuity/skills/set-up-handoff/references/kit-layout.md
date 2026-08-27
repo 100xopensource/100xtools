@@ -26,7 +26,7 @@ carries its own copy of the engine and always will.
   "namespace": "analytics",
   "service_name": "",
   "kit_name": "acme-handoff",
-  "factory_version": "0.1.0",
+  "factory_version": "0.2.0",
   "emitted_at": "2026-08-21T09:14:02Z"
 }
 ```

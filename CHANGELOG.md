@@ -32,6 +32,8 @@ First public release. Scoring version **1**.
 
 ### 100x-continuity
 
+- Manifest version **0.2.0**, ahead of the other two, so a pre-release install can be told
+  apart from an earlier one. Everything here goes out at 1.0.0 on the actual roll-out.
 - **A factory, not a handoff plugin.** An Operator installs it, answers questions about
   their team and their storage, and it writes a *Kit* — a tailored plugin, with the store
   baked in — into their own plugin repo with its marketplace row. Their teammates install
