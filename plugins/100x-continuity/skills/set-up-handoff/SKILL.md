@@ -26,18 +26,13 @@ interview, not a form:
 - **Carry on to the end.** Approval is the one place a human is needed. Everything after
   it is yours to finish — do not stop and offer to continue.
 
-## 1. Say what the run is, then read what is already there
-
-Show the shape of it before asking anything. Somebody who knows there are ten steps and
-one question waits through the interview differently from somebody who does not:
+## 1. Read what is already there
 
 ```bash
 FACTORY="${CLAUDE_PLUGIN_ROOT}"
-python3 "$FACTORY/scripts/board.py" outline
 ```
 
-It writes nothing. The real board goes up at step 3, once the answers say which half of
-it applies. Then look at the Operator's side:
+Then look at the Operator's side:
 
 - Are they in a plugin repository? A `.claude-plugin/marketplace.json` at the root says
   yes, and its rows say what naming they already use.
@@ -75,6 +70,10 @@ waiting on a server is still worth having on disk.
 
 ## 3. Write the plan, put the board up, and get one yes
 
+**Display the plan file. Do not retype it into the chat.** Writing it and then saying it
+again is the same document twice, and the second copy is the one nobody reads. The same
+goes for the board: it is a file and a page, not something to paste.
+
 Write `continuity-plan.md` into the target repo: what it will be called and where it goes;
 its two skills and one line each on what a Teammate says; where handoffs go and **who can
 read them**; and what will be created or overwritten, including the marked section this
@@ -90,12 +89,15 @@ python3 "$FACTORY/scripts/board.py" init --into <repo> --name <kit-name> \
 
 Swap in `--store service --service-name <the chosen name> --server-route <org|mcp-json>
 --server-location <where its source will live>` for a service store, and the board grows
-the tasks only a server has. It writes `status/board.html` and `status/tasks.json` and
-prints the same board as text — put that text in the chat, and say it can be watched:
+the tasks only a server has. It writes `status/board.html` and `status/tasks.json`. Say
+where it is and how to watch it, in one line, rather than listing what is on it:
 
 ```bash
 cd <repo>/status && python3 -m http.server 4173    # then open localhost:4173/board.html
 ```
+
+`board.py show` prints it if you need to read the state back yourself. That output is for
+you, not for the chat.
 
 Every task carries a `key`. Mark one off the moment it lands, never in a batch at the
 end, and give it the evidence that convinced you rather than the word *done*:
@@ -109,8 +111,8 @@ python3 "$FACTORY/scripts/board.py" set --into <repo> read-the-repo \
 for the real thing, which is the honest label for anything a synthetic session or a local
 process satisfied. Anything the run turns up that no plan predicted goes on with `add`.
 
-Mark `read-the-repo` now, with what reading the repo actually turned up. Then show the
-plan and the board, and ask in the chat — not a pop-up, which invites a click. This is
+Mark `read-the-repo` now, with what reading the repo actually turned up. Then display
+`continuity-plan.md` and ask in the chat — not a pop-up, which invites a click. This is
 the gate. Their yes is what marks `plan`.
 
 ## 4. Write it
@@ -189,13 +191,12 @@ branch is the release, and that call is theirs.
 
 ## Self-check
 
-- [ ] The run was laid out before the first question, not after.
 - [ ] Facts that could be looked up were looked up, not asked.
 - [ ] An existing `kit.json` was found and used as defaults, not overwritten blind.
 - [ ] The access consequence of the store choice was said before it was chosen.
 - [ ] For a service store, the registered name was chosen before anything was emitted.
-- [ ] The plan was written to a file, the board was up beside it, and both were approved
-      in the chat.
+- [ ] The plan was written to a file, displayed rather than restated, and approved in
+      the chat with the board already up beside it.
 - [ ] Every task was marked as it happened, with evidence, and nothing that stood in for
       the real thing was marked `proven`.
 - [ ] The target is the Operator's repo, never this factory's own.

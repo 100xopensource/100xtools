@@ -104,23 +104,6 @@ class SeedTests(unittest.TestCase):
         self.assertLessEqual(blockers, ids)
 
 
-class OutlineTests(unittest.TestCase):
-    """Said before any answer is in, so it has to cover both stores at once."""
-
-    def test_it_names_every_step_of_either_run(self):
-        text = board_mod.outline()
-        for store in ("folder", "service"):
-            for task in board_mod._setup_tasks(store):
-                self.assertIn(task["title"], text)
-
-    def test_the_server_steps_are_marked_as_conditional(self):
-        text = board_mod.outline()
-        folder = {t["key"] for t in board_mod._setup_tasks("folder")}
-        for task in board_mod._setup_tasks("service"):
-            line = next(l for l in text.splitlines() if task["title"] in l)
-            self.assertEqual("only for a store service" in line, task["key"] not in folder)
-
-
 class WriteTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
