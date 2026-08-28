@@ -3,7 +3,8 @@
 Claude drives this plugin through this module, so every command prints **JSON on
 stdout and nothing else** — a human-readable line would have to be parsed back out of
 the model's context, and a half-parsed status is worse than none. A failure carries
-`ok: false`, an `error`, and a `hint` naming the remedy, then exits non-zero.
+`ok: false` and an `error` object — `code`, `op`, `origin`, `fix_by`, `remedy` and a
+quarantined `hint` — then exits non-zero. See `ERROR_CODES` for the closed set.
 
 The commands split three ways, which is also how the three skills split:
 
@@ -66,71 +67,218 @@ def main(argv: list[str] | None = None) -> int:
         ValueError,
         OSError,
     ) as exc:
-        hint = str(exc)
-        result: dict[str, Any] = {
-            "ok": False,
-            "error": type(exc).__name__,
-            # Two audiences, two strings. `hint` names the remedy in this engine's own
-            # words and is for whoever is debugging it. `say` is what a Kit repeats to
-            # a person handing work to a colleague, who has never heard of a bundle or
-            # a transcript. A Kit relaying `hint` verbatim is how those words reached a
-            # teammate's chat, so both are always present and the Kit is told which.
-            "say": _plain(exc, hint),
-            "hint": hint,
-        }
-        if isinstance(exc, wire.TransferError):
-            result["error_code"] = exc.code
-        _emit(result)
+        _emit({"ok": False, "error": describe(exc, getattr(args, "command", None))})
         return 1
 
 
-# Internal word -> what a person is actually told. Ordered: the first pattern that
-# matches wins, so the specific cases sit above the catch-alls.
-_PLAIN_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
-    (
-        re.compile(r"no transcript directory|no session|transcript.*not found", re.I),
-        "I can't find this conversation on this machine, so there is nothing to send "
-        "yet.",
+# --- how a failure is described ----------------------------------------------
+#
+# A failure is not a sentence. It is a set of facts a caller acts on: which command was
+# running, which component broke, who can do anything about it, and what that person
+# would do. The Kit's skills compose from those; a script branches on `code`.
+#
+# There used to be a `say` here — one pre-written sentence a skill repeated verbatim.
+# It was replaced because its fallback, which is by construction the branch every
+# unrecognised failure lands in, read "nothing was sent". True while publishing, a lie
+# while picking up: the sender's half had worked and only the reading back had failed,
+# and the person was told their colleague had failed them.
+#
+# `hint` stays quarantined. It is this engine's own wording — bundle, transcript,
+# manifest — and it is there to be understood, never quoted at a Teammate.
+
+
+class UnknownCode(Exception):
+    """A code with no row in the registry. Raised rather than passed through.
+
+    An unregistered code is one somebody added in a hurry, and it reaches whoever
+    drives this engine from their own code as a string they cannot branch on.
+    """
+
+
+# Which half of the exchange a command belongs to. This is the distinction the old
+# single fallback sentence did not have, and not having it is what let a failed
+# *receive* be reported as "nothing was sent".
+SENDING_OPS = frozenset({"pack", "publish", "upload"})
+RECEIVING_OPS = frozenset({"fetch", "open"})
+
+
+def side(op: str | None) -> str:
+    if op in SENDING_OPS:
+        return "sending"
+    if op in RECEIVING_OPS:
+        return "receiving"
+    return "neither"
+
+
+# code -> (origin, fix_by, remedy). `origin` is the component that broke; `fix_by` is
+# the person who can act, and they are not the same — a publication whose bytes are
+# gone breaks at the store and is fixable only by whoever sent it.
+#
+# Every row is part of the contract with whoever drives the engine from their own code,
+# so the set is closed, `UnknownCode` is raised for anything outside it, and
+# `emit.error_codes()` renders it into the Operator's notes. `remedy` is written for a
+# person: this engine's own vocabulary belongs in `hint` and nowhere else.
+ERROR_CODES: dict[str, tuple[str, str, str | None]] = {
+    "session.not_found": (
+        "input", "user",
+        "open this in the conversation you want to send, or name it with --session",
     ),
-    (
-        re.compile(r"not materiali[sz]ed|short bytes|still (?:down)?loading", re.I),
-        "That isn't on this machine yet — your cloud drive is still fetching it. Give "
-        "it a moment and try again.",
+    "session.not_materialized": (
+        "input", "user",
+        "wait for your cloud drive to finish fetching it, then try again",
     ),
-    (
-        re.compile(r"digest|sha256|checksum|corrupt", re.I),
-        "What arrived doesn't match what was sent. Ask them to send it again — it "
-        "costs them nothing.",
+    "input.credential_detected": (
+        "input", "user",
+        "take the value out, leave that file behind, or send without it",
     ),
-    (
-        re.compile(r"credential|secret|password|\.env\b|private key", re.I),
-        "One of the files looks like it holds a password or a key, so I stopped "
-        "before sending anything.",
+    "input.file_missing": (
+        "input", "user",
+        "that file is not where it was named; check the path and try again",
     ),
-    (
-        re.compile(r"no publication|not available to you|access", re.I),
-        "That code doesn't open for you. Whoever sent it needs to share it with you.",
+    "input.not_a_bundle": (
+        "input", "user",
+        "what was pointed at is not a packaged handoff; pack one first",
     ),
-    (
-        re.compile(r"resolve|handle|publication id", re.I),
-        "I can't find anything for that code. Check it with the person who sent it.",
+    "usage.invalid": (
+        "input", "user",
+        "one of the values given was not usable; nothing was changed",
     ),
+    "config.rejected": (
+        "input", "operator",
+        "this build cannot work the way it has been configured",
+    ),
+    "bundle.digest_mismatch": (
+        "network", "sender",
+        "ask them to send it again; it costs them nothing",
+    ),
+    "bundle.damaged": (
+        "input", "sender",
+        "what arrived cannot be opened; ask them to send it again",
+    ),
+    "store.unreachable": (
+        "store", "operator",
+        "the store is not answering from here",
+    ),
+    "store.object_missing": (
+        "store", "sender",
+        "ask them to hand it over again, which will give them a new code",
+    ),
+    "store.url_expired": (
+        "store", "sender",
+        "ask them to hand it over again; the address they gave you has run out",
+    ),
+    "store.access_denied": (
+        "store", "sender",
+        "ask whoever sent it to share it with you",
+    ),
+    "store.too_large": (
+        "store", "user",
+        "this is too big for the store to take; leave the largest files out",
+    ),
+    "store.bad_answer": (
+        "store", "operator",
+        "the store's reply was not usable, so nothing was transferred",
+    ),
+    "handle.unknown": (
+        "input", "user",
+        "check the code with the person who sent it",
+    ),
+    "network.refused": (
+        "network", "operator",
+        "the address this was pointed at is not one it will use",
+    ),
+    # The catch-all carries no remedy on purpose. Anything written here would be a
+    # claim about a failure nothing recognised, and the last one of those was wrong.
+    "engine.unknown": ("engine", "operator", None),
+}
+
+FALLBACK_CODE = "engine.unknown"
+
+# `wire.TransferError` already carries a stable code for exactly this reason, so the
+# transfer path is classified structurally rather than by matching on prose.
+_TRANSFER_CODES: dict[str, str] = {
+    "target_missing": "store.object_missing",
+    "empty_body": "store.object_missing",
+    "url_expired_or_forbidden": "store.url_expired",
+    "store_unavailable": "store.unreachable",
+    "unreachable": "store.unreachable",
+    "body_too_large": "store.too_large",
+    "digest_mismatch": "bundle.digest_mismatch",
+    "not_accepted": "store.bad_answer",
+    "bad_mint": "store.bad_answer",
+    "body_unreadable": "store.bad_answer",
+    "insecure_url": "network.refused",
+    "invalid_url": "network.refused",
+    "credentials_in_url": "network.refused",
+    "unexpected_redirect": "network.refused",
+    "host_not_allowed": "network.refused",
+}
+
+# An archive that will not open is the same fault with two different owners: pointing
+# at the wrong file while sending, or being handed a broken one while receiving. Which
+# it is comes from the command, not from the wording.
+_BY_SIDE: dict[str, dict[str, str]] = {
+    "archive": {"sending": "input.not_a_bundle", "receiving": "bundle.damaged"},
+}
+
+# The engine's own wording -> a code, or a `_BY_SIDE` key. Ordered: the first match
+# wins, so the specific cases sit above the catch-alls.
+_CODE_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"no transcript directory|no session|transcript.*not found", re.I),
+     "session.not_found"),
+    (re.compile(r"not materiali[sz]ed|short bytes|still (?:down)?loading", re.I),
+     "session.not_materialized"),
+    (re.compile(r"credential|secret|password|\.env\b|private key", re.I),
+     "input.credential_detected"),
+    (re.compile(r"digest|sha256|checksum", re.I), "bundle.digest_mismatch"),
+    (re.compile(r"not a zip|no manifest|unsafe|refus\w+ member|absolute path"
+                r"|symlink|outside|corrupt|archive", re.I), "archive"),
+    (re.compile(r"no tool matching|not answering|unreachable", re.I),
+     "store.unreachable"),
+    (re.compile(r"never uploaded|no object|404", re.I), "store.object_missing"),
+    # Above the access rule: a handle naming nothing is not a permission problem, and
+    # telling somebody to ask for access to something that does not exist wastes both
+    # their time and the sender's.
+    (re.compile(r"no publication at that handle|nothing at that|unknown handle"
+                r"|publication id", re.I), "handle.unknown"),
+    (re.compile(r"not available to you|access denied|not yours", re.I),
+     "store.access_denied"),
+    (re.compile(r"^\[Errno 2\]|no such file or directory", re.I),
+     "input.file_missing"),
+    (re.compile(r"ConfigError", re.I), "config.rejected"),
+    (re.compile(r"must (?:be|contain|carry)|is required|unrecognised argument", re.I),
+     "usage.invalid"),
 )
 
-_PLAIN_FALLBACK = "That didn't work, and nothing was sent."
 
-
-def _plain(exc: Exception, hint: str) -> str:
-    """One sentence for the person, never the engine's own wording.
-
-    Deliberately lossy. Anything a Kit cannot say safely collapses to the fallback,
-    because a vague true sentence beats an exact one carrying words the reader has no
-    use for — and the precise text is still in `hint` for whoever needs it.
-    """
-    for pattern, sentence in _PLAIN_RULES:
+def classify(exc: Exception, hint: str, op: str | None = None) -> str:
+    """Which registered code this failure is, or the catch-all."""
+    if isinstance(exc, wire.TransferError) and exc.code in _TRANSFER_CODES:
+        return _TRANSFER_CODES[exc.code]
+    for pattern, code in _CODE_RULES:
         if pattern.search(hint) or pattern.search(type(exc).__name__):
-            return sentence
-    return _PLAIN_FALLBACK
+            if code in _BY_SIDE:
+                return _BY_SIDE[code].get(side(op), FALLBACK_CODE)
+            return code
+    return FALLBACK_CODE
+
+
+def describe(exc: Exception, op: str | None) -> dict[str, Any]:
+    """The whole failure, as facts. Never a sentence to be repeated."""
+    hint = str(exc)
+    code = classify(exc, hint, op)
+    if code not in ERROR_CODES:
+        raise UnknownCode(f"{code!r} is not in ERROR_CODES")
+    origin, fix_by, remedy = ERROR_CODES[code]
+    return {
+        "code": code,
+        "op": op,
+        "origin": origin,
+        "fix_by": fix_by,
+        "remedy": remedy,
+        "hint": hint,
+        "exception": type(exc).__name__,
+    }
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -295,6 +443,9 @@ def _cmd_where(args: argparse.Namespace) -> dict[str, Any]:
         "config_searched": cfg["config_searched"],
         "sources": cfg["sources"],
         "service_name": cfg["service_name"],
+        # The word a Teammate pastes. `where` is the one command that answers "what did
+        # this Kit actually resolve to", so it has to be here or nobody can check it.
+        "label": cfg["label"],
         "transcript_roots": [str(root) for root in transcript_mod.roots()],
         "transcript": str(found.path) if found.ok else None,
         "transcript_notes": list(found.notes),
@@ -454,7 +605,7 @@ def _bundle_result(prepared: dict[str, Any]) -> dict[str, Any]:
         "size": built.size,
         "manifest": built.manifest,
         "redacted": built.redacted,
-        "redaction_total": sum(built.redacted.values()),
+        "redaction_tally": redact.tally(built.redacted),
         # Said on every publish, not only when something was removed: "0 redacted" is a
         # result the caller should repeat, because it means the scrubber matched
         # nothing — not that there was nothing to find.

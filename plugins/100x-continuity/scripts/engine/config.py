@@ -50,6 +50,9 @@ STORE_KIND_ENV = "CONTINUITY_STORE"
 STORE_ROOT_ENV = "CONTINUITY_ROOT"
 NAMESPACE_ENV = "CONTINUITY_NAMESPACE"
 SERVICE_ENV = "CONTINUITY_SERVICE"
+# What a person calls this thing. It goes in the sentence a Teammate pastes to pick
+# work up, so it should read as the project rather than as a plugin name.
+LABEL_ENV = "CONTINUITY_LABEL"
 CONFIG_ENV = "CONTINUITY_CONFIG"
 
 # Written by the Factory into a Kit, beside `scripts/`. Its presence is what tells this
@@ -80,13 +83,18 @@ CONFIG_PATHS = (
 # sync client at it, and shares it with whoever is continuing the work.
 DEFAULT_ROOT_NAME = "Continuity"
 
-_KNOWN_KEYS = frozenset({"store", "root", "namespace", "service_name", "written_at"})
+_KNOWN_KEYS = frozenset(
+    {"store", "root", "namespace", "service_name", "label", "written_at"}
+)
 
 # What a Kit's baked config may say. `kit_name`, `factory_version` and `emitted_at` are
 # provenance: a Teammate reporting a problem names which Factory built their Kit, without
 # having to know what a Factory is.
 _KIT_KEYS = frozenset(
-    {"store", "root", "namespace", "service_name", "kit_name", "factory_version", "emitted_at"}
+    {
+        "store", "root", "namespace", "service_name", "label", "kit_name",
+        "factory_version", "emitted_at",
+    }
 )
 
 
@@ -287,6 +295,15 @@ def settings(
         or baked.get("service_name")
         or values.get("service_name")
     )
+    # Falls back to the Kit's name, which is always present, so the sentence a person
+    # pastes never comes out with a hole in it.
+    label = (
+        os.environ.get(LABEL_ENV)
+        or baked.get("label")
+        or values.get("label")
+        or baked.get("kit_name")
+        or ""
+    )
     session = session_flag or os.environ.get(SESSION_ENV)
 
     return {
@@ -294,6 +311,7 @@ def settings(
         "root": str(pathlib.Path(root).expanduser()),
         "namespace": namespace,
         "service_name": service_name,
+        "label": label,
         "session": session,
         "config_path": loaded["path"],
         "config_searched": loaded["searched"],
@@ -308,6 +326,7 @@ def settings(
             "store": _source(store_flag, STORE_KIND_ENV, baked, values, "store"),
             "root": _source(root_flag, STORE_ROOT_ENV, baked, values, "root"),
             "namespace": _source(namespace_flag, NAMESPACE_ENV, baked, values, "namespace"),
+            "label": _source(None, LABEL_ENV, baked, values, "label"),
         },
     }
 

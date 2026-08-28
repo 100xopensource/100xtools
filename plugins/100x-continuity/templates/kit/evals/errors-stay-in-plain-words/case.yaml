@@ -26,5 +26,7 @@ graders:
     focus: last_message
     criteria: >
       The reply tells the person, in ordinary words, that it could not open what they
-      pasted and what to do next. PASS if both are there. FAIL if it is silent about the
-      failure, or if it only prints a raw error with no explanation.
+      pasted and what to do next, and it does not blame the person who sent it for
+      something that is not their fault. PASS if the failure and the next step are both
+      there. FAIL if it is silent about the failure, if it only prints a raw error with
+      no explanation, or if it says nothing was sent when the sending is not what failed.

@@ -1,6 +1,6 @@
 ---
 name: hand-off
-description: Hands this session to someone else — the conversation, and any files worth sending — and gives back one short code to pass on. Use when someone says to hand this over, send this to a colleague, pass this on, share this session, or wants another person to carry this work on. Do NOT use for ordinary file writes that belong in the working folder.
+description: Hands this session to someone else on {{TEAM}} — the conversation, and any files worth sending — and gives back one short code to pass on. Use when someone says to hand this over, send this to a colleague, pass this on, share this session, or wants another person to carry this work on. Do NOT use for ordinary file writes that belong in the working folder.
 ---
 
 # Hand this session over
@@ -47,10 +47,13 @@ derived from where this file is, so if it is wrong the plugin is not laid out th
 ships, and a search will either come back empty or turn up somebody else's copy. Searching
 all of `~/mnt` is the worst of these: the team's shared folders are under there too.
 
-Results come back as JSON. A failure exits non-zero and carries two strings: **`say`**
-is one plain sentence written for the person in front of you — repeat that one.
-**`hint`** is the engine talking to whoever maintains it, and it uses words like
-*transcript* and *bundle*; never put it in the chat.
+Results come back as JSON. A failure exits non-zero and carries an **`error`** object
+rather than a sentence to repeat: `op` is the command that ran, `origin` the part that
+broke, `fix_by` whoever can actually act — the person here, the person receiving, or
+whoever runs the store — and `remedy` what that person would do. Build your own sentence
+out of those, and be clear about which half failed. **`hint`** is the engine talking to a
+maintainer in words like *transcript* and *bundle*: read it to understand what happened,
+never put it in the chat.
 
 ## 2. Check you're packaging the right conversation
 
@@ -75,10 +78,20 @@ options — never an open question.
 
 {{HANDOFF_STEPS}}
 
-## 5. Say one line
+## 5. Hand back the sentence they send
 
-Give them the code and who to send it to, in plain words — *"Done. Send Dana this:
-`<code>` — she can open it in her Claude and pick up where this left off."*
+Not the code on its own. The person now has to write a message to a colleague, and the
+colleague then has to say something to their own Claude — so give them both halves, with
+the second one written out ready to be pasted:
+
+> Done. Send Dana this, and she can carry on from here:
+>
+> ```
+> pick up the handoff for {{LABEL}} — <code>
+> ```
+
+That first word is the label this Kit was built with. `run.py where` prints the one in
+force and `CONTINUITY_LABEL` overrides it. Give the code exactly as it came back.
 
 Then two things you must not skip, said simply:
 

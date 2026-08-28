@@ -30,10 +30,20 @@ the loop:
 {{ENGINE_COMMANDS}}
 ```
 
-Every command prints JSON and exits non-zero when it fails. A failure carries two
-strings: `say` is one plain sentence written for the person at the keyboard, and `hint`
-is the engine's own wording for whoever maintains this. Show `say`; keep `hint` in the
-logs.
+Every command prints JSON and exits non-zero when it fails. A failure carries an
+`error` object rather than a finished sentence, because the right thing to say depends
+on who is reading and which half of the exchange broke:
+
+| field | what it is |
+| --- | --- |
+| `code` | one of the closed set below; branch on this, never on wording |
+| `op` | the command that was running |
+| `origin` | which part broke: `input`, `store`, `network` or `engine` |
+| `fix_by` | who can act: `user`, `sender`, `operator` or `nobody` |
+| `remedy` | that action, in ordinary words, safe to show a person |
+| `hint` | this engine's own wording, for your logs and not for a chat |
+
+{{ERROR_CODES}}
 
 ### Regenerating it
 

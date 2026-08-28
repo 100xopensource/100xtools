@@ -1,6 +1,6 @@
 ---
 name: pick-up
-description: Picks up work a colleague handed over — takes the short code they sent, opens their session, and carries on from where they stopped. Use when someone pastes a handoff code, says a colleague sent or shared a session with them, or asks to continue work started somewhere else. Do NOT use for ordinary file reads in the working folder.
+description: Picks up work someone on {{TEAM}} handed over — takes the short code they sent, opens their session, and carries on from where they stopped. Use when someone pastes a handoff code, says a colleague sent or shared a session with them, or asks to continue work started somewhere else. Do NOT use for ordinary file reads in the working folder.
 ---
 
 # Pick up what a colleague sent
@@ -36,9 +36,12 @@ do
 done
 ```
 
-Results come back as JSON. When something fails, read **`say`** — one plain sentence
-meant for the person — and repeat that. **`hint`** beside it is the engine's own wording,
-full of terms they have no use for; it is for a maintainer, not for the chat.
+Results come back as JSON. When something fails you get an **`error`** object, not a
+finished sentence. `code` names what went wrong, `fix_by` says who can do anything about
+it, and `remedy` is that action in ordinary words. Put it in your own words, and get the
+side right: a code that names nothing is a different thing from one whose sender did
+everything correctly and whose file has since gone. **`hint`** is written for a
+maintainer and its vocabulary has no place in front of the person here.
 
 ## 2. Open what they sent
 

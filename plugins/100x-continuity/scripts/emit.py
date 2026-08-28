@@ -140,6 +140,7 @@ def _substitutions(args: argparse.Namespace, emitted_at: str) -> dict[str, str]:
         "KIT_DESCRIPTION": args.description
         or "Hand a Claude session to a colleague, and pick up one they handed to you.",
         "KIT_VERSION": args.kit_version,
+        "LABEL": args.label or args.name,
         "ORG": args.org,
         "TEAM": args.team,
         "SERVICE_NAME": args.service_name or "",
@@ -247,7 +248,12 @@ def _plan_files(store: str, route: str) -> list[tuple[pathlib.Path, str]]:
     return files
 
 
-def operator_items(args: argparse.Namespace, kit_source: str) -> list[dict[str, object]]:
+def operator_items(
+    args: argparse.Namespace,
+    kit_source: str,
+    *,
+    repo_root: pathlib.Path | None = None,
+) -> list[dict[str, object]]:
     """What is left for the Operator after the Factory stops, as structured work.
 
     Built here rather than in the template because every line of it is a fact about the
@@ -259,6 +265,23 @@ def operator_items(args: argparse.Namespace, kit_source: str) -> list[dict[str, 
     from one list so they cannot come to disagree about what is outstanding.
     """
     items: list[dict[str, object]] = []
+    # A marketplace is installed by cloning, so a destination that is not a repository
+    # yet holds a plugin nobody can install however correct it is. Seen: a whole setup
+    # run finished and the deliverable was unreachable for this reason alone.
+    if repo_root is not None and not (repo_root / ".git").exists():
+        items.append(
+            {
+                "key": "git-init",
+                "title": f"Make `{repo_root.name}` a git repository",
+                "body": (
+                    "There is no `.git` here. A plugin marketplace is installed by "
+                    "cloning, so until this is a repository your Teammates can reach, "
+                    "nobody can install the Kit."
+                ),
+                "labels": ["repo"],
+                "priority": "high",
+            }
+        )
     if args.store == "folder":
         items.append(
             {
@@ -372,6 +395,34 @@ def operator_items(args: argparse.Namespace, kit_source: str) -> list[dict[str, 
                 "blocked_by": ["register"],
             }
         )
+    if args.store == "service":
+        items.append(
+            {
+                "key": "stop-the-local-server",
+                "title": "Stop the store server this run started on your machine",
+                "body": (
+                    "It holds a live storage credential in its environment and it does "
+                    "not stop when the conversation does. One was found still listening "
+                    "a day later with its source already in the Trash."
+                ),
+                "labels": ["store", "security"],
+                "priority": "high",
+            }
+        )
+    items.append(
+        {
+            "key": "run-the-evals",
+            "title": "Run the Kit's eval suite once, and decide if it is worth repeating",
+            "body": (
+                "The contract test is free and proves the engine. These score what the "
+                "*model* does with the two skills, which is the half a deterministic "
+                "test cannot see, and they cost money — so nothing runs them for you. "
+                f"From `{kit_source}`: `{eval_invocation(args.store)}`"
+            ),
+            "labels": ["kit", "test"],
+            "priority": "medium",
+        }
+    )
     items.append(
         {
             "key": "release",
@@ -427,12 +478,34 @@ def operator_items(args: argparse.Namespace, kit_source: str) -> list[dict[str, 
     return items
 
 
-def operator_todo(args: argparse.Namespace, kit_source: str) -> str:
+def operator_todo(
+    args: argparse.Namespace,
+    kit_source: str,
+    *,
+    repo_root: pathlib.Path | None = None,
+) -> str:
     """The same work as a checklist, for the Operator's notes."""
     return "\n".join(
         f"- [ ] **{item['title']}.** {item['body']}"
-        for item in operator_items(args, kit_source)
+        for item in operator_items(args, kit_source, repo_root=repo_root)
     )
+
+
+def error_codes() -> str:
+    """The engine's failure codes, as a table in the Operator's notes.
+
+    Rendered from the registry rather than written out, because the notes tell the
+    Operator to drive the engine from their own code and a code they cannot branch on
+    reliably is worse than no code at all. `cli.ERROR_CODES` is the only source.
+    """
+    sys.path.insert(0, str(FACTORY_ROOT / "scripts"))
+    from engine import cli  # noqa: PLC0415
+
+    rows = ["| `code` | `fix_by` | `remedy` |", "| --- | --- | --- |"]
+    for code in sorted(cli.ERROR_CODES):
+        origin, fix_by, remedy = cli.ERROR_CODES[code]
+        rows.append(f"| `{code}` | `{fix_by}` | {remedy or '*nothing recognised it*'} |")
+    return "\n".join(rows)
 
 
 def board_note(repo_root: pathlib.Path | None) -> str:
@@ -611,12 +684,13 @@ def emit(args: argparse.Namespace) -> dict[str, object]:
 
     emitted_at = _stamp()
     values = _substitutions(args, emitted_at)
-    values["OPERATOR_TODO"] = operator_todo(args, market_source)
+    values["OPERATOR_TODO"] = operator_todo(args, market_source, repo_root=_notes_root(args))
     values["ENGINE_COMMANDS"] = engine_commands(args.store, market_source)
     values["EVAL_TABLE"] = eval_table(args.store)
     values["EVAL_INVOCATION"] = eval_invocation(args.store)
     values["KIT_SOURCE"] = market_source
     values["BOARD_NOTE"] = board_note(_notes_root(args))
+    values["ERROR_CODES"] = error_codes()
     values.update(_fragments(args.store, values))
 
     existing = into / KIT_CONFIG_NAME
@@ -647,6 +721,7 @@ def emit(args: argparse.Namespace) -> dict[str, object]:
         "root": args.root or "",
         "namespace": args.namespace,
         "service_name": args.service_name or "",
+        "label": args.label or args.name,
         "kit_name": args.name,
         "factory_version": values["FACTORY_VERSION"],
         "emitted_at": emitted_at,
@@ -779,6 +854,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="where the server's source lives, in the Operator's words; for the notes only",
     )
     parser.add_argument("--description", help="one line for the marketplace row")
+    parser.add_argument(
+        "--label",
+        default=None,
+        help="what a person calls this work, used in the sentence a Teammate pastes "
+        "(default: the Kit's name)",
+    )
     parser.add_argument("--kit-version", default="0.1.0")
     parser.add_argument("--marketplace", help="marketplace.json to add or refresh a row in")
     parser.add_argument("--repo", help="the destination repo root; defaults to the marketplace's")

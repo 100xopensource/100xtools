@@ -7,6 +7,7 @@ import io
 import json
 import os
 import pathlib
+import re
 import tempfile
 import unittest
 import unittest.mock
@@ -157,13 +158,13 @@ class PublishTests(_CliCase):
     def test_a_service_store_is_sent_to_pack(self) -> None:
         code, result = self.run_cli("publish", "--store", "service")
         self.assertEqual(code, 1)
-        self.assertIn("pack", result["hint"])
+        self.assertIn("pack", result["error"]["hint"])
 
     def test_no_transcript_is_an_error_that_says_what_was_searched(self) -> None:
         self.transcript.unlink()
         code, result = self.publish()
         self.assertEqual(code, 1)
-        self.assertIn("no transcript found", result["hint"])
+        self.assertIn("no transcript found", result["error"]["hint"])
 
 
 class ArtifactTests(_CliCase):
@@ -195,7 +196,7 @@ class ArtifactTests(_CliCase):
         (self.work / ".env").write_text("TOKEN=abc\n", encoding="utf-8")
         code, result = self.publish("--artifact", str(self.work / ".env"))
         self.assertEqual(code, 1)
-        self.assertIn(".env", result["hint"])
+        self.assertIn(".env", result["error"]["hint"])
         self.assertEqual(store.publications(self.root), [])
 
     def test_a_credential_inside_an_artifact_stops_the_publish(self) -> None:
@@ -203,7 +204,7 @@ class ArtifactTests(_CliCase):
         self.note.write_text("key AKIA" + "W" * 16 + "\n", encoding="utf-8")
         code, result = self.publish("--artifact", str(self.note))
         self.assertEqual(code, 1)
-        self.assertIn("handover.md", result["hint"])
+        self.assertIn("handover.md", result["error"]["hint"])
 
     def test_it_can_be_included_deliberately(self) -> None:
         self.note.write_text("key AKIA" + "W" * 16 + "\n", encoding="utf-8")
@@ -271,18 +272,19 @@ class OpenTests(_CliCase):
             "--root", str(self.root),
         )
         self.assertEqual(code, 1)
-        self.assertIn("where", result["hint"])
+        self.assertIn("where", result["error"]["hint"])
 
     def test_neither_handle_nor_bundle_is_a_usage_error(self) -> None:
         code, result = self.run_cli("open")
         self.assertEqual(code, 1)
-        self.assertIn("--handle", result["hint"])
+        self.assertIn("--handle", result["error"]["hint"])
 
     def test_an_evicted_bundle_is_not_read_as_a_short_session(self) -> None:
         pathlib.Path(self.published["path"], bundle.BUNDLE_NAME).write_bytes(b"")
         code, result = self.run_cli("open", "--handle", self.published["path"])
         self.assertEqual(code, 1)
-        self.assertEqual(result["error"], "ObjectNotMaterialized")
+        self.assertEqual(result["error"]["exception"], "ObjectNotMaterialized")
+        self.assertEqual(result["error"]["code"], "session.not_materialized")
 
 
 class UploadGuardTests(_CliCase):
@@ -297,7 +299,8 @@ class UploadGuardTests(_CliCase):
             "upload", "--bundle", str(not_a_bundle), "--mint-file", str(mint)
         )
         self.assertEqual(code, 1)
-        self.assertEqual(result["error"], "BundleError")
+        self.assertEqual(result["error"]["exception"], "BundleError")
+        self.assertEqual(result["error"]["code"], "input.not_a_bundle")
 
 
 class ConfigCommandTests(_CliCase):
@@ -335,7 +338,7 @@ class ConfigCommandTests(_CliCase):
     def test_a_store_this_build_cannot_use_is_refused(self) -> None:
         code, result = self.run_cli("config", "--set-store", "s3")
         self.assertEqual(code, 1)
-        self.assertIn("service", result["hint"])
+        self.assertIn("service", result["error"]["hint"])
 
 
 class RoundTripTests(_CliCase):
@@ -370,15 +373,17 @@ class PlainErrorTests(_CliCase):
     #: Words the Kit's skills are told never to put in front of a person.
     INTERNAL = ("bundle", "transcript", "namespace", "publication", "redact", "digest")
 
-    def test_a_failure_carries_both_audiences(self) -> None:
+    def test_a_failure_carries_the_facts_a_caller_acts_on(self) -> None:
         code, result = self.run_cli("open", "--handle", "nope/nope/nope")
         self.assertEqual(code, 1)
         self.assertFalse(result["ok"])
-        self.assertTrue(result["say"], "a failure with no plain sentence is unreportable")
-        self.assertTrue(result["hint"], "the precise wording must survive for debugging")
-        self.assertNotEqual(result["say"], result["hint"])
+        error = result["error"]
+        self.assertEqual(error["op"], "open")
+        self.assertEqual(error["code"], "handle.unknown")
+        self.assertTrue(error["hint"], "the precise wording must survive for debugging")
+        self.assertNotEqual(error["remedy"], error["hint"])
 
-    def test_the_plain_sentence_keeps_internal_words_out(self) -> None:
+    def test_the_remedy_keeps_internal_words_out(self) -> None:
         for argv in (
             ("open", "--handle", "nope/nope/nope"),
             ("publish", "--session", "no-such-session-at-all"),
@@ -388,13 +393,25 @@ class PlainErrorTests(_CliCase):
                 _, result = self.run_cli(*argv)
                 if result.get("ok"):
                     continue
-                spoken = result["say"].lower()
+                spoken = (result["error"]["remedy"] or "").lower()
                 for word in self.INTERNAL:
                     self.assertNotIn(word, spoken, f"{argv[0]} said {word!r} to a person")
 
-    def test_an_unrecognised_failure_still_says_something_true(self) -> None:
-        self.assertEqual(cli._plain(Exception(), "disk on fire"), cli._PLAIN_FALLBACK)
-        self.assertIn("nothing was sent", cli._PLAIN_FALLBACK)
+    def test_a_receiving_failure_never_claims_nothing_was_sent(self) -> None:
+        """The defect this shape exists for. Found against real R2.
+
+        The old single fallback said "nothing was sent" for everything it did not
+        recognise, so a reader whose download failed was told the *sender* had failed.
+        """
+        for code, (_origin, _fix_by, remedy) in cli.ERROR_CODES.items():
+            with self.subTest(code=code):
+                self.assertNotIn("nothing was sent", (remedy or "").lower())
+                self.assertNotIn("nothing arrived", (remedy or "").lower())
+
+    def test_an_unrecognised_failure_promises_nothing(self) -> None:
+        described = cli.describe(Exception("disk on fire"), "open")
+        self.assertEqual(described["code"], cli.FALLBACK_CODE)
+        self.assertIsNone(described["remedy"])
 
 
 class FetchDigestTests(_CliCase):
@@ -454,3 +471,52 @@ class FetchDigestTests(_CliCase):
             )
         self.assertIsNone(result["digest_source"])
         self.assertIn("not checked", result["note"])
+
+
+class ErrorContractTests(unittest.TestCase):
+    """The failure payload is a contract, so the registry cannot rot quietly."""
+
+    def test_every_registered_code_is_complete(self):
+        for code, row in cli.ERROR_CODES.items():
+            origin, fix_by, remedy = row
+            self.assertIn(origin, {"input", "store", "network", "engine"}, code)
+            self.assertIn(fix_by, {"user", "sender", "operator", "nobody"}, code)
+            self.assertTrue(remedy is None or remedy.strip(), code)
+
+    def test_every_transfer_code_maps_to_a_registered_one(self):
+        for wire_code, code in cli._TRANSFER_CODES.items():
+            self.assertIn(code, cli.ERROR_CODES, wire_code)
+
+    def test_no_transfer_code_falls_through_unmapped(self):
+        """A new `TransferError` code must be mapped, not left to the catch-all.
+
+        Read out of the source rather than a hand-kept list, so adding one to `wire.py`
+        or `download.py` is what fails this — which is the moment to decide what it is.
+        """
+        source = "".join(
+            path.read_text(encoding="utf-8")
+            for path in (pathlib.Path(cli.__file__).parent).glob("*.py")
+        )
+        raised = set(re.findall(r'TransferError\(\s*"([a-z_]+)"', source))
+        raised |= set(re.findall(r'return "([a-z_]+)"', source)) & {
+            "target_missing", "url_expired_or_forbidden", "body_too_large",
+            "store_unavailable", "not_accepted",
+        }
+        self.assertTrue(raised)
+        self.assertEqual(sorted(raised - set(cli._TRANSFER_CODES)), [])
+
+    def test_a_remedy_never_carries_the_engine_s_own_vocabulary(self):
+        for code, (_o, _f, remedy) in cli.ERROR_CODES.items():
+            for word in ("bundle", "transcript", "namespace", "publication", "manifest"):
+                self.assertNotIn(word, (remedy or "").lower(), code)
+
+    def test_an_unregistered_code_raises_rather_than_shipping(self):
+        original = cli._CODE_RULES
+        cli._CODE_RULES = ((re.compile("boom"), "nope.not.a.code"),)
+        self.addCleanup(setattr, cli, "_CODE_RULES", original)
+        with self.assertRaises(cli.UnknownCode):
+            cli.describe(ValueError("boom"), "pack")
+
+    def test_the_catch_all_promises_nothing(self):
+        """Its remedy was a sentence about sending, on failures that were receiving."""
+        self.assertIsNone(cli.ERROR_CODES[cli.FALLBACK_CODE][2])

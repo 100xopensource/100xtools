@@ -31,6 +31,7 @@ def _args(**overrides):
         "server_route": "org",
         "server_location": None,
         "kit_source": "plugins/acme-handoff",
+        "label": None,
         "subtitle": None,
         "restart": False,
         "force": False,

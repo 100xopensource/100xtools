@@ -101,6 +101,7 @@ def emit_kit(root: pathlib.Path) -> pathlib.Path:
             server_location=None,
             description=None,
             kit_version="0.1.0",
+            label=None,
             marketplace=None,
             repo=None,
             force=False,

@@ -7,8 +7,9 @@ this plugin actually carries.
 
 {{EVAL_INVOCATION}}
 
-These cost money and need a model, so they gate nothing. **`tests/contract_test.py` is what
-gates a release** — it is deterministic, free, and covers the mechanics. Run these when a
+These cost money and need a model, so nothing runs them for you — which is exactly why
+they are also on your setup board with the whole command on the card, rather than left as
+a directory somebody might notice. **`tests/contract_test.py` is what gates a release** — it is deterministic, free, and covers the mechanics. Run these when a
 skill's wording changes, which is the only thing they can catch that the contract test
 cannot.
 
@@ -26,6 +27,11 @@ of the runner rather than of this plugin:
   past that point — choosing files, the scrub, the credential stop, the code coming back —
   is exercised here. `tests/contract_test.py` covers those mechanics; what stays unproven
   is the *model's* judgement inside them.
+- **A store that answers but has lost the bytes cannot be set up here.** A publication
+  whose row exists and whose object is gone needs a live server holding that state, and
+  the sandbox cannot stand one up. It is the failure that reported the wrong half of the
+  exchange as broken, so it is covered in `tests/contract_test.py` with the transport
+  stubbed instead.
 - **`AskUserQuestion` is not offered to a headless run.** So the rule that a
   credential-shaped file goes to a pop-up rather than a line in the chat cannot be scored
   at all. It is a real rule and it is written into the skill; it is simply not observable

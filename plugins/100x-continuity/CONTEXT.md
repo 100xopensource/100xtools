@@ -5,6 +5,11 @@ giving a team a system of their own for doing that.
 
 ## Language
 
+These words are for prose — what a person is told, and what we say to each other about
+the product. They are **not** field names. A serialised payload says which command ran,
+not which *moment* it was; a term that reads well in a sentence and badly in JSON has
+done its job.
+
 ### The two sides of the product
 
 **Factory**:
@@ -156,6 +161,15 @@ Registered name, or a folder root that is not on this machine. It is not a faile
 Handoff — nothing was sent. A Kit says so and stops, rather than filing the work somewhere
 nobody is looking.
 _Avoid_: offline, down, broken, error, failed.
+
+**Emptied**:
+The Store answered and the Publication is known to it, but its bytes are not there — an
+abandoned publish, or something removed behind the Store's back. Distinct from
+**Unreachable**, where nothing answered at all, and from an unknown **Handle**, where the
+code names nothing. The sending half worked; only the reading back failed, and a Kit that
+says otherwise blames the wrong person.
+_Avoid_: missing, lost, corrupt (the bytes are absent, not damaged — damaged is a digest
+failure).
 
 ### What the product does and does not claim
 

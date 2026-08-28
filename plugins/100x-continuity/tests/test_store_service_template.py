@@ -5,9 +5,11 @@ imports it. These are the properties whose loss is expensive and silent: a reade
 have to already know they mattered to notice they were gone.
 """
 
+import ast
 import pathlib
 import re
 import unittest
+import urllib.parse
 
 TEMPLATE = pathlib.Path(__file__).resolve().parents[1] / "templates" / "store-service"
 SERVER = TEMPLATE / "server.py"
@@ -52,6 +54,81 @@ class FailsClosedTests(unittest.TestCase):
         example = (TEMPLATE / ".env.example").read_text(encoding="utf-8")
         self.assertIn("CONTINUITY_DEV_PRINCIPAL", example)
         self.assertIn("Never set", example)
+
+
+def _endpoint_check():
+    """Pull `_check_endpoint` out of the template and run it for real.
+
+    The module imports boto3 and fastmcp, which this repo does not depend on, so the
+    function is compiled on its own. Worth the trouble: this is a guard against silent
+    data misplacement and a text assertion would only prove somebody typed the words.
+    """
+    tree = ast.parse(SERVER.read_text(encoding="utf-8"))
+    node = next(
+        n for n in tree.body
+        if isinstance(n, ast.FunctionDef) and n.name == "_check_endpoint"
+    )
+
+    class Refused(Exception):
+        pass
+
+    namespace = {"Refused": Refused, "urllib": urllib}
+    exec(compile(ast.Module([node], []), "<template>", "exec"), namespace)  # noqa: S102
+    return namespace["_check_endpoint"], Refused
+
+
+class EndpointTests(unittest.TestCase):
+    """An endpoint carrying a path silently misfiles every object.
+
+    boto3 treats it as a prefix and `put_object` returns 200 either way, so a whole
+    team's handoffs land where no correctly-configured server looks. Found against real
+    R2 after the objects were already stranded.
+    """
+
+    def setUp(self):
+        self.check, self.Refused = _endpoint_check()
+
+    def test_a_bare_host_is_accepted(self):
+        for endpoint in (
+            "",
+            "https://0a97396.r2.cloudflarestorage.com",
+            "https://0a97396.r2.cloudflarestorage.com/",
+            "https://s3.us-west-004.backblazeb2.com",
+            "https://minio.example.net",
+        ):
+            with self.subTest(endpoint=endpoint):
+                self.check(endpoint)
+
+    def test_a_path_is_refused_rather_than_stripped(self):
+        with self.assertRaises(self.Refused) as caught:
+            self.check("https://0a97396.r2.cloudflarestorage.com/ost-dev-bucket")
+        message = str(caught.exception)
+        self.assertIn("ost-dev-bucket", message)
+        self.assertIn("CONTINUITY_BUCKET", message)
+
+    def test_every_documented_endpoint_passes_its_own_guard(self):
+        """The four vendors in `.env.example` must not be refused by this."""
+        example = (TEMPLATE / ".env.example").read_text(encoding="utf-8")
+        endpoints = re.findall(r"^#\s*CONTINUITY_S3_ENDPOINT=(\S+)", example, re.M)
+        self.assertGreaterEqual(len(endpoints), 3)
+        for endpoint in endpoints:
+            with self.subTest(endpoint=endpoint):
+                self.check(endpoint)
+
+
+class ResolveTests(unittest.TestCase):
+    """A row is written at mint time, before any bytes exist."""
+
+    def test_the_object_is_checked_before_a_url_is_handed_out(self):
+        source = SERVER.read_text(encoding="utf-8")
+        resolve = source[source.index("def resolve_publication"):]
+        resolve = resolve[: resolve.index("@mcp.tool")]
+        self.assertIn("head_object", resolve)
+        self.assertLess(
+            resolve.index("head_object"),
+            resolve.index("generate_presigned_url"),
+            "the URL is minted before anything checks the object is there",
+        )
 
 
 if __name__ == "__main__":

@@ -145,7 +145,12 @@ class Packing(_Contract):
             blob = b"".join(archive.read(n) for n in archive.namelist())
         self.assertNotIn(PLANTED.encode(), blob, "an access key reached the archive")
         self.assertNotIn(b"dpl_" + b"a" * 20, blob, "a labelled token reached the archive")
-        self.assertGreater(built["redaction_total"], 0)
+        tally = built["redaction_tally"]
+        self.assertGreater(
+            tally["credential_shaped_values"] + tally["sensitive_looking_keys"], 0
+        )
+        # The two are reported apart because only the first is about a credential.
+        self.assertIn("not a count of secrets found", tally["means"]["sensitive_looking_keys"])
 
     def test_a_file_a_person_wrote_travels_verbatim(self) -> None:
         built = self.pack()
@@ -169,12 +174,22 @@ class Packing(_Contract):
             expect_ok=False,
         )
 
-    def test_a_failure_speaks_to_a_person_and_to_a_maintainer(self) -> None:
+    def test_a_failure_carries_the_facts_a_caller_acts_on(self) -> None:
+        """Not a sentence to repeat: which command, which component, who can fix it."""
         result = self.run_kit("open", "--handle", "no/such/handle", expect_ok=False)
-        self.assertTrue(result["say"], "nothing to tell the person")
-        self.assertTrue(result["hint"], "nothing to tell whoever maintains this")
-        for word in ("bundle", "transcript", "namespace", "publication"):
-            self.assertNotIn(word, result["say"].lower())
+        error = result["error"]
+        self.assertEqual(error["op"], "open")
+        self.assertIn(error["origin"], {"input", "store", "network", "engine"})
+        self.assertIn(error["fix_by"], {"user", "sender", "operator", "nobody"})
+        self.assertTrue(error["hint"], "nothing to tell whoever maintains this")
+        self.assertTrue(error["code"])
+
+    def test_the_remedy_never_carries_this_engine_s_own_vocabulary(self) -> None:
+        """`remedy` is read by a person. `hint` is the only place those words belong."""
+        result = self.run_kit("open", "--handle", "no/such/handle", expect_ok=False)
+        remedy = (result["error"]["remedy"] or "").lower()
+        for word in ("bundle", "transcript", "namespace", "publication", "manifest"):
+            self.assertNotIn(word, remedy)
 
 
 class Reading(_Contract):
@@ -236,7 +251,7 @@ class FolderStore(_Contract):
         result = self.run_kit(
             "open", "--handle", filed["handle"], "--out", str(self.tmp / "e"), expect_ok=False
         )
-        self.assertTrue(result["say"])
+        self.assertTrue(result["error"]["code"])
 
 
 @unittest.skipUnless(STORE_KIND == "service", "this Kit files into a folder, not a service")
@@ -260,7 +275,7 @@ class ServiceStore(_Contract):
             "fetch", "--mint-file", str(mint), "--out", str(self.tmp / "no.zip"),
             expect_ok=False,
         )
-        self.assertIn("https", result["hint"])
+        self.assertIn("https", result["error"]["hint"])
 
     def _download(self, served: bytes, reported: str) -> None:
         """Call the engine's own download with the network stubbed out."""
@@ -288,6 +303,53 @@ class ServiceStore(_Contract):
         wrong[len(wrong) // 2] ^= 0xFF
         with self.assertRaises(Exception):
             self._download(bytes(wrong), hashlib.sha256(body).hexdigest())
+
+    def test_a_code_whose_bytes_are_gone_does_not_blame_the_sender(self) -> None:
+        """The store answered, the id is known to it, and the object is not there.
+
+        Found against real R2: an abandoned publish leaves a row with no bytes. The
+        reply used to be "nothing was sent", which is a sentence about the *sending*
+        half — and the sending half had worked. This is the case an eval cannot reach,
+        because it would need a live server holding a row with no object behind it.
+
+        Driven in-process rather than through `run_kit`, because the 404 has to come
+        from a stubbed transport and a subprocess would not see the stub.
+        """
+        import contextlib  # noqa: PLC0415
+        import io  # noqa: PLC0415
+
+        sys.path.insert(0, str(PLUGIN / "scripts"))
+        from engine import cli as cli_mod, wire  # noqa: PLC0415
+
+        mint = self.tmp / "gone-mint.json"
+        mint.write_text(
+            json.dumps({
+                "url": "https://example.net/pub_gone.zip",
+                "required_headers": {},
+                "sha256": "b" * 64,
+            }),
+            encoding="utf-8",
+        )
+        def gone(*_args, **_kwargs):
+            raise wire.TransferError("target_missing", "the store answered 404")
+
+        original = wire.send
+        wire.send = gone  # type: ignore[assignment]
+        self.addCleanup(setattr, wire, "send", original)
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            status = cli_mod.main(
+                ["fetch", "--mint-file", str(mint), "--out", str(self.tmp / "gone.zip")]
+            )
+        self.assertEqual(status, 1)
+        error = json.loads(out.getvalue())["error"]
+        # Positive first: the catch-all carries no remedy, so an absence check alone
+        # would pass for a failure nothing recognised.
+        self.assertEqual(error["code"], "store.object_missing")
+        self.assertEqual(error["fix_by"], "sender")
+        self.assertEqual(error["op"], "fetch")
+        self.assertNotIn("nothing was sent", (error["remedy"] or "").lower())
 
     def test_the_reading_skill_passes_the_reported_digest_through(self) -> None:
         """`fetch` must read the digest out of the mint answer, not only from --sha256."""

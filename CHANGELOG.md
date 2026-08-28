@@ -41,6 +41,25 @@ First public release. Scoring version **1**.
 - Three skills: `set-up-handoff` (interview → plan → your approval → write → verify),
   `verify`, and `store-service`. One entry point on purpose — see
   `docs/adr/0001-one-setup-skill.md`.
+- **A failure is facts rather than a sentence to repeat.** Commands now print an `error`
+  object — `code`, `op`, `origin`, `fix_by`, `remedy` and a quarantined `hint` — from a
+  closed registry, and the skills compose their own wording from it. The pre-written `say`
+  is gone: its catch-all said "nothing was sent" for everything it did not recognise, so a
+  failed *pick-up* told the reader their colleague had failed them. Found against real
+  Cloudflare R2.
+- **The store service refuses an S3 endpoint that carries a path.** boto3 treats it as a
+  prefix, `put_object` returns 200 either way, and a whole team's handoffs land where no
+  correctly-configured server will look. It also checks the object exists before handing
+  out a download URL, so an abandoned publish is refused precisely instead of 404ing.
+- **`hand-off` hands back the sentence the receiver pastes**, not just the code, named
+  with a `label` that defaults to the Kit's name and is overridable by `CONTINUITY_LABEL`.
+  Both skills' descriptions now name the team, which is the only thing telling two Kits
+  apart in one workspace.
+- **The redaction count is two numbers with a gloss**, because one total read as "N secrets
+  caught" when almost all of it was token counters matching a deliberately broad key rule.
+  The patterns were not touched.
+- The eval suite, a missing `git init`, and the local store server left running now appear
+  on the board and in the notes, all generated from one list.
 - **A setup run is put up as a board before it happens.** `status/board.html` and
   `status/tasks.json` land in the Operator's repo at plan time with every task still todo
   — the factory's steps and the ones that stay theirs — so they approve a plan they can

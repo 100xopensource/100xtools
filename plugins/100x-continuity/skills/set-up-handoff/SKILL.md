@@ -40,6 +40,9 @@ Then look at the Operator's side:
   read it, treat every value as the default, ask only about what they want changed.
 - Which synced folders exist (`~/OneDrive*`, `~/Library/Mobile Documents/com~apple~CloudDocs`,
   `~/Google Drive`, `~/Dropbox`)? Offer what exists.
+- Is there a `.git` at the root? A marketplace is installed by cloning, so without one
+  the Kit is uninstallable however correct it is. Do not refuse over it — say it, and it
+  goes on the board by itself.
 
 ## 2. Ask, in two rounds
 
@@ -143,6 +146,11 @@ ever rewritten. Add `--dry-run` first if the target already holds files, and sho
 Then mark `emit` and `marketplace` off — the file count and whatever `overwrote` named,
 and the row as it was written.
 
+One thing the emit cannot do for itself: the two skills' `description:` lines name the
+team, and nothing else in the Kit distinguishes it from another one installed beside it.
+**Do that edit after the last write of the run, not here** — step 5 re-emits for a service
+Kit with its own `.mcp.json`, and that rewrites every file including this one.
+
 ## 5. Stand the server up, if the plan chose one
 
 Service store only, and it belongs here rather than earlier: the registered name is settled
@@ -166,7 +174,15 @@ ends up shipping one that was never run.
 It settles three more: `contract-test`, `baked-config` and `round-trip`. A task that
 failed is marked `blocked` with what it said, not quietly left in `todo`.
 
-## 7. Say what happened, and where the rest of it is written
+## 7. Sharpen the two descriptions, once nothing else will be written
+
+Now, after any re-emit. Read the emitted `skills/hand-off/SKILL.md` and
+`skills/pick-up/SKILL.md` and make each `description:` say what this Kit is for in the
+words this team uses, keeping every trigger phrase already there — add, never replace.
+The description is what routes a sentence to a skill, so narrowing it costs more than
+leaving it alone.
+
+## 8. Say what happened, and where the rest of it is written
 
 Close the board first. Set the verdict to the one true sentence about the state of this
 thing — what works, and what is not yet reachable by anybody else:
@@ -202,6 +218,8 @@ branch is the release, and that call is theirs.
 - [ ] The target is the Operator's repo, never this factory's own.
 - [ ] `store-service` was run in this same turn when the plan chose a service store.
 - [ ] `verify` was actually run, not offered.
+- [ ] Both descriptions were sharpened after the last write, and no trigger phrase was
+      dropped to make room.
 - [ ] The verdict says what nobody else can do yet, rather than that it all works.
 - [ ] The Operator was pointed at the board and the notes in their `CLAUDE.md`, not told
       it all in chat.

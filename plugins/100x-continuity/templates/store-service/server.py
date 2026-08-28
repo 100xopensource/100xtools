@@ -44,6 +44,7 @@ import os
 import re
 import secrets
 import sqlite3
+import urllib.parse
 from typing import Any
 
 import boto3
@@ -168,6 +169,33 @@ def now() -> str:
 def require_config() -> None:
     if not BUCKET:
         raise Refused("this server has no CONTINUITY_BUCKET configured")
+    _check_endpoint(os.environ.get("CONTINUITY_S3_ENDPOINT", ""))
+
+
+def _check_endpoint(endpoint: str) -> None:
+    """An endpoint must be a bare host. A path on it silently misfiles everything.
+
+    boto3 treats a path on the endpoint as a prefix, so with
+    `https://<account>.r2.cloudflarestorage.com/my-bucket` every object is written to
+    `my-bucket/continuity/...` instead of `continuity/...`. Nothing reports it —
+    `put_object` returns 200 either way — so a whole team's handoffs can land where no
+    correctly-configured server will ever look for them. Found against real R2, after
+    the objects were already stranded.
+
+    Refused rather than stripped: this is config somebody wrote on purpose, and a guard
+    that silently changes behaviour is the same class of thing as the bug.
+    """
+    if not endpoint:
+        return
+    path = urllib.parse.urlsplit(endpoint).path
+    if path and path != "/":
+        raise Refused(
+            f"CONTINUITY_S3_ENDPOINT must be a bare host, and this one carries the path "
+            f"{path!r}. Every object would be written under that path as a prefix and "
+            f"nothing would report it. For Cloudflare R2 the endpoint is "
+            f"https://<account-id>.r2.cloudflarestorage.com with no bucket on the end — "
+            f"the bucket is CONTINUITY_BUCKET"
+        )
 
 
 # --- tools -------------------------------------------------------------------
@@ -268,7 +296,20 @@ def resolve_publication(publication_id: str) -> dict[str, Any]:
             (publication_id, who, now()),
         )
 
-    url = s3().generate_presigned_url(
+    # A row is written when the upload is minted, before any bytes exist, so an
+    # abandoned publish leaves an id that would otherwise resolve to a URL that 404s.
+    # The reader then sees a download failure and reads it as the sender's fault. One
+    # HEAD makes the refusal precise and costs nothing beside fetching the bundle.
+    client = s3()
+    try:
+        client.head_object(Bucket=BUCKET, Key=row["object_key"])
+    except client.exceptions.ClientError as exc:
+        raise Refused(
+            "that publication was started but its bytes were never uploaded, so there "
+            "is nothing to read"
+        ) from exc
+
+    url = client.generate_presigned_url(
         "get_object",
         Params={"Bucket": BUCKET, "Key": row["object_key"]},
         ExpiresIn=DOWNLOAD_TTL,

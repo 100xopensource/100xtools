@@ -26,6 +26,7 @@ def _args(**overrides):
         "server_location": None,
         "description": None,
         "kit_version": "0.1.0",
+        "label": None,
         "marketplace": None,
         "repo": None,
         "force": False,
@@ -260,8 +261,8 @@ class EmitTests(unittest.TestCase):
         )
         self.assertEqual(
             set(result["kit_config"]),
-            {"store", "root", "namespace", "service_name", "kit_name", "factory_version",
-             "emitted_at"},
+            {"store", "root", "namespace", "service_name", "label", "kit_name",
+             "factory_version", "emitted_at"},
         )
         self.assertNotIn("acme-store/mcp", json.dumps(result["kit_config"]))
 
@@ -451,3 +452,79 @@ class OperatorNotesTests(unittest.TestCase):
         into = pathlib.Path(self.tmp.name) / "loose" / "kit"
         result = emit_mod.emit(_args(into=str(into)))
         self.assertEqual(result["operator_notes"]["action"], "skipped")
+
+
+class LabelAndVisibilityTests(unittest.TestCase):
+    """What a person pastes, and what they are never told about."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.repo = pathlib.Path(self.tmp.name)
+        self.addCleanup(self.tmp.cleanup)
+
+    def _emit_kit(self, **overrides):
+        market = self.repo / ".claude-plugin" / "marketplace.json"
+        market.parent.mkdir(parents=True, exist_ok=True)
+        market.write_text(
+            json.dumps({"name": "p", "owner": {"name": "Acme"}, "plugins": []}),
+            encoding="utf-8",
+        )
+        into = self.repo / "plugins" / "acme-handoff"
+        emit_mod.emit(_args(into=str(into), marketplace=str(market), **overrides))
+        return into
+
+    def test_the_label_defaults_to_the_kit_name(self):
+        kit = self._emit_kit()
+        config = json.loads((kit / "kit.json").read_text(encoding="utf-8"))
+        self.assertEqual(config["label"], "acme-handoff")
+
+    def test_the_paste_ready_sentence_carries_the_label(self):
+        kit = self._emit_kit(label="the Q3 report")
+        skill = (kit / "skills" / "hand-off" / "SKILL.md").read_text(encoding="utf-8")
+        self.assertIn("pick up the handoff for the Q3 report — <code>", skill)
+
+    def test_the_sentence_reads_with_a_label_that_carries_its_own_article(self):
+        """A label is whatever the Operator wrote, so the sentence supplies no article."""
+        for label in ("the Q3 report", "report-builder"):
+            with self.subTest(label=label):
+                kit = self._emit_kit(label=label, force=True)
+                skill = (kit / "skills" / "hand-off" / "SKILL.md").read_text(encoding="utf-8")
+                self.assertIn(f"handoff for {label} — <code>", skill)
+                self.assertNotIn("the the", skill)
+
+    def test_both_descriptions_name_the_team(self):
+        """Nothing else tells two Kits apart in one workspace."""
+        kit = self._emit_kit()
+        for name in ("hand-off", "pick-up"):
+            text = (kit / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
+            description = next(
+                line for line in text.splitlines() if line.startswith("description:")
+            )
+            self.assertIn("the Acme analytics team", description)
+
+    def test_the_notes_carry_the_eval_command_someone_could_run(self):
+        """It was mentioned once, as something that "gates nothing", and never run."""
+        self._emit_kit()
+        notes = (self.repo / "CLAUDE.md").read_text(encoding="utf-8")
+        self.assertIn("claude plugin eval", notes)
+        self.assertIn("CLAUDE_CODE_WALNUT_SPIRE=1", notes)
+
+    def test_the_notes_carry_every_error_code(self):
+        self._emit_kit()
+        notes = (self.repo / "CLAUDE.md").read_text(encoding="utf-8")
+        sys.path.insert(0, str(pathlib.Path(emit_mod.__file__).parent))
+        from engine import cli  # noqa: PLC0415
+
+        for code in cli.ERROR_CODES:
+            self.assertIn(f"`{code}`", notes)
+
+    def test_a_destination_with_no_git_is_told_so(self):
+        self._emit_kit()
+        notes = (self.repo / "CLAUDE.md").read_text(encoding="utf-8")
+        self.assertIn("git repository", notes)
+
+    def test_a_destination_that_is_a_repo_is_not_nagged(self):
+        (self.repo / ".git").mkdir(parents=True, exist_ok=True)
+        self._emit_kit()
+        notes = (self.repo / "CLAUDE.md").read_text(encoding="utf-8")
+        self.assertNotIn("git repository", notes)

@@ -224,7 +224,11 @@ def seed(args: argparse.Namespace) -> dict[str, object]:
     """
     prefix = id_prefix(args.name)
     rows = [dict(task, assignee="claude") for task in _setup_tasks(args.store)]
-    rows += [dict(item, assignee="operator") for item in operator_items(args, args.kit_source or args.name)]
+    repo_root = pathlib.Path(args.into).expanduser() if args.into else None
+    rows += [
+        dict(item, assignee="operator")
+        for item in operator_items(args, args.kit_source or args.name, repo_root=repo_root)
+    ]
 
     ids = {task["key"]: f"{prefix}-{n}" for n, task in enumerate(rows, start=1)}
     tasks = []

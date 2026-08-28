@@ -92,6 +92,9 @@ SENSITIVE_KEYS = (
     "token",
 )
 
+#: The counter name used when a value is removed for the *name* of its field.
+KEY_MATCH = "sensitive-key"
+
 _KEY_SEPARATORS = re.compile(r"[^a-z0-9]+")
 
 
@@ -239,8 +242,8 @@ def redact_value(value: Any) -> Redaction:
                 if isinstance(key, str) and _is_sensitive_key(key):
                     # The key alone is enough. Descending would leave a plain-word
                     # credential in place, which is the case this rule exists for.
-                    out[key] = _sub("sensitive-key")
-                    bump({"sensitive-key": 1})
+                    out[key] = _sub(KEY_MATCH)
+                    bump({KEY_MATCH: 1})
                     continue
                 out[key] = walk(item)
             return out
@@ -292,6 +295,38 @@ def redact_record(record: dict[str, Any]) -> Redaction:
         "integrity_hash_covers": "the record before redaction",
     }
     return Redaction(out, result.counts)
+
+
+#: What each half of the tally means, carried beside the numbers so a reader does not
+#: have to come and read this file. Written because a single total was being quoted as
+#: "N secrets caught" when almost all of it was LLM token counters landing in the second
+#: category — `_CREDENTIAL_WORDS` contains a bare `token`, deliberately, for recall.
+TALLY_MEANS = {
+    "credential_shaped_values": (
+        "text that looks like a secret whatever it is called: a key block, a bearer "
+        "token, an AKIA id, a KEY=value assignment"
+    ),
+    "sensitive_looking_keys": (
+        "a field whose name sounds secret, so its value went for what it is called "
+        "rather than what it looks like. Ordinary metadata such as token counters "
+        "lands here, so this number is not a count of secrets found"
+    ),
+}
+
+
+def tally(counts: dict[str, int]) -> dict[str, Any]:
+    """The two kinds of redaction, kept apart.
+
+    One number could not be read honestly: the two halves answer different questions,
+    and only the first is about anything that looked like a credential.
+    """
+    return {
+        "credential_shaped_values": sum(
+            hits for name, hits in counts.items() if name != KEY_MATCH
+        ),
+        "sensitive_looking_keys": counts.get(KEY_MATCH, 0),
+        "means": TALLY_MEANS,
+    }
 
 
 def redact_records(records: list[dict[str, Any]]) -> Redaction:

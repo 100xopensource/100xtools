@@ -404,6 +404,14 @@ built to answer to it afterwards. Asking for the name once a server exists is ho
 server end up never meeting — a failure nothing reports, which surfaces as tools that are
 simply absent.
 
+**The store service refuses an endpoint carrying a path.** boto3 treats it as a prefix, so
+`https://<account>.r2.cloudflarestorage.com/my-bucket` writes every object under a phantom
+`my-bucket/` and `put_object` returns 200 either way. A real team's handoffs were stranded
+this way before anyone noticed. `_check_endpoint` refuses rather than stripping — silently
+correcting config somebody wrote is the same class of thing as the bug. `resolve_publication`
+likewise HEADs the object before minting a URL, because a row is written at mint time and an
+abandoned publish otherwise resolves to a 404.
+
 **A Kit checks its store is reachable before it packages anything.** No matching tool, or a
 folder root that is not on this machine, means nothing was sent — and the skill says that and
 stops rather than filing the work where nobody is looking. `CONTEXT.md` calls that state
@@ -448,13 +456,26 @@ than a missing feature. `wire.py` holds the URL refusals (https only, no credent
 redirects, optional host pin) once for both directions; a second copy is how one of them
 becomes the lenient one.
 
-**Every failure carries two strings.** `say` is one plain sentence for a Teammate; `hint`
-is the engine's own wording for whoever maintains it. The Kit skills are told to repeat
-`say` and never `hint`. A Kit that relays `hint` puts *transcript* and *bundle* in front of
-someone who has never heard of either, and `evals/errors-stay-in-plain-words` scores that.
-`_plain()` in `cli.py` is deliberately lossy: anything it cannot map collapses to "that
-didn't work, and nothing was sent", because a vague true sentence beats an exact one full
-of words the reader has no use for.
+**A failure is facts, not a sentence to repeat.** `cli.describe()` returns `code`, `op`,
+`origin` (which component broke), `fix_by` (who can act — not the same thing), `remedy` in
+ordinary words, and a quarantined `hint` in the engine's own vocabulary. The Kit skills
+compose from the first five and never put `hint` in a chat;
+`evals/errors-stay-in-plain-words` scores that.
+
+There used to be a pre-written `say`. It was removed because its fallback — the branch
+every unrecognised failure lands in, by design — read *"nothing was sent"*: true while
+publishing, a lie while picking up, where the sending half had worked and only the reading
+back failed. Found against real R2. Three consequences worth keeping:
+
+- **`ERROR_CODES` is closed and `UnknownCode` raises**, the same discipline as 100xeval's
+  check IDs, because `operator-notes` tells Operators to drive the engine from their own
+  code and `emit.error_codes()` renders the table into those notes from the registry.
+- **Classification is structural first.** `wire.TransferError` already carries a stable
+  code, so the transfer path maps off `exc.code` rather than matching prose.
+- **No `remedy` may assert which half failed** — `op` says that, and `SENDING_OPS` /
+  `RECEIVING_OPS` decide the pair in `_BY_SIDE` where one fault has two owners (pointing
+  at the wrong file while sending versus being handed a broken one while receiving).
+  `test_cli` asserts no remedy anywhere contains "nothing was sent".
 
 **Artifacts travel verbatim and are scanned, never rewritten.** They are files a person
 composed, so `bundle.py` fails closed instead: a credential-shaped value inside a text
@@ -482,6 +503,13 @@ retired 100xcontinuity rather than being shared with it (invariant 1) — the fi
 were hard-won, and the copy was the point. One difference: `identify()` here reads
 **`aiTitle`**, the field the host actually writes; reading `title` alone returned None for
 every real session, silently.
+
+**The redaction count is reported as two numbers, never one.** `redact.tally()` splits
+credential-shaped *values* from sensitive-looking *keys* and carries a sentence saying what
+each means. One total was being read as "N secrets caught" when 1341 of 1359 were LLM token
+counters: `_CREDENTIAL_WORDS` contains a bare `token` and `_is_sensitive_key` strips
+separators, so `input_tokens` matches. **That is recall working as designed and the patterns
+were deliberately left alone** — the defect was the reporting.
 
 `redact.py`'s patterns look like `100xeval`'s `SECRET_PATTERNS` and must not be merged
 with them: the linter optimizes for **precision** (a false positive costs a plugin its

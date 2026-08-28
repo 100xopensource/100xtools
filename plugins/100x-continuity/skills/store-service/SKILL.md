@@ -64,13 +64,32 @@ repository that Teammates clone it is worse again.
 
 ## 3. Run it here
 
+Check the port first. A server from an earlier run of this can still be holding it — one
+was found a day later, still listening, with a live storage credential in its environment
+and its own source already in the Trash:
+
 ```bash
-cd <where they put it> && set -a && . ./.env && set +a && python3 server.py
+lsof -nP -iTCP:<the port .env names> -sTCP:LISTEN
 ```
+
+If something answers, say whose it looks like and let them decide; do not assume the port
+is yours. Then start it. **Not with a bare `python3`** — the floor is 3.11 and a stock
+macOS `python3` is 3.9, which fails on the import with nothing about versions in it:
+
+```bash
+cd <where they put it> && set -a && . ./.env && set +a && \
+  uv run --with fastmcp --with boto3 python server.py
+```
+
+If `uv` is not installed, any interpreter 3.11 or newer with those two packages will do.
 
 Then check it answers on the port `.env` names, and that the four tools are listed. What
 this proves is that their credentials work and the code runs — not that the deployed one
 will, and say so in those words.
+
+**Give them the pid and the line that stops it**, and put it on the board. It does not
+stop when this conversation does, and while it is up it is a credentialed process on
+their machine that they did not knowingly leave running.
 
 For a single-machine check the template accepts `CONTINUITY_DEV_PRINCIPAL`, which skips the
 authentication gate. Say plainly that it must never be set anywhere a second person can
@@ -105,7 +124,9 @@ and a renamed field surfaces as a Teammate who cannot hand anything over.
 - [ ] It was copied outside the plugin repo, or the consequence of not doing so was said.
 - [ ] The vendor was asked, and the commands given were that vendor's.
 - [ ] No secret was requested in the chat, and `.env` was confirmed git-ignored.
+- [ ] The port was checked before anything was started on it.
 - [ ] The server was actually started and checked, not just described.
+- [ ] They were told the pid, how to stop it, and that it outlives this conversation.
 - [ ] The dev principal escape hatch was named as local-only.
 - [ ] The planned name was used verbatim, not replaced with a better-sounding one.
 - [ ] Nothing was deployed, and no credential was echoed.
