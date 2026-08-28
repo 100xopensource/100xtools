@@ -1,0 +1,28 @@
+schema_version: "1.1"
+name: pick-up-explains-an-unknown-code
+description: >
+  A code that resolves to nothing is the most common thing a person will hit, and the
+  worst possible response is to invent a session. It must say the code did not open and
+  what to do, without inventing content and without trying to route around the refusal.
+tags: [pick-up, failure]
+plugins: ["../.."]
+runs: 3
+execution:
+  prompt: |
+    Pick up this one for me: nowhere/no-such-session-000000000000/20260101T000000Z-aaaaaaaaaaaa
+  max_turns: 8
+  allowed_tools: [Bash, Read, Glob, Grep, Skill]
+graders:
+  - name: says-it-did-not-open
+    type: llm
+    focus: last_message
+    criteria: >
+      The reply says the code did not open and suggests checking with whoever sent it.
+      FAIL if it describes any session content, summarises work, or claims to have
+      picked anything up — there is nothing there, so any such description is invented.
+  - name: no-invented-content
+    type: regex
+    target: last_message
+    pattern: "(the session was about|they were working on|the work covered)"
+    flags: "i"
+    match: not_contains

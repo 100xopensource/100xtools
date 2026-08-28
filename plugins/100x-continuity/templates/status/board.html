@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>setup board</title>
+<style>
+:root {
+  --bg:#ffffff; --bg-sub:#fafafa; --panel:#ffffff; --card:#ffffff; --card-hover:#f7f7f8;
+  --line:#e8e8e9; --line-2:#efeff0;
+  --tx:#1c1d21; --tx-2:#54555c; --tx-3:#8a8f98;
+  --accent:#5e6ad2; --accent-soft:#eeeffc;
+  --urgent:#d9730d; --high:#c2410c; --amber:#b8860b; --green:#3f9e64; --red:#c4433a; --blue:#4c6ef5;
+  --shadow:0 1px 2px rgba(0,0,0,.05);
+  --ui:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg:#08090a; --bg-sub:#0d0e10; --panel:#0f1011; --card:#141517; --card-hover:#1a1b1e;
+    --line:#23252a; --line-2:#1a1c20;
+    --tx:#f2f3f4; --tx-2:#b4b8bf; --tx-3:#8a8f98;
+    --accent:#7c86e8; --accent-soft:#1c1f35;
+    --urgent:#e8912d; --high:#e07a4a; --amber:#d4a23c; --green:#4cc38a; --red:#e5645c; --blue:#7d92f7;
+    --shadow:0 1px 2px rgba(0,0,0,.5);
+  }
+}
+:root[data-theme="dark"] {
+  --bg:#08090a; --bg-sub:#0d0e10; --panel:#0f1011; --card:#141517; --card-hover:#1a1b1e;
+  --line:#23252a; --line-2:#1a1c20;
+  --tx:#f2f3f4; --tx-2:#b4b8bf; --tx-3:#8a8f98;
+  --accent:#7c86e8; --accent-soft:#1c1f35;
+  --urgent:#e8912d; --high:#e07a4a; --amber:#d4a23c; --green:#4cc38a; --red:#e5645c; --blue:#7d92f7;
+  --shadow:0 1px 2px rgba(0,0,0,.5);
+}
+
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0; background:var(--bg); color:var(--tx);
+  font-family:var(--ui); font-size:13px; line-height:1.5;
+  letter-spacing:-.005em; -webkit-font-smoothing:antialiased;
+  display:flex; flex-direction:column; overflow:hidden;
+}
+
+/* ---------- top bar ---------- */
+header{
+  flex:none; border-bottom:1px solid var(--line); background:var(--panel);
+  padding:10px 16px; display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+}
+.brand{display:flex; align-items:baseline; gap:8px; min-width:0;}
+.brand h1{font-size:13px; font-weight:600; margin:0; letter-spacing:-.01em; white-space:nowrap;}
+.brand .sub{font-size:12px; color:var(--tx-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;}
+.spacer{flex:1 1 auto;}
+
+.pill{
+  display:inline-flex; align-items:center; gap:5px;
+  font-size:11px; padding:3px 8px; border-radius:5px;
+  border:1px solid var(--line); background:var(--bg-sub); color:var(--tx-2);
+  white-space:nowrap;
+}
+.pill.warn{border-color:color-mix(in srgb,var(--urgent) 40%,var(--line)); color:var(--urgent); background:transparent;}
+.dot{width:6px; height:6px; border-radius:50%; background:var(--green); flex:none;}
+.dot.stale{background:var(--tx-3);}
+.dot.err{background:var(--red);}
+
+input[type="search"]{
+  font:inherit; font-size:12px; color:var(--tx);
+  background:var(--bg-sub); border:1px solid var(--line);
+  border-radius:5px; padding:4px 9px; width:190px; outline:none;
+}
+input[type="search"]:focus{border-color:var(--accent);}
+input[type="search"]::placeholder{color:var(--tx-3);}
+
+.seg{display:flex; border:1px solid var(--line); border-radius:5px; overflow:hidden;}
+.seg button{
+  font:inherit; font-size:11px; color:var(--tx-2); background:var(--bg-sub);
+  border:0; border-right:1px solid var(--line); padding:4px 9px; cursor:pointer; white-space:nowrap;
+}
+.seg button:last-child{border-right:0;}
+.seg button[aria-pressed="true"]{background:var(--accent-soft); color:var(--accent);}
+.seg button:hover{color:var(--tx);}
+
+/* ---------- verdict ---------- */
+.verdict{
+  flex:none; display:flex; gap:9px; align-items:flex-start;
+  padding:9px 16px; border-bottom:1px solid var(--line);
+  background:var(--bg-sub); font-size:12px; color:var(--tx-2);
+}
+.verdict svg{flex:none; margin-top:1px;}
+.verdict b{color:var(--tx); font-weight:600;}
+
+/* ---------- board ---------- */
+main{flex:1 1 auto; overflow-x:auto; overflow-y:hidden; display:flex; gap:1px; background:var(--line-2);}
+.col{
+  flex:0 0 300px; display:flex; flex-direction:column;
+  background:var(--bg); min-height:0;
+}
+.col-h{
+  flex:none; display:flex; align-items:center; gap:7px;
+  padding:11px 12px 9px; position:sticky; top:0; background:var(--bg);
+}
+.col-h .nm{font-size:12px; font-weight:600; letter-spacing:-.01em;}
+.col-h .ct{
+  font-size:11px; color:var(--tx-3); font-variant-numeric:tabular-nums;
+  background:var(--bg-sub); border-radius:4px; padding:0 5px; min-width:18px; text-align:center;
+}
+.col-body{
+  flex:1 1 auto; overflow-y:auto; padding:0 8px 16px;
+  display:flex; flex-direction:column; gap:6px;
+}
+.col-body::-webkit-scrollbar{width:8px;}
+.col-body::-webkit-scrollbar-thumb{background:var(--line); border-radius:4px;}
+
+.card{
+  background:var(--card); border:1px solid var(--line);
+  border-radius:6px; padding:9px 10px; cursor:pointer;
+  display:flex; flex-direction:column; gap:6px;
+  box-shadow:var(--shadow); text-align:left; font:inherit; color:inherit; width:100%;
+}
+.card:hover{background:var(--card-hover); border-color:color-mix(in srgb,var(--tx-3) 35%,var(--line));}
+.card:focus-visible{outline:2px solid var(--accent); outline-offset:1px;}
+.card.sel{border-color:var(--accent);}
+.card .top{display:flex; align-items:center; gap:6px;}
+.card .id{font-family:var(--mono); font-size:10.5px; color:var(--tx-3); letter-spacing:0;}
+.card .ttl{font-size:12.5px; font-weight:500; line-height:1.42; color:var(--tx); letter-spacing:-.008em;}
+.card .foot{display:flex; align-items:center; gap:5px; flex-wrap:wrap;}
+
+.lbl{
+  display:inline-flex; align-items:center; gap:4px;
+  font-size:10.5px; color:var(--tx-2);
+  border:1px solid var(--line); border-radius:9px; padding:1px 7px 1px 5px;
+}
+.lbl i{width:6px; height:6px; border-radius:50%; display:block;}
+
+.who{
+  margin-left:auto; width:18px; height:18px; border-radius:50%;
+  display:grid; place-items:center; font-size:9.5px; font-weight:600;
+  color:#fff; letter-spacing:0; flex:none;
+}
+.who.claude{background:#8b6db8;}
+.who.operator{background:#3f7fb8;}
+
+.proof{
+  font-size:10px; font-family:var(--mono); padding:1px 5px; border-radius:3px; border:1px solid;
+}
+.proof.proven{color:var(--green); border-color:color-mix(in srgb,var(--green) 35%,transparent);}
+.proof.standin{color:var(--amber); border-color:color-mix(in srgb,var(--amber) 40%,transparent);}
+
+.empty{font-size:11.5px; color:var(--tx-3); padding:10px 4px;}
+
+/* ---------- drawer ---------- */
+.scrim{
+  position:fixed; inset:0; background:rgba(0,0,0,.32);
+  opacity:0; pointer-events:none; transition:opacity .15s ease;
+}
+.scrim.on{opacity:1; pointer-events:auto;}
+aside{
+  position:fixed; top:0; right:0; height:100%; width:min(460px,92vw);
+  background:var(--panel); border-left:1px solid var(--line);
+  transform:translateX(100%); transition:transform .18s cubic-bezier(.4,0,.2,1);
+  display:flex; flex-direction:column; z-index:2;
+}
+aside.on{transform:none;}
+@media (prefers-reduced-motion:reduce){
+  aside,.scrim{transition:none;}
+}
+.dr-h{
+  flex:none; padding:12px 14px; border-bottom:1px solid var(--line);
+  display:flex; align-items:center; gap:9px;
+}
+.dr-h .id{font-family:var(--mono); font-size:11px; color:var(--tx-3);}
+.dr-h button{
+  margin-left:auto; background:transparent; border:1px solid var(--line);
+  color:var(--tx-2); border-radius:5px; width:24px; height:24px; cursor:pointer;
+  font:inherit; line-height:1; display:grid; place-items:center;
+}
+.dr-h button:hover{color:var(--tx); background:var(--bg-sub);}
+.dr-b{flex:1 1 auto; overflow-y:auto; padding:16px 16px 40px; display:flex; flex-direction:column; gap:16px;}
+.dr-b h2{font-size:15px; font-weight:600; margin:0; line-height:1.35; letter-spacing:-.012em; text-wrap:balance;}
+.meta{display:grid; grid-template-columns:78px 1fr; gap:8px 12px; font-size:12px;}
+.meta dt{color:var(--tx-3);}
+.meta dd{margin:0; color:var(--tx-2); display:flex; flex-wrap:wrap; gap:5px; align-items:center;}
+.body-tx{font-size:12.5px; line-height:1.6; color:var(--tx-2); margin:0; max-width:60ch;}
+.ev-box{
+  font-family:var(--mono); font-size:11.5px; line-height:1.55;
+  background:var(--bg-sub); border:1px solid var(--line); border-radius:6px;
+  padding:9px 11px; color:var(--tx-2); overflow-x:auto; white-space:pre-wrap; word-break:break-word;
+}
+.sec-lbl{font-size:10.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--tx-3); font-weight:500;}
+.sec{display:flex; flex-direction:column; gap:6px;}
+
+.err-screen{margin:auto; max-width:44ch; text-align:left; padding:32px; color:var(--tx-2); font-size:13px; display:flex; flex-direction:column; gap:10px;}
+.err-screen h2{font-size:15px; color:var(--tx); margin:0; font-weight:600;}
+.err-screen pre{
+  font-family:var(--mono); font-size:11.5px; background:var(--bg-sub);
+  border:1px solid var(--line); border-radius:6px; padding:9px 11px; margin:0; overflow-x:auto;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <h1 id="proj"></h1>
+    <span class="sub" id="projsub"></span>
+  </div>
+  <div class="spacer"></div>
+  <input type="search" id="q" placeholder="Filter by title, label, id…" aria-label="Filter tasks">
+  <div class="seg" role="group" aria-label="Filter by assignee">
+    <button data-who="all" aria-pressed="true">All</button>
+    <button data-who="operator" aria-pressed="false">Yours</button>
+    <button data-who="claude" aria-pressed="false">Mine</button>
+  </div>
+  <span class="pill" id="sync"><span class="dot" id="syncdot"></span><span id="synctx">loading</span></span>
+</header>
+
+<div class="verdict" id="verdict" hidden>
+  <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+    <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.5"/>
+    <path d="M7 4v3.5M7 10h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+  </svg>
+  <span id="verdicttx"></span>
+</div>
+
+<main id="board"></main>
+
+<div class="scrim" id="scrim"></div>
+<aside id="drawer" aria-hidden="true">
+  <div class="dr-h">
+    <span class="id" id="dr-id"></span>
+    <span id="dr-status"></span>
+    <button id="dr-close" aria-label="Close">&times;</button>
+  </div>
+  <div class="dr-b" id="dr-body"></div>
+</aside>
+
+<script>
+const SRC = "./tasks.json";
+const LABEL_HUE = {
+  kit:"#5e6ad2", store:"#3f9e64", security:"#c4433a", test:"#4c9ed9",
+  bug:"#c4433a", deploy:"#8b6db8", cleanup:"#8a8f98", repo:"#b8860b",
+  scale:"#6f7b8a", docs:"#6f7b8a", access:"#e8912d"
+};
+const STATUS_META = {
+  backlog:{c:"#8a8f98", d:"6 3"}, todo:{c:"#8a8f98"}, in_progress:{c:"#d4a23c", half:true},
+  blocked:{c:"#c4433a"}, needsyou:{c:"#5e6ad2"}, done:{c:"#3f9e64", done:true}
+};
+const PRIO = {urgent:3, high:2, medium:1, low:0};
+
+let DATA = null, RAW = "", sel = null, who = "all", q = "";
+
+function statusIcon(id, size=13){
+  const m = STATUS_META[id] || {c:"#8a8f98"};
+  const r = size/2 - 1.5;
+  if (m.done) return `<svg width="${size}" height="${size}" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="6.2" fill="${m.c}"/><path d="M4.3 7.1l1.9 1.9 3.5-3.6" stroke="#fff" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+  const dash = m.d ? ` stroke-dasharray="${m.d}"` : "";
+  const half = m.half ? `<path d="M7 7 L7 2.2 A4.8 4.8 0 0 1 7 11.8 Z" fill="${m.c}"/>` : "";
+  return `<svg width="${size}" height="${size}" viewBox="0 0 14 14" aria-hidden="true"><circle cx="7" cy="7" r="${r}" fill="none" stroke="${m.c}" stroke-width="1.5"${dash}/>${half}</svg>`;
+}
+function prioIcon(p){
+  const lv = PRIO[p] ?? -1;
+  if (lv < 0) return "";
+  if (p === "urgent") return `<svg width="12" height="12" viewBox="0 0 14 14" aria-label="Urgent"><rect x="1" y="1" width="12" height="12" rx="3" fill="var(--urgent)"/><path d="M7 3.6v4M7 9.8h.01" stroke="#fff" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+  const on = c => c <= lv ? "var(--tx-2)" : "var(--line)";
+  return `<svg width="12" height="12" viewBox="0 0 14 14" aria-label="${p}"><rect x="1.5" y="8.5" width="3" height="4" rx="1" fill="${on(1)}"/><rect x="5.5" y="5.5" width="3" height="7" rx="1" fill="${on(2)}"/><rect x="9.5" y="2.5" width="3" height="10" rx="1" fill="${on(3)}"/></svg>`;
+}
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function matches(t){
+  if (who !== "all" && t.assignee !== who) return false;
+  if (!q) return true;
+  const hay = [t.id, t.title, t.body, t.evidence, ...(t.labels||[])].join(" ").toLowerCase();
+  return hay.includes(q);
+}
+
+function render(){
+  const board = document.getElementById("board");
+  document.getElementById("proj").textContent = DATA.project;
+  document.title = DATA.project + " \u00b7 board";
+  document.getElementById("projsub").textContent = DATA.subtitle || "";
+  if (DATA.verdict){
+    const v = document.getElementById("verdict");
+    v.hidden = false;
+    document.getElementById("verdicttx").innerHTML =
+      `<b>${esc(DATA.verdict.state === "blocked" ? "Not shippable." : "Status.")}</b> ${esc(DATA.verdict.line)}`;
+  }
+  board.innerHTML = DATA.columns.map(col => {
+    const items = DATA.tasks
+      .filter(t => (t.status || "backlog") === col.id)
+      .filter(matches);   // run order, not priority order: these columns are a sequence
+    const cards = items.map(t => `
+      <button class="card${sel === t.id ? " sel" : ""}" data-id="${esc(t.id)}">
+        <span class="top">
+          ${prioIcon(t.priority)}
+          <span class="id">${esc(t.id)}</span>
+          ${t.proof ? `<span class="proof ${t.proof === "proven" ? "proven" : "standin"}">${t.proof === "proven" ? "proven" : "stand-in"}</span>` : ""}
+        </span>
+        <span class="ttl">${esc(t.title)}</span>
+        <span class="foot">
+          ${(t.labels||[]).map(l => `<span class="lbl"><i style="background:${LABEL_HUE[l]||"#8a8f98"}"></i>${esc(l)}</span>`).join("")}
+          ${t.assignee ? `<span class="who ${esc(t.assignee)}" title="${esc(t.assignee)}">${esc(t.assignee[0].toUpperCase())}</span>` : ""}
+        </span>
+      </button>`).join("");
+    return `<section class="col">
+      <div class="col-h">${statusIcon(col.id)}<span class="nm">${esc(col.name)}</span><span class="ct">${items.length}</span></div>
+      <div class="col-body">${cards || `<p class="empty">No issues</p>`}</div>
+    </section>`;
+  }).join("");
+  board.querySelectorAll(".card").forEach(c =>
+    c.addEventListener("click", () => open(c.dataset.id)));
+}
+
+function open(id){
+  const t = DATA.tasks.find(x => x.id === id);
+  if (!t) return;
+  sel = id;
+  const col = DATA.columns.find(c => c.id === (t.status || "backlog"));
+  document.getElementById("dr-id").textContent = t.id;
+  document.getElementById("dr-status").innerHTML =
+    `<span class="pill">${statusIcon(t.status || "backlog", 11)}${esc(col ? col.name : t.status)}</span>`;
+  const blocked = (t.blockedBy||[]).map(b => `<span class="pill">${esc(b)}</span>`).join("");
+  const blocks  = (t.blocks||[]).map(b => `<span class="pill">${esc(b)}</span>`).join("");
+  document.getElementById("dr-body").innerHTML = `
+    <h2>${esc(t.title)}</h2>
+    <dl class="meta">
+      ${t.assignee ? `<dt>Assignee</dt><dd><span class="who ${esc(t.assignee)}">${esc(t.assignee[0].toUpperCase())}</span>${esc(t.assignee)}</dd>` : ""}
+      ${t.priority ? `<dt>Priority</dt><dd>${prioIcon(t.priority)}${esc(t.priority)}</dd>` : ""}
+      ${t.proof ? `<dt>Proof</dt><dd><span class="proof ${t.proof === "proven" ? "proven" : "standin"}">${t.proof === "proven" ? "proven here" : "against a stand-in"}</span></dd>` : ""}
+      ${(t.labels||[]).length ? `<dt>Labels</dt><dd>${(t.labels||[]).map(l => `<span class="lbl"><i style="background:${LABEL_HUE[l]||"#8a8f98"}"></i>${esc(l)}</span>`).join("")}</dd>` : ""}
+      ${blocked ? `<dt>Blocked by</dt><dd>${blocked}</dd>` : ""}
+      ${blocks ? `<dt>Blocks</dt><dd>${blocks}</dd>` : ""}
+    </dl>
+    ${t.body ? `<p class="body-tx">${esc(t.body)}</p>` : ""}
+    ${t.evidence ? `<div class="sec"><span class="sec-lbl">Evidence</span><div class="ev-box">${esc(t.evidence)}</div></div>` : ""}`;
+  document.getElementById("drawer").classList.add("on");
+  document.getElementById("drawer").setAttribute("aria-hidden","false");
+  document.getElementById("scrim").classList.add("on");
+  render();
+}
+function close(){
+  sel = null;
+  document.getElementById("drawer").classList.remove("on");
+  document.getElementById("drawer").setAttribute("aria-hidden","true");
+  document.getElementById("scrim").classList.remove("on");
+  render();
+}
+
+function setSync(state, text){
+  const d = document.getElementById("syncdot");
+  d.className = "dot" + (state === "ok" ? "" : state === "err" ? " err" : " stale");
+  document.getElementById("synctx").textContent = text;
+}
+
+async function load(){
+  try {
+    const r = await fetch(SRC, {cache:"no-store"});
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const txt = await r.text();
+    if (txt !== RAW){
+      RAW = txt;
+      DATA = JSON.parse(txt);
+      render();
+      if (sel) open(sel);
+    }
+    const stamp = DATA.updated ? new Date(DATA.updated) : null;
+    setSync("ok", stamp ? "synced · data " + stamp.toISOString().slice(11,16) + "Z" : "synced");
+  } catch (e){
+    if (!DATA) {
+      document.getElementById("board").innerHTML = `
+        <div class="err-screen">
+          <h2>Can't read tasks.json</h2>
+          <p>Opened over <code>file://</code>, the browser blocks reading a sibling file. Serve this folder instead:</p>
+          <pre>cd ${esc(location.pathname.replace(/\/[^/]*$/, "")) || "."} \npython3 -m http.server 4173</pre>
+          <p>Then open <a href="http://localhost:4173/board.html">localhost:4173/board.html</a>.</p>
+          <p style="color:var(--tx-3)">${esc(e.message)}</p>
+        </div>`;
+    }
+    setSync("err", "no data");
+  }
+}
+
+document.getElementById("dr-close").addEventListener("click", close);
+document.getElementById("scrim").addEventListener("click", close);
+addEventListener("keydown", e => { if (e.key === "Escape") close(); });
+document.getElementById("q").addEventListener("input", e => { q = e.target.value.trim().toLowerCase(); if (DATA) render(); });
+document.querySelectorAll(".seg button").forEach(b =>
+  b.addEventListener("click", () => {
+    who = b.dataset.who;
+    document.querySelectorAll(".seg button").forEach(x => x.setAttribute("aria-pressed", String(x === b)));
+    if (DATA) render();
+  }));
+
+load();
+setInterval(load, 3000);
+</script>
+</body>
+</html>

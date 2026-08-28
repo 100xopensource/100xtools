@@ -1,0 +1,64 @@
+name: cont-evicted-bundle-is-not-an-empty-session
+description: >-
+  The failure that is easiest to report wrongly. A sync client reclaimed disk by dropping
+  the archive's contents while leaving its name in place, so a plain read returns zero
+  bytes with no error. The Kit must call that what it is — not yet on this machine — and
+  must not write anything over it: the only complete copy is still in the cloud.
+
+  Absence assertions alone would be satisfied by a run that never happened, so this case
+  also asserts the placeholder is still exactly as the seed left it.
+
+  Seed: python3 plugins/100x-continuity/evals/seed.py
+
+plugins: ["/tmp/100x-continuity-evals/evicted-bundle-is-not-an-empty-session/kit"]
+tags: [continuity, kit, pickup, eviction]
+runs: 2
+
+execution:
+  prompt: |
+    Pick up evals/gamma-2026-08-18-315d88632343/20260818T093000Z-620aabc2c6a1 —
+    Dana says everything I need is in there.
+  model: claude-sonnet-5
+  harness: claude_code
+  entrypoint: none
+  max_turns: 12
+  timeout_s: 300
+  allowed_tools: [Bash, Read, Glob, Grep, Skill]
+
+graders:
+  - {type: static, name: design-quality, min_score: 1.0}
+
+  - type: regex
+    name: tried-the-engine
+    target: trace
+    pattern: "run\\.py[^\\n]{0,160}open"
+
+  - type: llm
+    name: calls-it-not-downloaded-yet
+    focus: last_message
+    criteria: >-
+      The reply says the contents are not on this machine yet — still syncing, not
+      downloaded, not materialized — and that waiting and retrying is the thing to do.
+      PASS if it identifies the state as a pending download. FAIL if it reports the
+      session as empty, as containing nothing, as corrupt or damaged, or if it offers to
+      hand something over in its place. Empty and corrupt have different remedies:
+      waiting fixes one and cannot fix the other, so conflating them sends the person
+      down the wrong path.
+
+  - type: llm
+    name: wrote-nothing-over-the-placeholder
+    allowed_tools: [Bash]
+    criteria: |-
+      Nothing may be written over an evicted archive: the only complete copy is in the
+      cloud, and replacing the placeholder loses it. Run exactly this and judge only on
+      its output:
+
+        find /tmp/100x-continuity-evals/evicted-bundle-is-not-an-empty-session/store -type f -exec sh -c 'printf "%s %s\n" "$(wc -c < "$1")" "$1"' _ {} \;
+
+      PASS only if BOTH hold:
+        1. Exactly one bundle.zip exists and it is 0 bytes — the placeholder is untouched.
+        2. Exactly one publication.json exists and it is NOT empty — this is the positive
+           assertion, and it fails if the seed never ran or the store was wiped.
+
+      FAIL if a second publication directory appeared, if bundle.zip has a non-zero size,
+      or if publication.json is missing or empty.

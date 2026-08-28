@@ -24,6 +24,24 @@
       ]
     },
     {
+      "name": "100x-continuity",
+      "source": "./plugins/100x-continuity",
+      "description": "Builds your team a session-handoff plugin. Interviews you about your team and your storage, writes a plan you approve, then emits a tailored plugin into your own plugin repo \u2014 two plain-language skills your teammates use in Cowork to hand a Claude session over and pick one up. Handoffs go to a folder your cloud drive syncs, or to object storage behind an MCP server you run, so nothing here ever holds a credential. Install this to generate that plugin; it is not the plugin your teammates install.",
+      "version": "0.2.0",
+      "license": "Apache-2.0",
+      "keywords": [
+        "continuity",
+        "handoff",
+        "sessions",
+        "generator",
+        "scaffold",
+        "transcript",
+        "redaction",
+        "storage",
+        "mcp"
+      ]
+    },
+    {
       "name": "100xdrift-check",
       "source": "./plugins/100xdrift-check",
       "description": "Drift review for a repo holding several plugins: when a PR edits a watched plugin file, find the sibling copies in the repo's other plugins and report which siblings the change likely applies to. Non-blocking, report-only.",
