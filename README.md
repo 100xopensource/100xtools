@@ -1,7 +1,8 @@
 # 100xtools
 
-**Two tools that check your Claude Code plugins for problems.** Open source, free to run,
-built while maintaining a plugin fleet in production.
+**Three tools for the Claude Code plugins you maintain.** Two check them for problems; the
+third builds your team a new one. Open source, free to run, built while maintaining a plugin
+fleet in production.
 
 A *plugin* is a folder of written instructions telling Claude how to do a job — and nothing
 checks instructions. No spell-check, no compiler, no test that goes red. Someone edits a
@@ -15,6 +16,7 @@ sentence, the plugin quietly gets worse, and you find out when a user complains.
 | *"Does my plugin still answer correctly after we edited it?"* | **[100xeval](./plugins/100xeval/README.md)** — testcases      | ~$1–2 per run                    |
 | *"Is anything obviously wrong with my plugin?"*               | **[100xeval](./plugins/100xeval/README.md)** — static check   | **Nothing.** No key, no internet |
 | *"A fix in one plugin never reached the others."*            | **[100xdrift-check](./plugins/100xdrift-check/README.md)**   | Claude usage per review          |
+| *"Someone has to carry on a teammate's session tomorrow."*    | **[100x-continuity](./plugins/100x-continuity/README.md)** — handoff Kit | Claude usage per setup |
 
 
 **100xeval is testcases for plugins.** You save the questions your plugin must get right and
@@ -22,6 +24,11 @@ run them after every change, so quality survives months of edits and more than o
 editing them. It also ships a free static check — a quick run-free pass over the files, useful
 on every commit, but it cannot tell you whether the plugin still *answers* correctly. Only a
 case does that.
+
+**100x-continuity is a factory, not the handoff itself.** You answer questions about your team
+and where your files live, and it writes a plugin — tailored to you, with your storage baked in
+— into your own plugin repo. Your teammates install *that* and use it in Cowork to hand a
+session over and pick one up. They never see this one.
 
 ## Start here
 
@@ -38,6 +45,7 @@ cd 100xtools
 claude plugin marketplace add ./
 claude plugin install 100xeval@100xtools
 claude plugin install 100xdrift-check@100xtools
+claude plugin install 100x-continuity@100xtools
 ```
 
 **Then just ask.** Open the folder your plugin is in and say what you want in plain words:
@@ -69,7 +77,8 @@ CHANGELOG.md                      releases + the scoring-version contract
 docs/                             OKF knowledge bundle — concepts, not how-to
 plugins/
 ├── 100xeval/                     eval engine + skill
-└── 100xdrift-check/              two install skills + the reviewer and workflow they install
+├── 100xdrift-check/              two install skills + the reviewer and workflow they install
+└── 100x-continuity/              factory: interviews you, emits your team's handoff Kit
 scripts/check_docs.py             OKF bundle conformance + link check (runs in CI)
 ```
 
