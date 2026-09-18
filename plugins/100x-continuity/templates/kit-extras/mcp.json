@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "{{SERVICE_NAME}}": {
+      "type": "http",
+      "url": "{{SERVER_URL}}"
+    }
+  }
+}

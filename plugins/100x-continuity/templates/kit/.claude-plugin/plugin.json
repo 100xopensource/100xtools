@@ -1,0 +1,13 @@
+{
+  "name": "{{KIT_NAME}}",
+  "description": "{{KIT_DESCRIPTION}}",
+  "version": "{{KIT_VERSION}}",
+  "author": {
+    "name": "{{ORG}}"
+  },
+  "keywords": [
+    "handoff",
+    "sessions",
+    "continuity"
+  ]
+}

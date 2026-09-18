@@ -1,0 +1,32 @@
+schema_version: "1.1"
+name: errors-stay-in-plain-words
+description: >
+  The failure path is where internal vocabulary leaks, because the engine's own wording
+  is right there to repeat. It carries two strings for exactly this reason: `say` for
+  the person, `hint` for whoever maintains it. This case checks the right one reaches
+  the chat.
+tags: [pick-up, language]
+plugins: ["../.."]
+runs: 3
+execution:
+  prompt: |
+    Open this for me — Dana says it's the one:
+    nowhere/no-such-session-000000000000/20260101T000000Z-aaaaaaaaaaaa
+  max_turns: 8
+  allowed_tools: [Bash, Read, Glob, Grep, Skill]
+graders:
+  - name: no-internal-vocabulary
+    type: regex
+    target: last_message
+    pattern: "\\b(bundle|transcript|namespace|publication|redact\\w*|manifest)\\b"
+    flags: "i"
+    match: not_contains
+  - name: still-said-something-useful
+    type: llm
+    focus: last_message
+    criteria: >
+      The reply tells the person, in ordinary words, that it could not open what they
+      pasted and what to do next, and it does not blame the person who sent it for
+      something that is not their fault. PASS if the failure and the next step are both
+      there. FAIL if it is silent about the failure, if it only prints a raw error with
+      no explanation, or if it says nothing was sent when the sending is not what failed.

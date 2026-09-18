@@ -22,6 +22,12 @@ import re
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DOCS = os.path.join(REPO, "docs")
 RESERVED = {"index.md", "log.md"}
+
+# `docs/adr/` is not part of the OKF bundle and is not checked against it. An ADR records
+# one decision and the trade behind it; an OKF concept doc explains a thing that exists.
+# Different genre, different format, and giving an ADR `type:` frontmatter to get it past
+# this checker would be dressing it up as something it is not. Its links are still checked.
+NOT_A_CONCEPT = {"adr"}
 OKF_VERSION = "0.2"
 ROOT_INDEX = os.path.join(DOCS, "index.md")
 
@@ -41,14 +47,28 @@ def read(path: str) -> str:
         return fh.read()
 
 
-def bundle_docs() -> list[str]:
+def _markdown_under(root: str, *, skip: set[str] = frozenset()) -> list[str]:
     out = []
-    for dirpath, dirnames, files in os.walk(DOCS):
-        dirnames.sort()
+    for dirpath, dirnames, files in os.walk(root):
+        dirnames[:] = sorted(d for d in dirnames if d not in skip)
         for fn in sorted(files):
             if fn.endswith(".md"):
                 out.append(os.path.join(dirpath, fn))
     return out
+
+
+def bundle_docs() -> list[str]:
+    """The OKF concept docs — what conformance is checked against."""
+    return _markdown_under(DOCS, skip=NOT_A_CONCEPT)
+
+
+def linkable_docs() -> list[str]:
+    """Every markdown file under docs/, ADRs included.
+
+    A broken link is a broken link whatever the genre, so the link check is deliberately
+    wider than the conformance check.
+    """
+    return _markdown_under(DOCS)
 
 
 def _frontmatter(text: str) -> tuple[dict, str | None]:
@@ -122,9 +142,9 @@ def check_okf_conformance() -> list[str]:
 
 
 def check_links() -> list[str]:
-    """Every relative link in the bundle must resolve to a real file."""
+    """Every relative link under docs/ must resolve to a real file."""
     errors = []
-    for path in bundle_docs():
+    for path in linkable_docs():
         rel = os.path.relpath(path, REPO)
         for target in _LINK.findall(read(path)):
             if target.startswith(("http://", "https://", "mailto:", "#")):
@@ -156,7 +176,10 @@ def main() -> int:
     if failed:
         print("\ndocs check failed")
         return 1
-    print(f"\ndocs check passed ({len(bundle_docs())} files)")
+    concepts, linked = len(bundle_docs()), len(linkable_docs())
+    adrs = linked - concepts
+    extra = f" + {adrs} ADR{'s' if adrs != 1 else ''}" if adrs else ""
+    print(f"\ndocs check passed ({concepts} concept files{extra})")
     return 0
 
 

@@ -1,0 +1,66 @@
+name: cont-continues-from-a-handle
+description: >-
+  The receiving half. A colleague sent a code; the Kit has to open it, verify it, and
+  report what that session was actually doing — including the open item it left behind,
+  which is the thing a summary invented from the code alone would miss.
+
+  The code is content-derived, so it changes whenever the fixture changes. The seed
+  prints the current one; if this case starts failing on a "not found", re-read it there
+  before suspecting the skill.
+
+  Seed: python3 plugins/100x-continuity/evals/seed.py
+
+plugins: ["/tmp/100x-continuity-evals/continues-from-a-handle/kit"]
+tags: [continuity, kit, pickup]
+runs: 2
+
+execution:
+  prompt: |
+    Dana sent me this to pick up:
+    evals/gamma-2026-08-18-315d88632343/20260818T093000Z-620aabc2c6a1
+
+    What was that work, and where did it leave off?
+  model: claude-sonnet-5
+  harness: claude_code
+  entrypoint: none
+  max_turns: 12
+  timeout_s: 300
+  allowed_tools: [Bash, Read, Glob, Grep, Skill]
+
+graders:
+  - {type: static, name: design-quality, min_score: 1.0}
+
+  # Positive assertion: it went through the engine rather than guessing from the code.
+  - type: regex
+    name: opened-it-through-the-engine
+    target: trace
+    pattern: "run\\.py[^\\n]{0,160}open"
+
+  - type: llm
+    name: reports-what-that-session-was-doing
+    focus: last_message
+    criteria: >-
+      The reply describes the seeded session's actual content, which is only available by
+      reading it: an Acme widget importer flag turned on for store 41 only, and a nightly
+      stock-count job still scheduled that must be dealt with before the flag widens. PASS
+      if both the flag-for-store-41 work and the still-scheduled nightly job appear. FAIL
+      if it reports only a generic summary, or if it describes the work without the open
+      item — the thing left undone is what a person picking this up most needs, and it
+      cannot be guessed from the code.
+
+  - type: llm
+    name: names-the-file-that-travelled
+    focus: last_message
+    criteria: >-
+      The reply mentions that a file came with the handoff, and names it (handover.md).
+      PASS if the file is named or its contents are described. FAIL if the reply covers
+      only the conversation and never mentions that anything else arrived.
+
+  - type: llm
+    name: does-not-claim-to-know-their-setup
+    focus: last_message
+    criteria: >-
+      PASS unless the reply asserts things a handoff cannot carry: what the sending
+      session cost, how many tokens it used, which tools or connectors were enabled, or
+      what its system prompt said. Those are deliberately never read. Saying that
+      information is not available passes; presenting invented values fails.
